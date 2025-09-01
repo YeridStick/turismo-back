@@ -1,0 +1,8 @@
+dependencies {
+    implementation project(':model')
+    implementation 'org.springframework:spring-context'
+
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    //implementation 'io.projectreactor:reactor-core'
+    implementation 'jakarta.mail:jakarta.mail-api'
+}

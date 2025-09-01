@@ -1,0 +1,45 @@
+server:
+  port: "${SERVER_PORT:8081}"
+spring:
+  application:
+    name: "${APP_NAME:portafolio}"
+  r2dbc:
+    postgresql:
+      host: "${DB_HOST:localhost}"
+      port: "${DB_PORT:5432}"
+      database: "${DB_NAME:turismo}"
+      schema: "${DB_SCHEMA:public}"
+      username: "${DB_USER:turismo}"
+      password: "${DB_PASSWORD:turismo}"
+  connection-pool:
+    initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
+    max-size: "${CONN_POOL_MAX_SIZE:15}"
+    max-idle-time: "${CONN_POOL_IDLE_TIME:30}"
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,prometheus"
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+cors:
+  allowed-origins: "http://localhost:4200,http://localhost:8080"
+logging:
+  level:
+    org.springframework.r2dbc: "${LOGGING_R2DBC:DEBUG}"
+    org.yeridstick: "${LOGGING_YERIDSTICK:DEBUG}"
+    root: "${LOGGING_ROOT:INFO}"
+security:
+  jwt:
+    secret: "${JWT_SECRET:cambia-esto-por-una-clave-de-32+caracteres-para-HS256}"
+email:
+  username: "${EMAIL_NAME:yeridstickramirez@gmail.com}"
+  password: "${PASSWORD_EMAIL:hzxx rvww ncht qyfq}"
+admin:
+  email: "${ADMIN_EMAIL:yeridstick3000@gmail.com}"
