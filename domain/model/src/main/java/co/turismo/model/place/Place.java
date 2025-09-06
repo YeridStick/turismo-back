@@ -14,7 +14,6 @@ import java.time.OffsetDateTime;
 @Builder(toBuilder = true)
 public class Place {
     private Long id;
-    private Long ownerUserId;
     private String name;
     private String description;
     private String category;

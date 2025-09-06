@@ -15,6 +15,9 @@ public class User {
     private String email;
     private String urlAvatar;
 
+    private String identificationType;
+    private String identificationNumber;
+
     private OffsetDateTime lockedUntil;
     private OffsetDateTime createdAt;
 

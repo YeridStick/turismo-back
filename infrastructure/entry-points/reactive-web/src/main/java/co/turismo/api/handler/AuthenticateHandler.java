@@ -1,6 +1,5 @@
 package co.turismo.api.handler;
 
-import co.turismo.api.Handler;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;

@@ -10,6 +10,7 @@ import reactor.core.publisher.Mono;
 
 public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, Long>,
         ReactiveQueryByExampleExecutor<UserData> {
+
     @Query("SELECT * FROM users WHERE lower(email)=lower(:email) LIMIT 1")
     Mono<UserData> findByEmail(@Param("email") String email);
 
@@ -22,7 +23,37 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     """)
     Flux<String> findRoleNamesByEmail(@Param("email") String email);
 
-    // ↑ OTP fallido: suma intento y bloquea si llegó al máximo
+    @Query("""
+        UPDATE users
+           SET full_name = COALESCE(:fullName, full_name),
+               url_avatar = COALESCE(:urlAvatar, url_avatar),
+               identification_type = COALESCE(:identificationType, identification_type),
+               identification_number = COALESCE(:identificationNumber, identification_number)
+         WHERE lower(email)=lower(:email)
+     RETURNING id, full_name, email, url_avatar, identification_type, identification_number,
+               otp_hash, otp_expires_at, otp_attempts, otp_max_attempts,
+               locked_until, last_login_at, created_at
+    """)
+    Mono<UserData> updateProfileByEmail(
+            @Param("email") String email,
+            @Param("fullName") String fullName,
+            @Param("urlAvatar") String urlAvatar,
+            @Param("identificationType") String identificationType,
+            @Param("identificationNumber") String identificationNumber
+    );
+
+    // Para confirmar cambio de correo tras OTP verificado (opcional)
+    @Query("""
+        UPDATE users
+           SET email = :newEmail
+         WHERE id = :userId
+     RETURNING id, full_name, email, url_avatar, identification_type, identification_number,
+               otp_hash, otp_expires_at, otp_attempts, otp_max_attempts,
+               locked_until, last_login_at, created_at
+    """)
+    Mono<UserData> updateEmailById(@Param("userId") Long userId, @Param("newEmail") String newEmail);
+
+    // ======= (tus métodos OTP existentes) =======
     @Query("""
         UPDATE users
            SET otp_attempts = otp_attempts + 1,
@@ -35,7 +66,6 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     """)
     Mono<Void> registerOtpFail(@Param("email") String email);
 
-    // ↑ Login exitoso: marca último acceso y limpia estados
     @Query("""
         UPDATE users
            SET last_login_at = NOW(),
@@ -45,7 +75,6 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     """)
     Mono<Void> registerSuccessfulLogin(@Param("email") String email);
 
-    // ↑ Si el bloqueo ya venció, limpia contador y bloqueo
     @Query("""
         UPDATE users
            SET otp_attempts = 0,

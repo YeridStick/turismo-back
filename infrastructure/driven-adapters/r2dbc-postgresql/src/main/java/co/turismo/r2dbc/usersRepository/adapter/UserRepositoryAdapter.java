@@ -1,11 +1,13 @@
 package co.turismo.r2dbc.usersRepository.adapter;
 
+import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.model.user.gateways.UserRepository;
 import co.turismo.r2dbc.helper.ReactiveAdapterOperations;
 import co.turismo.r2dbc.usersRepository.entity.UserData;
 import co.turismo.r2dbc.usersRepository.repository.UserAdapterRepository;
 import org.reactivecommons.utils.ObjectMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -23,8 +25,7 @@ public class UserRepositoryAdapter
 
     @Override
     public Mono<User> findByEmail(String email) {
-        return repository.findByEmail(email)
-                .map(this::toEntity);
+        return repository.findByEmail(email).map(this::toEntity);
     }
 
     @Override
@@ -53,15 +54,30 @@ public class UserRepositoryAdapter
     }
 
     @Override
-    public Mono<Void> registerOtpFail(String email){
-        return repository.registerOtpFail(email);
-    }
+    public Mono<Void> registerOtpFail(String email){ return repository.registerOtpFail(email); }
     @Override
-    public Mono<Void> registerSuccessfulLogin(String email){
-        return repository.registerSuccessfulLogin(email);
-    }
-    @Override public Mono<Void> resetLockIfExpired(String email){
-        return repository.resetLockIfExpired(email);
+    public Mono<Void> registerSuccessfulLogin(String email){ return repository.registerSuccessfulLogin(email); }
+    @Override
+    public Mono<Void> resetLockIfExpired(String email){ return repository.resetLockIfExpired(email); }
+
+    // ====== NUEVOS ======
+    @Override
+    public Mono<User> updateProfileByEmail(String email, UpdateUserProfileRequest patch) {
+        return repository.updateProfileByEmail(
+                        email,
+                        patch.getFullName(),
+                        patch.getUrlAvatar(),
+                        patch.getIdentificationType(),
+                        patch.getIdentificationNumber()
+                )
+                .map(this::toEntity);
     }
 
+    @Override
+    public Mono<User> updateEmailById(Long userId, String newEmail) {
+        return repository.updateEmailById(userId, newEmail)
+                .onErrorResume(DuplicateKeyException.class,
+                        e -> Mono.error(new IllegalArgumentException("El correo ya está en uso")))
+                .map(this::toEntity);
+    }
 }

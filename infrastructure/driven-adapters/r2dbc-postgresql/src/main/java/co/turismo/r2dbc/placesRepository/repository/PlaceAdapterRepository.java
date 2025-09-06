@@ -11,16 +11,16 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
 
     @Query("""
         INSERT INTO places(owner_user_id, name, description, category, geom, address, phone, website)
-        VALUES (:ownerId, :name, :description, :category,
+        VALUES (:ownerUserId, :name, :description, :category,
                 ST_SetSRID(ST_MakePoint(:lng, :lat), 4326),
                 :address, :phone, :website)
-        RETURNING id, owner_user_id AS ownerUserId, name, description, category,
+        RETURNING id, name, description, category,
                   ST_Y(geom) AS lat, ST_X(geom) AS lng,
                   address, phone, website,
                   is_verified AS isVerified, is_active AS isActive, created_at AS createdAt
     """)
     Mono<PlaceData> insertPlace(
-            @Param("ownerId") Long ownerId,
+            @Param("ownerUserId") Long ownerUserId,
             @Param("name") String name,
             @Param("description") String description,
             @Param("category") String category,
@@ -32,11 +32,14 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
     );
 
     @Query("""
-        SELECT p.id, p.owner_user_id AS ownerUserId, p.name, p.description, p.category,
+        SELECT p.id, p.name, p.description, p.category,
                ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
                p.address, p.phone, p.website,
-               p.is_verified AS isVerified, p.is_active AS isActive, p.created_at AS createdAt,
-               ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)) AS distanceMeters
+               p.is_verified, p.is_active, p.created_at,
+               ST_DistanceSphere(
+                 p.geom,
+                 ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+               ) AS distanceMeters
           FROM places p
          WHERE p.is_active = TRUE
            AND ST_DWithin(
@@ -53,6 +56,19 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             @Param("radiusMeters") double radiusMeters,
             @Param("limit") int limit
     );
+
+
+    @Query("""
+        SELECT p.id, p.name, p.description, p.category,
+               ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
+               p.address, p.phone, p.website,
+               p.is_verified, p.is_active, p.created_at
+          FROM places p
+          JOIN place_owners po ON po.place_id = p.id
+          JOIN users u         ON u.id = po.user_id
+         WHERE lower(u.email) = lower(:email)
+    """)
+    Flux<PlaceData> findMine(@Param("email") String email);
 
     @Query("""
         UPDATE places
@@ -73,17 +89,38 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             @Param("verifiedBy") Long verifiedBy
     );
 
-    @Query("""
+    @Query(
+        """
         UPDATE places
-           SET is_active = :active
-         WHERE id = :id
-     RETURNING id, owner_user_id AS ownerUserId, name, description, category,
-               ST_Y(geom) AS lat, ST_X(geom) AS lng,
-               address, phone, website,
-               is_verified AS isVerified, is_active AS isActive, created_at AS createdAt
+               SET is_active = :active
+             WHERE id = :id
+         RETURNING id, name, description, category,
+                   ST_Y(geom) AS lat, ST_X(geom) AS lng,
+                   address, phone, website,
+                   is_verified, is_active, created_at
+        """)
+    Mono<PlaceData> setActive(@Param("id") Long id, @Param("active") boolean active);
+
+
+    @Query("""
+        SELECT p.id, p.name, p.description, p.category,
+               ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
+               p.address, p.phone, p.website,
+               p.is_verified AS isVerified, p.is_active AS isActive, p.created_at AS createdAt
+          FROM places p
+          JOIN place_owners po ON po.place_id = p.id
+         WHERE po.user_id = :ownerId
+         ORDER BY p.created_at DESC
     """)
-    Mono<PlaceData> setActive(
-            @Param("id") Long id,
-            @Param("active") boolean active
-    );
+    Flux<PlaceData> findByOwnerId(@Param("ownerId") Long ownerId);
+
+    @Query("""
+        SELECT p.id, p.name, p.description, p.category,
+               ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
+               p.address, p.phone, p.website,
+               p.is_verified AS isVerified, p.is_active AS isActive, p.created_at AS createdAt
+          FROM places p
+         WHERE p.id = :id
+    """)
+    Mono<PlaceData> findOneProjected(@Param("id") Long id);
 }

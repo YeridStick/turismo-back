@@ -28,6 +28,12 @@ public class UserData {
     @Column("url_avatar")
     private String urlAvatar;
 
+    @Column("identification_type")
+    private String identificationType;
+
+    @Column("identification_number")
+    private String identificationNumber;
+
     @Column("otp_hash")
     private String otpHash;
 

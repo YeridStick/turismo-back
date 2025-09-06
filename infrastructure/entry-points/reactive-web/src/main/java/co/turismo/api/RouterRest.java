@@ -1,4 +1,3 @@
-// infrastructure/entry-points/reactive-web/src/main/java/co/turismo/api/RouterRest.java
 package co.turismo.api;
 
 import co.turismo.api.config.ConstantsEntryPoint;
@@ -27,13 +26,18 @@ public class RouterRest {
 
                 // Users
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.CREATEUSER, userHandler::createUser)
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USERS_ME_PATH, userHandler::updateMyProfile)
 
-                // Places
-                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_BASE_PATH,   placesHandler::create)
-                .GET (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH, placesHandler::findNearby)
+                // Places (público autenticado / owners)
+                .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_BASE_PATH,   placesHandler::create)
+                .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH, placesHandler::findNearby)
+                .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MINE_PATH,    placesHandler::myPlaces)
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ACTIVE_PATH,  placesHandler::setActive)
+                .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_OWNERS_PATH,  placesHandler::addOwner)
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_OWNER_DEL_PATH, placesHandler::removeOwner)
+
                 // Places - Admin
-                .PATCH(ConstantsEntryPoint.API_ADMIN + "/places/{id}/verify", placesHandler::verify)
-                .PATCH(ConstantsEntryPoint.API_ADMIN + "/places/{id}/active", placesHandler::setActive)
+                .PATCH(ConstantsEntryPoint.API_ADMIN + ConstantsEntryPoint.ADMIN_PLACES_VERIFY_PATH, placesHandler::verify)
 
                 .build();
     }

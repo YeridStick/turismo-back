@@ -1,9 +1,11 @@
 package co.turismo.api.handler;
 
+import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.usecase.user.UserUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -21,5 +23,15 @@ public class UserHandler {
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(response))
                 .onErrorResume(e -> ServerResponse.badRequest().build());
+    }
+
+    // PATCH /api/users/me  (actualiza perfil SIN tocar email)
+    public Mono<ServerResponse> updateMyProfile(ServerRequest req) {
+        return req.principal()
+                .cast(Authentication.class)
+                .map(Authentication::getName) // email autenticado
+                .zipWith(req.bodyToMono(UpdateUserProfileRequest.class))
+                .flatMap(t -> userUseCase.updateMyProfile(t.getT1(), t.getT2()))
+                .flatMap(u -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(u));
     }
 }

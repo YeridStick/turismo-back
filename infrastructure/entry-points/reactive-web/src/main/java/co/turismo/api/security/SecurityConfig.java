@@ -22,11 +22,9 @@ public class SecurityConfig {
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        // Tu proveedor de tokens + manager
         var tokenProvider = new JwtTokenProvider(jwtSecret);
         var authManager   = new JwtReactiveAuthenticationManager(tokenProvider);
 
-        // Filtro de autenticación Bearer (sin oauth2ResourceServer)
         var bearerConverter = new ServerBearerTokenAuthenticationConverter();
         var jwtFilter = new AuthenticationWebFilter(authManager);
         jwtFilter.setServerAuthenticationConverter(bearerConverter);
@@ -36,12 +34,25 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .authorizeExchange(ex -> ex
+                        // Público
                         .pathMatchers("/api/auth/**", "/actuator/health").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/api/places/**").permitAll()
-                        .pathMatchers(HttpMethod.POST,   "/api/places").hasRole("OWNER")
-                        .pathMatchers(HttpMethod.PUT,    "/api/places/**").hasRole("OWNER")
-                        .pathMatchers(HttpMethod.DELETE, "/api/places/**").hasRole("OWNER")
+                        .pathMatchers(HttpMethod.GET, "/api/places/nearby").permitAll()
+
+                        // Places: autenticado
+                        // Crear: OWNER o ADMIN
+                        .pathMatchers(HttpMethod.POST, "/api/places").hasAnyRole("OWNER", "ADMIN")
+                        // Listar "mis lugares"
+                        .pathMatchers(HttpMethod.GET, "/api/places/mine").authenticated()
+                        // Activar/desactivar: OWNER o ADMIN (adapter valida pertenencia del OWNER)
+                        .pathMatchers(HttpMethod.PATCH, "/api/places/*/active").hasAnyRole("OWNER", "ADMIN")
+                        // Gestionar co-owners: OWNER o ADMIN
+                        .pathMatchers(HttpMethod.POST,   "/api/places/*/owners").hasAnyRole("OWNER", "ADMIN")
+                        .pathMatchers(HttpMethod.DELETE, "/api/places/*/owners/**").hasAnyRole("OWNER", "ADMIN")
+
+                        // Admin
                         .pathMatchers("/admin/**").hasRole("ADMIN")
+
+                        // Resto: autenticado
                         .anyExchange().authenticated()
                 )
                 .addFilterAt(jwtFilter, AUTHENTICATION)
