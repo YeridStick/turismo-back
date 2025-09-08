@@ -26,6 +26,7 @@ public class RouterRest {
 
                 // Users
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.CREATEUSER, userHandler::createUser)
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.INFOUSER, userHandler::getInfoUser)
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USERS_ME_PATH, userHandler::updateMyProfile)
 
                 // Places (público autenticado / owners)

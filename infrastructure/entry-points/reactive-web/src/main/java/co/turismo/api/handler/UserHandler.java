@@ -22,6 +22,12 @@ public class UserHandler {
                 .flatMap(HttpResponses::ok);
     }
 
+    public Mono<ServerResponse> getInfoUser(ServerRequest request) {
+        String email = request.queryParam("userEmail").orElse("");
+        return userUseCase.getUserByEmail(email)
+                .flatMap(user -> ServerResponse.ok().bodyValue(user));
+    }
+
     public Mono<ServerResponse> updateMyProfile(ServerRequest req) {
         return req.principal()
                 .cast(Authentication.class)

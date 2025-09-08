@@ -21,5 +21,5 @@ public class User {
     private OffsetDateTime lockedUntil;
     private OffsetDateTime createdAt;
 
-    private Set<String> roles;
+    //private Set<String> roles;
 }

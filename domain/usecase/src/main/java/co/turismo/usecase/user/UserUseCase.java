@@ -22,4 +22,9 @@ public class UserUseCase {
     public Mono<User> confirmEmailChange(Long userId, String newEmail) {
         return userRepository.updateEmailById(userId, newEmail);
     }
+
+    public Mono<User> getUserByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
 }

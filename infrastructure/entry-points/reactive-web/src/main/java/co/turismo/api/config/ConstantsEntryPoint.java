@@ -12,6 +12,7 @@ public class ConstantsEntryPoint {
 
     // Users
     public static final String CREATEUSER = "/create/user";
+    public static final String INFOUSER = "/info/user";
     public static final String USERS_ME_PATH = "/users/me";
 
     // Places
