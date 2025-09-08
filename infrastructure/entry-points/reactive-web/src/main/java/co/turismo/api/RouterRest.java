@@ -29,12 +29,11 @@ public class RouterRest {
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USERS_ME_PATH, userHandler::updateMyProfile)
 
                 // Places (público autenticado / owners)
-                .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_BASE_PATH,   placesHandler::create)
-                .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH, placesHandler::findNearby)
-                .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MINE_PATH,    placesHandler::myPlaces)
-                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ACTIVE_PATH,  placesHandler::setActive)
-                .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_OWNERS_PATH,  placesHandler::addOwner)
-                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_OWNER_DEL_PATH, placesHandler::removeOwner)
+                .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_BASE_PATH,     placesHandler::create)
+                .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH,   placesHandler::findNearby)
+                .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MINE_PATH,     placesHandler::myPlaces)
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ACTIVE_PATH,   placesHandler::setActive)
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ID_PATH,       placesHandler::patch)
 
                 // Places - Admin
                 .PATCH(ConstantsEntryPoint.API_ADMIN + ConstantsEntryPoint.ADMIN_PLACES_VERIFY_PATH, placesHandler::verify)

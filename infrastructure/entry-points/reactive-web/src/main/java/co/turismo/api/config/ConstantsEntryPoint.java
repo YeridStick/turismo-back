@@ -19,8 +19,8 @@ public class ConstantsEntryPoint {
     public static final String PLACES_NEARBY_PATH  = "/places/nearby";
     public static final String PLACES_MINE_PATH    = "/places/mine";
     public static final String PLACES_ACTIVE_PATH  = "/places/{id}/active";
-    public static final String PLACES_OWNERS_PATH  = "/places/{id}/owners";
-    public static final String PLACES_OWNER_DEL_PATH = "/places/{id}/owners/{email}";
+    public static final String PLACES_ID_PATH = "/places/{id}";
+
 
     // Admin
     public static final String ADMIN_PLACES_VERIFY_PATH = "/places/{id}/verify";

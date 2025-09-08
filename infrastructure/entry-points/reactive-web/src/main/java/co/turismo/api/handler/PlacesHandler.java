@@ -1,5 +1,7 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.response.ApiResponse;
+import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.usecase.place.PlaceUseCase;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -11,45 +13,61 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class PlacesHandler {
 
     private final PlaceUseCase placeUseCase;
 
-    // POST /api/places
     public Mono<ServerResponse> create(ServerRequest req) {
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName) // ownerEmail autenticado
+                .map(Authentication::getName)               // ← email del owner autenticado
                 .switchIfEmpty(Mono.error(new IllegalStateException("Usuario no autenticado")))
                 .zipWith(req.bodyToMono(PlaceCreateRequest.class))
                 .flatMap(tuple -> {
                     String ownerEmail = tuple.getT1();
                     PlaceCreateRequest dto = tuple.getT2();
 
-                    if (dto.lat() == null || dto.lng() == null) {
+                    if (dto.lat() == null || dto.lng() == null)
                         return Mono.error(new IllegalArgumentException("lat y lng son obligatorios"));
-                    }
+                    if (dto.categoryId() == null)
+                        return Mono.error(new IllegalArgumentException("categoryId es obligatorio"));
 
-                    return placeUseCase.createPlaceForOwner(
-                            ownerEmail,
-                            dto.name(), dto.description(), dto.category(),
-                            dto.lat(), dto.lng(),
-                            dto.address(), dto.phone(), dto.website()
-                    );
+                    var cmd = CreatePlaceRequest.builder()
+                            .ownerEmail(ownerEmail)
+                            .name(dto.name())
+                            .description(dto.description())
+                            .categoryId(dto.categoryId())
+                            .lat(dto.lat())
+                            .lng(dto.lng())
+                            .address(dto.address())
+                            .phone(dto.phone())
+                            .website(dto.website())
+                            .imageUrls(dto.imageUrls())
+                            .build();
+
+                    return placeUseCase.createPlace(cmd);
                 })
                 .flatMap(place -> {
-                    var location = req.uriBuilder()
-                            .path("/{id}")
-                            .build(place.getId());
+                    var location = req.uriBuilder().path("/{id}").build(place.getId());
                     return ServerResponse.created(location)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(place);
+                            .bodyValue(ApiResponse.created(place));
                 });
     }
 
-    // GET /api/places/nearby?lat=..&lng=..&radiusMeters=..&limit=..
+    public Mono<ServerResponse> patch(ServerRequest req) {
+        long placeId = Long.parseLong(req.pathVariable("id"));
+        return req.bodyToMono(UpdateRequest.class)
+                .flatMap(dto -> placeUseCase.patch(placeId, dto.toDomain()))
+                .flatMap(place -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(place)));
+    }
+
     public Mono<ServerResponse> findNearby(ServerRequest req) {
         double lat = req.queryParam("lat").map(Double::parseDouble)
                 .orElseThrow(() -> new IllegalArgumentException("lat es obligatorio"));
@@ -62,41 +80,39 @@ public class PlacesHandler {
                 .orElse(1000.0);
 
         int limit = req.queryParam("limit").map(Integer::parseInt).orElse(20);
+        Long categoryId = req.queryParam("categoryId").map(Long::parseLong).orElse(null);
 
-        return placeUseCase.findNearby(lat, lng, radiusMeters, limit)
+        return placeUseCase.findNearby(lat, lng, radiusMeters, limit, categoryId)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(list));
+                        .bodyValue(ApiResponse.ok(list)));
     }
 
-    // PATCH /admin/places/{id}/verify   (ADMIN)
     public Mono<ServerResponse> verify(ServerRequest req) {
         long placeId = Long.parseLong(req.pathVariable("id"));
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName) // adminEmail (tu use case resuelve el id)
+                .map(Authentication::getName)
                 .zipWith(req.bodyToMono(VerifyRequest.class))
                 .flatMap(t -> placeUseCase.verifyPlaceByAdmin(t.getT1(), placeId, t.getT2().approve()))
                 .flatMap(place -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(place));
+                        .bodyValue(ApiResponse.ok(place)));
     }
 
-    // PATCH /api/places/{id}/active   (OWNER)
     public Mono<ServerResponse> setActive(ServerRequest req) {
         long placeId = Long.parseLong(req.pathVariable("id"));
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName) // ownerEmail
+                .map(Authentication::getName)
                 .zipWith(req.bodyToMono(ActiveRequest.class))
                 .flatMap(t -> placeUseCase.setActiveByOwner(t.getT1(), placeId, t.getT2().active()))
                 .flatMap(place -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(place));
+                        .bodyValue(ApiResponse.ok(place)));
     }
 
-    // GET /api/places/mine   (OWNER)
     public Mono<ServerResponse> myPlaces(ServerRequest req) {
         return req.principal()
                 .cast(Authentication.class)
@@ -105,39 +121,48 @@ public class PlacesHandler {
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(list));
+                        .bodyValue(ApiResponse.ok(list)));
     }
 
-    // POST /api/places/{id}/owners   body: { "email": "..." }  (OWNER/ADMIN según tu política)
-    public Mono<ServerResponse> addOwner(ServerRequest req) {
-        long placeId = Long.parseLong(req.pathVariable("id"));
-        return req.bodyToMono(OwnerEmailRequest.class)
-                .flatMap(body -> placeUseCase.addOwner(body.email(), placeId))
-                .then(ServerResponse.noContent().build());
-    }
-
-    // DELETE /api/places/{id}/owners/{email}  (OWNER/ADMIN)
-    public Mono<ServerResponse> removeOwner(ServerRequest req) {
-        long placeId = Long.parseLong(req.pathVariable("id"));
-        String email = req.pathVariable("email");
-        return placeUseCase.removeOwner(email, placeId)
-                .then(ServerResponse.noContent().build());
-    }
-
-    // DTOs
+    public record Message(String message) {}
     public record VerifyRequest(boolean approve) {}
     public record ActiveRequest(boolean active) {}
-
-    public record OwnerEmailRequest(@NotBlank String email) {}
 
     public record PlaceCreateRequest(
             @NotBlank String name,
             @NotBlank String description,
-            @NotBlank String category,
+            @NotNull  Long   categoryId,
             @NotNull  Double lat,
             @NotNull  Double lng,
             String address,
             String phone,
-            String website
+            String website,
+            String[] imageUrls
     ) {}
+
+    public record UpdateRequest(
+            String name,
+            String description,
+            Long categoryId,
+            Double lat,
+            Double lng,
+            String address,
+            String phone,
+            String website,
+            List<String> imageUrls
+    ) {
+        public co.turismo.model.place.UpdatePlaceRequest toDomain() {
+            return co.turismo.model.place.UpdatePlaceRequest.builder()
+                    .name(name)
+                    .description(description)
+                    .categoryId(categoryId)
+                    .lat(lat)
+                    .lng(lng)
+                    .address(address)
+                    .phone(phone)
+                    .website(website)
+                    .imageUrls(imageUrls == null ? null : imageUrls.toArray(String[]::new))
+                    .build();
+        }
+    }
 }

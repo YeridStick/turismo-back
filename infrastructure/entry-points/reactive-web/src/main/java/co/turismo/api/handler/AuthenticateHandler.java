@@ -1,5 +1,6 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -13,21 +14,18 @@ import reactor.core.publisher.Mono;
 public class AuthenticateHandler {
     private final AuthenticateUseCase authenticateUseCase;
 
+    // POST /api/auth/request-code
     public Mono<ServerResponse> sendVerificationCode(ServerRequest request) {
-        return request.bodyToMono(AuthenticateHandler.EmailRequest.class)
-                .flatMap(emailRequest -> authenticateUseCase.sendVerificationCode(emailRequest.getEmail()))
-                .flatMap(code -> ServerResponse.ok()
+        return request.bodyToMono(EmailRequest.class)
+                .flatMap(body -> authenticateUseCase.sendVerificationCode(body.email()))
+                .then(ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(new AuthenticateHandler.MessageResponse("Código enviado exitosamente")))
-                .onErrorResume(e -> {
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new AuthenticateHandler.MessageResponse(e.getMessage()));
-                });
+                        .bodyValue(ApiResponse.ok(new MessageResponse("Código enviado exitosamente"))));
     }
 
+    // POST /api/auth/verify-code
     public Mono<ServerResponse> authenticate(ServerRequest request) {
-        return request.bodyToMono(AuthenticateHandler.AuthRequest.class)
+        return request.bodyToMono(AuthRequest.class)
                 .flatMap(authReq -> {
                     String ip = request.remoteAddress()
                             .map(addr -> addr.getAddress().getHostAddress())
@@ -36,21 +34,12 @@ public class AuthenticateHandler {
                 })
                 .flatMap(token -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(new AuthenticateHandler.TokenResponse(token)))
-                .onErrorResume(e -> {
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new AuthenticateHandler.MessageResponse(e.getMessage()));
-                });
+                        .bodyValue(ApiResponse.ok(new TokenResponse(token))));
     }
 
-
+    // DTOs
     record AuthRequest(String email, String code) {}
     record TokenResponse(String token) {}
     record MessageResponse(String message) {}
-    record EmailRequest(String email) {
-        public String getEmail() {
-            return email;
-        }
-    }
+    record EmailRequest(String email) {}
 }

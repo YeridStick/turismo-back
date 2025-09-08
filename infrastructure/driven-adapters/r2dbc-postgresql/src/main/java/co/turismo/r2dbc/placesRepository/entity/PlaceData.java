@@ -6,18 +6,33 @@ import org.springframework.data.relational.core.mapping.Column;
 
 import java.time.OffsetDateTime;
 
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PlaceData {
+
     @Id
     private Long id;
+
+    @Column("owner_user_id")
+    private Long ownerUserId;
+
     private String name;
     private String description;
-    private String category;
+
+    @Column("category_id")
+    private Long categoryId;
+
     private Double lat;
     private Double lng;
+
     private String address;
     private String phone;
     private String website;
+
+    @Column("image_urls")
+    private String[] imageUrls;
 
     @Column("is_verified")
     private Boolean isVerified;
