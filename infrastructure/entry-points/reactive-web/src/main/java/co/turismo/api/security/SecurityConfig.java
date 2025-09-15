@@ -89,6 +89,9 @@ public class SecurityConfig {
                         // Público
                         .pathMatchers("/api/auth/**", "/actuator/health").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/places/nearby").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/places/all").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/places/search").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/pruebas/*").permitAll()
 
                         // Places
                         .pathMatchers(HttpMethod.POST, "/api/places").hasAnyRole("OWNER", "ADMIN")

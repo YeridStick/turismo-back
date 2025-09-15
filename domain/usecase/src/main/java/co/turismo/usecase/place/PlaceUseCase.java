@@ -24,6 +24,10 @@ public class PlaceUseCase {
         return placeRepository.findNearby(lat, lng, radiusMeters, limit, categoryId);
     }
 
+    public Flux<Place> findAllPlaces(){
+        return placeRepository.findAllPlace();
+    }
+
     public Mono<Place> verifyPlaceByAdmin(String adminEmail, long placeId, boolean approve) {
         return userRepository.findByEmail(adminEmail)
                 .switchIfEmpty(Mono.error(new RuntimeException("Admin no encontrado")))

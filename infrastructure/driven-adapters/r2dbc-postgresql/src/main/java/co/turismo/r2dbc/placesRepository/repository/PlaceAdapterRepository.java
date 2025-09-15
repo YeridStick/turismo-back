@@ -3,11 +3,13 @@ package co.turismo.r2dbc.placesRepository.repository;
 import co.turismo.r2dbc.placesRepository.entity.PlaceData;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.repository.query.ReactiveQueryByExampleExecutor;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData, Long> {
+public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData, Long> ,
+        ReactiveQueryByExampleExecutor<PlaceData> {
 
     // CREATE
     @Query("""
@@ -82,7 +84,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             @Param("categoryId") Long categoryId
     );
 
-    // SEARCH (texto libre + filtros + opcional cercanía)
+
     @Query("""
         SELECT
             p.id,
@@ -95,29 +97,77 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             p.image_urls,
             p.is_verified,
             p.is_active,
-            p.created_at,
-            CASE WHEN :lat IS NOT NULL AND :lng IS NOT NULL
-                 THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
-                 ELSE NULL END AS distance_meters
+            p.created_at
         FROM places p
+    """)
+    Flux<PlaceData> findAll();
+
+    @Query("""
+        WITH inp AS (
+          SELECT
+            NULLIF(
+              translate(lower(trim(:q)),
+                'áéíóúäëïöüñÁÉÍÓÚÄËÏÖÜÑ', 'aeiouaeiounaeiouaeioun'
+              ),
+              ''
+            ) AS qnorm
+        )
+        SELECT
+          p.id,
+          p.owner_user_id,
+          p.name, p.description,
+          p.category_id,
+          ST_Y(p.geom) AS lat,
+          ST_X(p.geom) AS lng,
+          p.address, p.phone, p.website,
+          p.image_urls,
+          p.is_verified,
+          p.is_active,
+          p.created_at,
+          CASE
+            WHEN :lat IS NOT NULL AND :lng IS NOT NULL
+            THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+            ELSE NULL
+          END AS distance_meters
+        FROM places p
+        CROSS JOIN inp
         WHERE p.is_active = TRUE
-          AND (:q IS NULL OR to_tsvector('spanish',
-                coalesce(p.name,'') || ' ' || coalesce(p.description,'') || ' ' || coalesce(p.address,'')
-              ) @@ plainto_tsquery('spanish', :q))
           AND (:categoryId IS NULL OR p.category_id = :categoryId)
-          AND ( (:onlyNearby = FALSE)
-                OR (:lat IS NOT NULL AND :lng IS NOT NULL AND :radiusMeters IS NOT NULL
-                    AND ST_DWithin(
-                          p.geom::geography,
-                          ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
-                          :radiusMeters
-                        )
-                   )
+          AND (
+            -- si q viene vacío -> no filtramos por texto
+            (SELECT qnorm FROM inp) IS NULL
+            OR
+            -- buscamos en nombre + dirección + descripción
+            translate(lower(coalesce(p.name,'') || ' ' || coalesce(p.address,'') || ' ' || coalesce(p.description,'')),
+                      'áéíóúäëïöüñÁÉÍÓÚÄËÏÖÜÑ', 'aeiouaeiounaeiouaeioun')
+            LIKE '%' || (SELECT qnorm FROM inp) || '%'
+          )
+          AND (
+            :onlyNearby = FALSE
+            OR (
+              :lat IS NOT NULL AND :lng IS NOT NULL AND :radiusMeters IS NOT NULL
+              AND ST_DWithin(
+                p.geom::geography,
+                ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
+                :radiusMeters
               )
+            )
+          )
         ORDER BY
-          CASE WHEN :lat IS NOT NULL AND :lng IS NOT NULL
-               THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+          -- si pediste solo cercanos con coords: primero por distancia
+          CASE
+            WHEN :onlyNearby = TRUE AND :lat IS NOT NULL AND :lng IS NOT NULL
+            THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
           END ASC NULLS LAST,
+          -- si no hay cercanía, aproxima relevancia: posición de la subcadena (más adelante = peor)
+          NULLIF(
+            position(
+              (SELECT qnorm FROM inp) IN
+              translate(lower(coalesce(p.name,'') || ' ' || coalesce(p.address,'') || ' ' || coalesce(p.description,'')),
+                        'áéíóúäëïöüñÁÉÍÓÚÄËÏÖÜÑ', 'aeiouaeiounaeiouaeioun')
+            ),
+            0
+          ) ASC NULLS LAST,
           p.created_at DESC
         LIMIT :limit
         OFFSET :offset

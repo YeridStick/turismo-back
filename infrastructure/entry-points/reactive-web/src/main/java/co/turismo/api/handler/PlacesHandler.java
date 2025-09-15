@@ -2,6 +2,7 @@ package co.turismo.api.handler;
 
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.model.place.CreatePlaceRequest;
+import co.turismo.model.place.Place;
 import co.turismo.usecase.place.PlaceUseCase;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -87,6 +88,46 @@ public class PlacesHandler {
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(list)));
+    }
+
+    public Mono<ServerResponse> search(ServerRequest req) {
+        String q = req.queryParam("q").orElse(null);
+        Long categoryId = req.queryParam("categoryId").map(Long::parseLong).orElse(null);
+
+        boolean onlyNearby = req.queryParam("onlyNearby").map(Boolean::parseBoolean).orElse(false);
+        Double lat = req.queryParam("lat").map(Double::parseDouble).orElse(null);
+        Double lng = req.queryParam("lng").map(Double::parseDouble).orElse(null);
+        Double radiusMeters = req.queryParam("radiusMeters")
+                .or(() -> req.queryParam("r"))
+                .map(Double::parseDouble)
+                .orElse(null);
+
+        int page = req.queryParam("page").map(Integer::parseInt).orElse(0);
+        int size = req.queryParam("size").map(Integer::parseInt).orElse(20);
+
+        // Validaciones mínimas
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
+
+        if (onlyNearby) {
+            if (lat == null || lng == null || radiusMeters == null) {
+                return Mono.error(new IllegalArgumentException(
+                        "Para onlyNearby=true debes enviar lat, lng y radiusMeters"));
+            }
+        }
+
+        return placeUseCase.search(q, categoryId, onlyNearby, lat, lng, radiusMeters, page, size)
+                .collectList()
+                .flatMap(list -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(list)));
+    }
+
+    public Mono<ServerResponse> findAllPlaces(ServerRequest request) {
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(placeUseCase.findAllPlaces(), Place.class);
     }
 
     public Mono<ServerResponse> verify(ServerRequest req) {
