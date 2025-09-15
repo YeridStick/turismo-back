@@ -69,6 +69,13 @@ public class PlacesHandler {
                         .bodyValue(ApiResponse.ok(place)));
     }
 
+    public Mono<ServerResponse> findByIdPlace(ServerRequest req) {
+        long placeId = Long.parseLong(req.pathVariable("id"));
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(placeUseCase.findByIdPlace(placeId), Place.class);
+    }
+
     public Mono<ServerResponse> findNearby(ServerRequest req) {
         double lat = req.queryParam("lat").map(Double::parseDouble)
                 .orElseThrow(() -> new IllegalArgumentException("lat es obligatorio"));

@@ -132,4 +132,9 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
     public Mono<Void> removeOwnerFromPlace(String ownerEmailToRemove, long placeId) {
         return Mono.error(new UnsupportedOperationException("Co‑owners no soportados en la nueva lógica"));
     }
+
+    @Override
+    public Mono<Place> findByPlaces(Long id) {
+        return findById(id);
+    }
 }

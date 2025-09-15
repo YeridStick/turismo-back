@@ -91,6 +91,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET,  "/api/places/nearby").permitAll()
                         .pathMatchers(HttpMethod.GET,  "/api/places/all").permitAll()
                         .pathMatchers(HttpMethod.GET,  "/api/places/search").permitAll()
+                        .pathMatchers(HttpMethod.GET,   "/api/places/{id}").permitAll()
 
                         // PRUEBAS (abrimos explícitamente los endpoints de visitas)
                         .pathMatchers(HttpMethod.POST,  "/api/pruebas/places/*/checkin").permitAll()         // <- público

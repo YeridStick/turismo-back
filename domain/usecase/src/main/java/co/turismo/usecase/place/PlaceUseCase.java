@@ -51,6 +51,11 @@ public class PlaceUseCase {
         return placeRepository.search(q, categoryId, onlyNearby, lat, lng, radiusMeters, page, size);
     }
 
+    public Mono<Place> findByIdPlace(long id) {
+        return placeRepository.findByPlaces(id)
+                .switchIfEmpty(Mono.error(new RuntimeException("Place no encontrado")));
+    }
+
     public Mono<Place> setActive(long placeId, boolean active) {
         return placeRepository.setActive(placeId, active);
     }

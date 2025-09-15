@@ -358,4 +358,22 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
     Mono<PlaceData> setActiveIfOwner(@Param("placeId") Long placeId,
                                      @Param("active")  Boolean active,
                                      @Param("ownerId") Long ownerId);
+
+    @Query("""
+        SELECT
+            p.id,
+            p.owner_user_id,
+            p.name, p.description,
+            p.category_id,
+            ST_Y(p.geom) AS lat,
+            ST_X(p.geom) AS lng,
+            p.address, p.phone, p.website,
+            p.image_urls,
+            p.is_verified,
+            p.is_active,
+            p.created_at
+        FROM places p
+        WHERE p.id = :id
+    """)
+    Mono<PlaceData> findById(@Param("id") Long id);
 }

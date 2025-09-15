@@ -19,4 +19,5 @@ public interface PlaceRepository {
     Mono<Void>  addOwnerToPlace(String ownerEmailToAdd, long placeId);
     Mono<Void>  removeOwnerFromPlace(String ownerEmailToRemove, long placeId);
     Flux<Place> findPlacesByOwnerEmail(String ownerEmail);
+    Mono<Place> findByPlaces(Long id);
 }
