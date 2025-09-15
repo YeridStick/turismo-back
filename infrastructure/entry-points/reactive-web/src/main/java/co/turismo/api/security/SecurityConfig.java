@@ -88,16 +88,23 @@ public class SecurityConfig {
                 .authorizeExchange(ex -> ex
                         // Público
                         .pathMatchers("/api/auth/**", "/actuator/health").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/api/places/nearby").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/api/places/all").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/api/places/search").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/api/pruebas/*").permitAll()
+                        .pathMatchers(HttpMethod.GET,  "/api/places/nearby").permitAll()
+                        .pathMatchers(HttpMethod.GET,  "/api/places/all").permitAll()
+                        .pathMatchers(HttpMethod.GET,  "/api/places/search").permitAll()
+
+                        // PRUEBAS (abrimos explícitamente los endpoints de visitas)
+                        .pathMatchers(HttpMethod.POST,  "/api/pruebas/places/*/checkin").permitAll()         // <- público
+                        .pathMatchers(HttpMethod.PATCH, "/api/pruebas/visits/*/confirm").authenticated()     // si quieres público, cambia a .permitAll()
+                        .pathMatchers(HttpMethod.GET,   "/api/pruebas/analytics/places/top").permitAll()     // <- **público** (lo que pediste)
+
+                        // Si quieres abrir TODO lo de /api/pruebas/ a público, puedes añadir:
+                        .pathMatchers("/api/pruebas/**").permitAll()
 
                         // Places
-                        .pathMatchers(HttpMethod.POST, "/api/places").hasAnyRole("OWNER", "ADMIN")
-                        .pathMatchers(HttpMethod.GET,  "/api/places/mine").authenticated()
-                        .pathMatchers(HttpMethod.PATCH,"/api/places/*/active").hasAnyRole("OWNER", "ADMIN")
-                        .pathMatchers(HttpMethod.POST, "/api/places/*/owners").hasAnyRole("OWNER", "ADMIN")
+                        .pathMatchers(HttpMethod.POST,  "/api/places").hasAnyRole("OWNER", "ADMIN")
+                        .pathMatchers(HttpMethod.GET,   "/api/places/mine").authenticated()
+                        .pathMatchers(HttpMethod.PATCH, "/api/places/*/active").hasAnyRole("OWNER", "ADMIN")
+                        .pathMatchers(HttpMethod.POST,  "/api/places/*/owners").hasAnyRole("OWNER", "ADMIN")
                         .pathMatchers(HttpMethod.DELETE,"/api/places/*/owners/**").hasAnyRole("OWNER", "ADMIN")
 
                         // Admin

@@ -1,5 +1,6 @@
 package co.turismo.r2dbc.visitsRepository.repository;
 
+import co.turismo.r2dbc.visitsRepository.dto.TopPlaceRowDto;
 import co.turismo.r2dbc.visitsRepository.entity.PlaceVisitData;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -7,6 +8,8 @@ import org.springframework.data.repository.query.ReactiveQueryByExampleExecutor;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.time.LocalDate;
 
 public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, Long>,
         ReactiveQueryByExampleExecutor<PlaceVisitData> {
@@ -68,21 +71,17 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
     Mono<Void> upsertDaily(@Param("placeId") Long placeId);
 
     @Query("""
-        SELECT p.id AS place_id, p.name, SUM(d.visits) AS visits
-          FROM place_visit_daily d
-          JOIN places p ON p.id = d.place_id
-         WHERE d.day BETWEEN :from AND :to
-         GROUP BY p.id, p.name
-         ORDER BY visits DESC
-         LIMIT :limit
-      """)
-    Flux<TopPlaceRow> topPlaces(@Param("from") String fromDate,
-                                @Param("to") String toDate,
-                                @Param("limit") int limit);
-
-    interface TopPlaceRow {
-        Long getPlace_id();
-        String getName();
-        Integer getVisits();
-    }
+      SELECT p.id AS placeId,
+             p.name AS name,
+             SUM(d.visits)::int AS visits
+        FROM place_visit_daily d
+        JOIN places p ON p.id = d.place_id
+       WHERE d.day BETWEEN :from AND :to
+       GROUP BY p.id, p.name
+       ORDER BY visits DESC
+       LIMIT :limit
+    """)
+    Flux<TopPlaceRowDto> topPlaces(@Param("from") LocalDate from,
+                                   @Param("to")   LocalDate to,
+                                   @Param("limit") int limit);
 }

@@ -93,8 +93,8 @@ public class VisitRepositoryAdapter
 
     @Override
     public Flux<TopPlace> topPlaces(LocalDate from, LocalDate to, int limit) {
-        return repository.topPlaces(from.toString(), to.toString(), limit)
-                .map(r -> new TopPlace(r.getPlace_id(), r.getName(), r.getVisits()));
+        return repository.topPlaces(from, to, limit)
+                .map(r -> new TopPlace(r.getPlaceId(), r.getName(), r.getVisits()));
     }
 
     @Override
