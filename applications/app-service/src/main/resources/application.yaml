@@ -29,7 +29,7 @@ management:
       probes:
         enabled: true
 cors:
-  allowed-origins: "http://localhost:4200,http://localhost:8080,http://localhost:5173"
+  allowed-origins: "http://localhost:4200,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app/"
 logging:
   level:
     org.springframework.r2dbc: "${LOGGING_R2DBC:DEBUG}"
