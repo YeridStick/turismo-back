@@ -4,7 +4,10 @@ import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.model.user.gateways.UserRepository;
 import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import javax.swing.plaf.LabelUI;
 
 @RequiredArgsConstructor
 public class UserUseCase {
@@ -27,4 +30,8 @@ public class UserUseCase {
         return userRepository.findByEmail(email);
     }
 
+    public Flux<User> getAllUsers() {
+        return userRepository.findAllUser()
+                .switchIfEmpty(Flux.error(new Exception("No se encontraron usuarios")));
+    }
 }

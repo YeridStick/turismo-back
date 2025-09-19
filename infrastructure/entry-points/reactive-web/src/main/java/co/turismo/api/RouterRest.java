@@ -23,12 +23,15 @@ public class RouterRest {
     ) {
         return route()
                 // Auth
-                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_REQUEST_CODE_PATH, authenticateHandler::sendVerificationCode)
-                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_VERIFY_CODE_PATH,  authenticateHandler::authenticate)
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_STATUS_PATH, authenticateHandler::totpStatus)
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_SETUP_PATH,   authenticateHandler::totpSetup)
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_CONFIRM_PATH, authenticateHandler::totpConfirm)
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_LOGIN_TOTP_PATH,   authenticateHandler::loginTotp)
 
                 // Users
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.CREATEUSER, userHandler::createUser)
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.INFOUSER, userHandler::getInfoUser)
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.ALLUSER, userHandler::getAllUsers)
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USERS_ME_PATH, userHandler::updateMyProfile)
 
                 // Places (público autenticado / owners)

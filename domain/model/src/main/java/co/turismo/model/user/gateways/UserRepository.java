@@ -23,4 +23,5 @@ public interface UserRepository {
 
     /** Útil para “confirmar” cambio de correo DESPUÉS de validar OTP por otro flujo. */
     Mono<User> updateEmailById(Long userId, String newEmail);
+    Flux<User> findAllUser();
 }

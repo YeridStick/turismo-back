@@ -22,17 +22,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuthenticateGateway implements AuthenticationSessionRepository {
 
-    private final Cache<String, String> verificationCodesCache;
     private final Cache<String, AuthenticationSession> sessionCache;
 
-    @Value("${security.jwt.secret}")              private String jwtSecret;
-    @Value("${security.jwt.issuer:turismo-app}")  private String jwtIssuer;
-    @Value("${security.jwt.ttl-hours:4}")         private long jwtTtlHours;
-
-    @Value("${admin.email}") private String adminEmail;
+    @Value("${security.jwt.secret}")             private String jwtSecret;       // >= 32 chars
+    @Value("${security.jwt.issuer:turismo-app}") private String jwtIssuer;
+    @Value("${security.jwt.ttl-hours:4}")        private long jwtTtlHours;
+    @Value("${security.session.bind-ip:false}")  private boolean bindIp;        // opcional
 
     /**
-     * Genera JWT con lista de roles y crea sesión temporal.
+     * Genera JWT con lista de roles y crea sesión en caché.
      */
     @Override
     public Mono<String> generateToken(String email, Set<String> roles, String ip) {
@@ -41,12 +39,13 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
 
         final String token = generateJWT(normEmail, normalizedRoles);
 
+        final LocalDateTime expiresAt = LocalDateTime.now().plus(Duration.ofHours(jwtTtlHours));
         AuthenticationSession session = AuthenticationSession.builder()
                 .token(token)
                 .email(normEmail)
                 .roles(normalizedRoles)
-                .ip(ip)
-                .expirationTime(LocalDateTime.now().plus(Duration.ofHours(jwtTtlHours)))
+                .ip(bindIp ? ip : null) // sólo ata a IP si está habilitado
+                .expirationTime(expiresAt)
                 .isValid(true)
                 .build();
 
@@ -54,55 +53,46 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
         return Mono.just(token);
     }
 
+    /**
+     * Valida que la sesión exista, no esté vencida y (opcional) coincida la IP.
+     * Nota: si quieres además validar criptográficamente el JWT en cada request,
+     * hazlo en un WebFilter leyendo el header y verificando firma/exp con jjwt.
+     */
     @Override
     public Mono<Boolean> validateToken(String token, String ip) {
         return Mono.justOrEmpty(sessionCache.getIfPresent(token))
-                .filter(session -> session.isValid()
-                        && LocalDateTime.now().isBefore(session.getExpirationTime())
-                        && (session.getIp() == null || session.getIp().equals(ip)))
+                .filter(s -> s.isValid()
+                        && LocalDateTime.now().isBefore(s.getExpirationTime())
+                        && (!bindIp || s.getIp() == null || Objects.equals(s.getIp(), ip)))
                 .map(s -> true)
                 .switchIfEmpty(Mono.fromRunnable(() -> sessionCache.invalidate(token)).thenReturn(false));
     }
 
-    @Override
-    public Mono<Void> storeCode(String email, String code) {
-        verificationCodesCache.put(normalize(email), code);
-        return Mono.empty();
-    }
+    // --------- Métodos legacy de OTP por email (no se usan con TOTP) ---------
+    @Override public Mono<Void> storeCode(String email, String code) { return Mono.empty(); }
+    @Override public Mono<String> getStoredCode(String email) { return Mono.empty(); }
+    @Override public Mono<Void> invalidateCode(String email) { return Mono.empty(); }
 
+    // Si tu interfaz aún exige adminEmail pero ya no lo usas, devuélvelo vacío o elimínalo del contrato
+    @Deprecated
     @Override
-    public Mono<String> getStoredCode(String email) {
-        return Mono.justOrEmpty(verificationCodesCache.getIfPresent(normalize(email)));
-    }
+    public String getAdminEmail() { return null; }
 
-    @Override
-    public Mono<Void> invalidateCode(String email) {
-        verificationCodesCache.invalidate(normalize(email));
-        return Mono.empty();
-    }
-
-    /**
-     * Genera un JWT firmado con HS256 que incluye claim "roles".
-     */
+    // -------------------- helpers --------------------
     private String generateJWT(String email, Set<String> roles) {
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         Instant now = Instant.now();
         Instant exp = now.plus(Duration.ofHours(jwtTtlHours));
 
         return Jwts.builder()
-                .id(UUID.randomUUID().toString()) // jti
-                .issuer(jwtIssuer)
-                .subject(email)
-                .claim("roles", new ArrayList<>(roles)) // claim "roles": ["ADMIN", "OWNER"]
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(exp))
-                .signWith(key) // HS256
+                .id(UUID.randomUUID().toString())       // jti
+                .issuer(jwtIssuer)                      // iss
+                .subject(email)                         // sub
+                .claim("roles", new ArrayList<>(roles)) // roles: ["admin","owner",...]
+                .issuedAt(Date.from(now))               // iat
+                .expiration(Date.from(exp))             // exp
+                .signWith(key)                          // HS256
                 .compact();
-    }
-
-    @Override
-    public String getAdminEmail() {
-        return normalize(adminEmail);
     }
 
     private static String normalize(String s) {

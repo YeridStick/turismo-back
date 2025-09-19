@@ -1,10 +1,12 @@
 package co.turismo.api.handler;
 
 import co.turismo.api.http.HttpResponses;
+import co.turismo.model.place.Place;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.usecase.user.UserUseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -35,5 +37,11 @@ public class UserHandler {
                 .zipWith(req.bodyToMono(UpdateUserProfileRequest.class))
                 .flatMap(t -> userUseCase.updateMyProfile(t.getT1(), t.getT2()))
                 .flatMap(HttpResponses::ok);
+    }
+
+    public Mono<ServerResponse> getAllUsers(ServerRequest req) {
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(userUseCase.getAllUsers(), User.class);
     }
 }

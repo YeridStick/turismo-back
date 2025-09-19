@@ -1,44 +1,31 @@
 package co.turismo.config;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.RegexPatternTypeFilter;
+
+import java.util.Set;
+import java.util.regex.Pattern;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class UseCasesConfigTest {
 
     @Test
-    void testUseCaseBeansExist() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestConfig.class)) {
-            String[] beanNames = context.getBeanDefinitionNames();
+    void testUseCaseClassesAreDiscoveredByScan() {
+        // Mismo criterio que tu UseCasesConfig:
+        // basePackages = "co.turismo.usecase"
+        // includeFilters REGEX "^.+UseCase$"
+        ClassPathScanningCandidateComponentProvider scanner =
+                new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(
+                new RegexPatternTypeFilter(Pattern.compile("^.+UseCase$"))
+        );
 
-            boolean useCaseBeanFound = false;
-            for (String beanName : beanNames) {
-                if (beanName.endsWith("UseCase")) {
-                    useCaseBeanFound = true;
-                    break;
-                }
-            }
+        Set<org.springframework.beans.factory.config.BeanDefinition> candidates =
+                scanner.findCandidateComponents("co.turismo.usecase");
 
-            assertTrue(useCaseBeanFound, "No beans ending with 'Use Case' were found");
-        }
-    }
-
-    @Configuration
-    @Import(UseCasesConfig.class)
-    static class TestConfig {
-
-        @Bean
-        public MyUseCase myUseCase() {
-            return new MyUseCase();
-        }
-    }
-
-    static class MyUseCase {
-        public String execute() {
-            return "MyUseCase Test";
-        }
+        // Aserción: deben existir clases que terminen en UseCase
+        assertFalse(candidates.isEmpty(), "No se encontraron clases *UseCase* bajo co.turismo.usecase");
     }
 }

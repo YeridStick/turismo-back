@@ -7,12 +7,15 @@ public class ConstantsEntryPoint {
     public static final String API_ADMIN     = "/admin";
 
     // Auth
-    public static final String AUTH_REQUEST_CODE_PATH = "/auth/request-code";
-    public static final String AUTH_VERIFY_CODE_PATH  = "/auth/verify-code";
+    public static final String AUTH_TOTP_SETUP_PATH   = "/auth/code/setup";
+    public static final String AUTH_TOTP_CONFIRM_PATH = "/auth/code/confirm";
+    public static final String AUTH_LOGIN_TOTP_PATH   = "/auth/login-code";
+    public static final String AUTH_TOTP_STATUS_PATH = "/auth/code/status";
 
     // Users
-    public static final String CREATEUSER = "/create/user";
+    public static final String CREATEUSER = "/auth/create/user";
     public static final String INFOUSER = "/info/user";
+    public static final String ALLUSER = "/admin/all/user";
     public static final String USERS_ME_PATH = "/users/me";
 
     // Places

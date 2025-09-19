@@ -104,26 +104,18 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
 
     @Query("""
         WITH inp AS (
-          SELECT
-            NULLIF(
-              translate(lower(trim(:q)),
-                'áéíóúäëïöüñÁÉÍÓÚÄËÏÖÜÑ', 'aeiouaeiounaeiouaeioun'
-              ),
-              ''
-            ) AS qnorm
+          SELECT NULLIF(
+            regexp_replace(
+              replace(unaccent(lower(trim(:q))), chr(160), ' '), -- NBSP->espacio
+              '\\s+', ' ', 'g'
+            ),
+            ''
+          ) AS qnorm
         )
         SELECT
-          p.id,
-          p.owner_user_id,
-          p.name, p.description,
-          p.category_id,
-          ST_Y(p.geom) AS lat,
-          ST_X(p.geom) AS lng,
-          p.address, p.phone, p.website,
-          p.image_urls,
-          p.is_verified,
-          p.is_active,
-          p.created_at,
+          p.id, p.owner_user_id, p.name, p.description, p.category_id,
+          ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
+          p.address, p.phone, p.website, p.image_urls, p.is_verified, p.is_active, p.created_at,
           CASE
             WHEN :lat IS NOT NULL AND :lng IS NOT NULL
             THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
@@ -134,13 +126,12 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
         WHERE p.is_active = TRUE
           AND (:categoryId IS NULL OR p.category_id = :categoryId)
           AND (
-            -- si q viene vacío -> no filtramos por texto
             (SELECT qnorm FROM inp) IS NULL
             OR
-            -- buscamos en nombre + dirección + descripción
-            translate(lower(coalesce(p.name,'') || ' ' || coalesce(p.address,'') || ' ' || coalesce(p.description,'')),
-                      'áéíóúäëïöüñÁÉÍÓÚÄËÏÖÜÑ', 'aeiouaeiounaeiouaeioun')
-            LIKE '%' || (SELECT qnorm FROM inp) || '%'
+            regexp_replace(
+              replace(unaccent(lower(coalesce(p.name,'') || ' ' || coalesce(p.address,'') || ' ' || coalesce(p.description,''))), chr(160), ' '),
+              '\\s+', ' ', 'g'
+            ) LIKE '%' || (SELECT qnorm FROM inp) || '%'
           )
           AND (
             :onlyNearby = FALSE
@@ -154,17 +145,17 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             )
           )
         ORDER BY
-          -- si pediste solo cercanos con coords: primero por distancia
           CASE
             WHEN :onlyNearby = TRUE AND :lat IS NOT NULL AND :lng IS NOT NULL
-            THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+              THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
           END ASC NULLS LAST,
-          -- si no hay cercanía, aproxima relevancia: posición de la subcadena (más adelante = peor)
           NULLIF(
             position(
               (SELECT qnorm FROM inp) IN
-              translate(lower(coalesce(p.name,'') || ' ' || coalesce(p.address,'') || ' ' || coalesce(p.description,'')),
-                        'áéíóúäëïöüñÁÉÍÓÚÄËÏÖÜÑ', 'aeiouaeiounaeiouaeioun')
+              regexp_replace(
+                replace(unaccent(lower(coalesce(p.name,'') || ' ' || coalesce(p.address,'') || ' ' || coalesce(p.description,''))), chr(160), ' '),
+                '\\s+', ' ', 'g'
+              )
             ),
             0
           ) ASC NULLS LAST,

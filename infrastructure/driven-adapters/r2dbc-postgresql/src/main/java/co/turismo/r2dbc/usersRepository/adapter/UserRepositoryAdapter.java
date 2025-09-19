@@ -36,8 +36,12 @@ public class UserRepositoryAdapter
     @Override
     public Mono<Boolean> isActiveByEmail(String email) {
         return repository.findByEmail(email)
-                .map(u -> u.getLockedUntil() == null || OffsetDateTime.now().isAfter(u.getLockedUntil()))
-                .defaultIfEmpty(false);
+                .map(u -> {
+                    boolean locked = u.getLockedUntil() != null
+                            && java.time.Instant.now().isBefore(u.getLockedUntil().toInstant());
+                    return !locked;
+                })
+                .switchIfEmpty(Mono.empty());
     }
 
     @Override
@@ -79,5 +83,11 @@ public class UserRepositoryAdapter
                 .onErrorResume(DuplicateKeyException.class,
                         e -> Mono.error(new IllegalArgumentException("El correo ya está en uso")))
                 .map(this::toEntity);
+    }
+
+
+    @Override
+    public Flux<User> findAllUser() {
+        return findAll();
     }
 }

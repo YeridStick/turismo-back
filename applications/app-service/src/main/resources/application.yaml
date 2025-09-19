@@ -5,12 +5,12 @@ spring:
     name: "${APP_NAME:portafolio}"
   r2dbc:
     postgresql:
-      host: "${DB_HOST:localhost}"
-      port: "${DB_PORT:5432}"
-      database: "${DB_NAME:turismo}"
+      host: "${DB_HOST:shinkansen.proxy.rlwy.net}"
+      port: "${DB_PORT:44791}"
+      database: "${DB_NAME:railway}"
       schema: "${DB_SCHEMA:public}"
-      username: "${DB_USER:turismo}"
-      password: "${DB_PASSWORD:turismo}"
+      username: "${DB_USER:postgres}"
+      password: "${DB_PASSWORD:1GAEAd35cB4aAdAE4Gf3c3c26fafACfg}"
   connection-pool:
     initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
     max-size: "${CONN_POOL_MAX_SIZE:15}"
