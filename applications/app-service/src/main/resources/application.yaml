@@ -1,6 +1,9 @@
 server:
   port: "${SERVER_PORT:8081}"
 spring:
+  main:
+    banner-mode: off
+    log-startup-info: false
   application:
     name: "${APP_NAME:portafolio}"
   r2dbc:
@@ -32,8 +35,8 @@ cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app/"
 logging:
   level:
-    org.springframework.r2dbc: "${LOGGING_R2DBC:DEBUG}"
-    org.yeridstick: "${LOGGING_YERIDSTICK:DEBUG}"
+    org.springframework.r2dbc: "${LOGGING_R2DBC:INFO}"
+    org.yeridstick: "${LOGGING_YERIDSTICK:INFO}"
     root: "${LOGGING_ROOT:INFO}"
 security:
   jwt:
