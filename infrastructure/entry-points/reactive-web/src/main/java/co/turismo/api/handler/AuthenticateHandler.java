@@ -1,6 +1,7 @@
 package co.turismo.api.handler;
 
 import co.turismo.api.dto.response.ApiResponse;
+import co.turismo.api.http.ClientIp;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,13 +38,11 @@ public class AuthenticateHandler {
                                 .onErrorResume(e -> {
                                     String msg = e.getMessage() == null ? "Error en setup" : e.getMessage();
                                     log.warn("TOTP setup error: {}", msg);
-                                    // Si el caso de uso lanzó "TOTP ya habilitado..." devolvemos 409
                                     if (msg.toLowerCase().contains("ya habilitado")) {
                                         return ServerResponse.status(409)
                                                 .contentType(MediaType.APPLICATION_JSON)
                                                 .bodyValue(new MessageRes(msg));
                                     }
-                                    // Otros errores → 400
                                     return ServerResponse.badRequest()
                                             .contentType(MediaType.APPLICATION_JSON)
                                             .bodyValue(new MessageRes(msg));
@@ -69,7 +68,6 @@ public class AuthenticateHandler {
                         .bodyValue(ApiResponse.ok(new StatusRes(enabled))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error consultando estado TOTP" : e.getMessage();
-                    // Si prefieres 404 para "Usuario no encontrado"
                     if (msg.toLowerCase().contains("no encontrado")) {
                         return ServerResponse.status(404)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -87,8 +85,7 @@ public class AuthenticateHandler {
                 .flatMap(req -> authenticateUseCase.confirmTotp(normalize(req.email()), req.code()))
                 .then(ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new MessageRes("TOTP habilitado")))
-                )
+                        .bodyValue(ApiResponse.ok(new MessageRes("TOTP habilitado"))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error al confirmar TOTP" : e.getMessage();
                     log.error("TOTP confirm error: {}", msg);
@@ -103,15 +100,13 @@ public class AuthenticateHandler {
         return request.bodyToMono(LoginReq.class)
                 .flatMap(req -> {
                     String email = normalize(req.email());
-                    String ip = request.remoteAddress()
-                            .map(a -> a.getAddress().getHostAddress())
-                            .orElse("unknown");
+                    // ✅ IP segura (evita NPE detrás de proxy/CDN)
+                    String ip = ClientIp.resolve(request.exchange().getRequest());
                     return authenticateUseCase.authenticateTotp(email, req.totpCode(), ip);
                 })
                 .flatMap(token -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new TokenRes(token)))
-                )
+                        .bodyValue(ApiResponse.ok(new TokenRes(token))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error en login TOTP" : e.getMessage();
                     log.error("Login TOTP error: {}", msg);
@@ -130,7 +125,6 @@ public class AuthenticateHandler {
     public record MessageRes(String message) {}
     public record StatusRes(boolean enabled) {}
 
-    // ---------- helpers ----------
     private static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }

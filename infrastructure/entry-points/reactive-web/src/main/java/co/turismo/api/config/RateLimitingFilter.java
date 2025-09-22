@@ -2,10 +2,8 @@ package co.turismo.api.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
-
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
@@ -17,14 +15,14 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-@Order(Ordered.HIGHEST_PRECEDENCE + 10) // muy temprano en la cadena
+import co.turismo.api.http.ClientIp;
+
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RateLimitingFilter implements WebFilter {
 
     private final RateLimiterProperties props;
@@ -33,7 +31,6 @@ public class RateLimitingFilter implements WebFilter {
 
     public RateLimitingFilter(RateLimiterProperties props) {
         this.props = props;
-        // hasta 100k claves activas, expiran si no se usan 30 min
         this.cache = Caffeine.newBuilder()
                 .maximumSize(100_000)
                 .expireAfterAccess(30, TimeUnit.MINUTES)
@@ -44,7 +41,6 @@ public class RateLimitingFilter implements WebFilter {
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         if (!props.isEnabled()) return chain.filter(exchange);
 
-        // Saltar preflight/HEAD para no bloquear CORS ni healthchecks
         HttpMethod method = exchange.getRequest().getMethod();
         if (method == HttpMethod.OPTIONS || method == HttpMethod.HEAD) {
             return chain.filter(exchange);
@@ -53,17 +49,15 @@ public class RateLimitingFilter implements WebFilter {
         final String path = exchange.getRequest().getPath().value();
         if (mustSkip(path)) return chain.filter(exchange);
 
-        String clientIp = resolveClientIp(exchange);
-        PathConfig cfg = resolvePathConfig(path);
+        final String clientIp = ClientIp.resolve(exchange.getRequest());
+        final PathConfig cfg = resolvePathConfig(path);
 
-        // Clave por IP (si quieres por ruta+IP, concatena ":" + cfg.path)
-        String key = cfg.keyPrefix + clientIp;
+        final String key = cfg.keyPrefix + clientIp;
 
         Bucket bucket = cache.get(key, k -> newBucket(cfg));
-
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+
         if (probe.isConsumed()) {
-            // Headers informativos
             var headers = exchange.getResponse().getHeaders();
             headers.add("X-Rate-Limit-Limit", String.valueOf(cfg.capacity));
             headers.add("X-Rate-Limit-Remaining", String.valueOf(probe.getRemainingTokens()));
@@ -106,7 +100,7 @@ public class RateLimitingFilter implements WebFilter {
         PathConfig(long capacity, long windowSeconds, long refill, String keyPrefix, String path) {
             this.capacity = capacity;
             this.window = Duration.ofSeconds(windowSeconds);
-            this.refill = refill > 0 ? refill : capacity; // por defecto full refill
+            this.refill = refill > 0 ? refill : capacity;
             this.keyPrefix = keyPrefix;
             this.path = path;
         }
@@ -129,47 +123,10 @@ public class RateLimitingFilter implements WebFilter {
     }
 
     private Bucket newBucket(PathConfig cfg) {
-        // Bucket4j 8.x: builder estilo lambda
         return Bucket.builder()
                 .addLimit(limit -> limit
                         .capacity(cfg.capacity)
                         .refillGreedy(cfg.refill, cfg.window))
                 .build();
-
-        // Alternativa explícita:
-        // var refill = io.github.bucket4j.Refill.greedy(cfg.refill, cfg.window);
-        // var bw = io.github.bucket4j.Bandwidth.classic(cfg.capacity, refill);
-        // return Bucket.builder().addLimit(bw).build();
-    }
-
-    private String resolveClientIp(ServerWebExchange exchange) {
-        var headers = exchange.getRequest().getHeaders();
-
-        String ip = firstNonBlank(
-                headers.getFirst("CF-Connecting-IP"),
-                headers.getFirst("X-Real-IP"),
-                firstIpFrom(headers.getFirst("X-Forwarded-For"))
-        );
-        if (ip != null) return ip;
-
-        InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
-        return Optional.ofNullable(remote)
-                .map(InetSocketAddress::getAddress)
-                .map(addr -> addr.getHostAddress())
-                .orElse("unknown");
-    }
-
-    private static String firstIpFrom(String xff) {
-        if (xff == null || xff.isBlank()) return null;
-        String first = xff.split(",")[0].trim();
-        return first.isEmpty() ? null : first;
-    }
-
-    private static String firstNonBlank(String... values) {
-        if (values == null) return null;
-        for (String v : values) {
-            if (v != null && !v.isBlank()) return v;
-        }
-        return null;
     }
 }
