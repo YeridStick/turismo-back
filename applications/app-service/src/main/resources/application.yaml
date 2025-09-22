@@ -1,11 +1,14 @@
 server:
   port: "${SERVER_PORT:8081}"
+  forward-headers-strategy: framework
+
 spring:
   main:
     banner-mode: off
     log-startup-info: false
   application:
     name: "${APP_NAME:portafolio}"
+
   r2dbc:
     postgresql:
       host: "${DB_HOST:shinkansen.proxy.rlwy.net}"
@@ -14,11 +17,21 @@ spring:
       schema: "${DB_SCHEMA:public}"
       username: "${DB_USER:postgres}"
       password: "${DB_PASSWORD:1GAEAd35cB4aAdAE4Gf3c3c26fafACfg}"
+    pool:
+      initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
+      max-size: "${CONN_POOL_MAX_SIZE:15}"
+      max-idle-time: "${CONN_POOL_IDLE_TIME:30m}"  # nota la unidad
+
+  # ⚠️ Compat: claves antiguas que tu bean propio está leyendo
   connection-pool:
     initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
     max-size: "${CONN_POOL_MAX_SIZE:15}"
-    max-idle-time: "${CONN_POOL_IDLE_TIME:30}"
+    max-idle-time: "${CONN_POOL_IDLE_TIME:30}"   # si tu bean espera número "crudo", déjalo así
+
 management:
+  health:
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -31,18 +44,37 @@ management:
     health:
       probes:
         enabled: true
+
 cors:
-  allowed-origins: "http://localhost:4200,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app/"
+  allowed-origins: "http://localhost:4200,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app"
+
 logging:
   level:
     org.springframework.r2dbc: "${LOGGING_R2DBC:INFO}"
     org.yeridstick: "${LOGGING_YERIDSTICK:INFO}"
     root: "${LOGGING_ROOT:INFO}"
+
 security:
   jwt:
     secret: "${JWT_SECRET:cambia-esto-por-una-clave-de-32+caracteres-para-HS256}"
-email:
-  username: "${EMAIL_NAME:yeridstickramirez@gmail.com}"
-  password: "${PASSWORD_EMAIL:hzxx rvww ncht qyfq}"
-admin:
-  email: "${ADMIN_EMAIL:yeridstick3000@gmail.com}"
+
+turismo:
+  rate-limiter:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    backend: ${RATE_LIMIT_BACKEND:local}
+    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+    capacity: ${RATE_LIMIT_CAPACITY:600}
+    refill-per-window: ${RATE_LIMIT_REFILL:600}
+    per-path:
+      "/api/auth":
+        capacity: ${RATE_LIMIT_AUTH_CAPACITY:30}
+        window-seconds: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:60}
+        refill-per-window: ${RATE_LIMIT_AUTH_REFILL:30}
+      "/api/places":
+        capacity: ${RATE_LIMIT_PLACES_CAPACITY:1500}
+        window-seconds: ${RATE_LIMIT_PLACES_WINDOW_SECONDS:60}
+        refill-per-window: ${RATE_LIMIT_PLACES_REFILL:1500}
+    skip-paths:
+      - /actuator/health
+      - /favicon.ico
+      - /

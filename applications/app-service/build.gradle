@@ -3,7 +3,6 @@ apply plugin: 'org.springframework.boot'
 dependencies {
 	implementation project(':reactive-web')
 	implementation project(':authenticate')
-	implementation project(':gmail')
 	implementation project(':r2dbc-postgresql')
 	implementation 'org.reactivecommons.utils:object-mapper:0.1.0'
     implementation project(':model')

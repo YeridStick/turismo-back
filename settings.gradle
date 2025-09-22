@@ -22,8 +22,6 @@ project(':model').projectDir = file('./domain/model')
 project(':usecase').projectDir = file('./domain/usecase')
 include ':r2dbc-postgresql'
 project(':r2dbc-postgresql').projectDir = file('./infrastructure/driven-adapters/r2dbc-postgresql')
-include ':gmail'
-project(':gmail').projectDir = file('./infrastructure/driven-adapters/gmail')
 include ':authenticate'
 project(':authenticate').projectDir = file('./infrastructure/driven-adapters/authenticate')
 include ':reactive-web'
