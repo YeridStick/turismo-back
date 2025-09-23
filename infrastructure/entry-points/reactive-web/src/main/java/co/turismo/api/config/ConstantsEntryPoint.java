@@ -11,6 +11,7 @@ public class ConstantsEntryPoint {
     public static final String AUTH_TOTP_CONFIRM_PATH = "/auth/code/confirm";
     public static final String AUTH_LOGIN_TOTP_PATH   = "/auth/login-code";
     public static final String AUTH_TOTP_STATUS_PATH = "/auth/code/status";
+    public static final String AUTH_REFRESH_PATH = "/auth/refresh";
 
     // Users
     public static final String CREATEUSER = "/auth/create/user";

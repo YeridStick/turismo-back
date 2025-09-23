@@ -49,6 +49,7 @@ public class AuthenticateUseCase {
                 });
     }
 
+    /** Consulta si el usuario tiene TOTP habilitado (y no está bloqueado). */
     public Mono<Boolean> totpStatus(String emailRaw) {
         final String email = normalize(emailRaw);
         Objects.requireNonNull(email, "email");
@@ -60,7 +61,7 @@ public class AuthenticateUseCase {
                             && java.time.Instant.now().isBefore(u.getLockedUntil().toInstant());
                     if (locked) {
                         return Mono.error(new Exception(
-                                "Usuario bloqueado hasta " + u.getLockedUntil().toString()));
+                                "Usuario bloqueado hasta " + u.getLockedUntil()));
                     }
                     return totpSecretRepository.isTotpEnabledByEmail(email)
                             .defaultIfEmpty(false);
@@ -88,7 +89,7 @@ public class AuthenticateUseCase {
     }
 
     // -------------------- LOGIN --------------------
-    /** Autenticación con TOTP (ya habilitado). */
+    /** Autenticación con TOTP (ya habilitado) -> emite token de sesión. */
     public Mono<String> authenticateTotp(String emailRaw, int totpCode, String ip) {
         final String email = normalize(emailRaw);
         Objects.requireNonNull(email, "email");
@@ -120,6 +121,16 @@ public class AuthenticateUseCase {
                                             .flatMap(roles -> authenticationRepository.generateToken(email, roles, ip));
                                 })
                 );
+    }
+
+    // -------------------- REFRESH --------------------
+    /**
+     * Refresca un token (vencido o por vencer) sin pasar por todo el login.
+     * Delegado directo al repositorio de autenticación.
+     */
+    public Mono<String> refreshSession(String oldToken, String ip) {
+        Objects.requireNonNull(oldToken, "oldToken");
+        return authenticationRepository.refreshToken(oldToken, ip);
     }
 
     // -------------------- VALIDACIÓN DE SESIÓN --------------------

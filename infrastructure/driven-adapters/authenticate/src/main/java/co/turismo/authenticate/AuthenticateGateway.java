@@ -27,7 +27,9 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
     @Value("${security.jwt.secret}")             private String jwtSecret;       // >= 32 chars
     @Value("${security.jwt.issuer:turismo-app}") private String jwtIssuer;
     @Value("${security.jwt.ttl-hours:4}")        private long jwtTtlHours;
-    @Value("${security.session.bind-ip:false}")  private boolean bindIp;        // opcional
+    @Value("${security.session.bind-ip:false}")  private boolean bindIp;
+    @Value("${security.session.refresh-grace-minutes:15}")
+    private long refreshGraceMinutes;
 
     /**
      * Genera JWT con lista de roles y crea sesión en caché.
@@ -68,15 +70,64 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
                 .switchIfEmpty(Mono.fromRunnable(() -> sessionCache.invalidate(token)).thenReturn(false));
     }
 
-    // --------- Métodos legacy de OTP por email (no se usan con TOTP) ---------
-    @Override public Mono<Void> storeCode(String email, String code) { return Mono.empty(); }
-    @Override public Mono<String> getStoredCode(String email) { return Mono.empty(); }
-    @Override public Mono<Void> invalidateCode(String email) { return Mono.empty(); }
-
-    // Si tu interfaz aún exige adminEmail pero ya no lo usas, devuélvelo vacío o elimínalo del contrato
-    @Deprecated
+    /**
+     * Refresca un token (vencido o por vencer) sin pasar por todo el login,
+     * siempre que:
+     *  - el token exista en cache,
+     *  - la IP (si bindIp=true) coincida,
+     *  - y si está expirado, no supere la ventana de gracia.
+     *
+     * Retorna un nuevo token y rota la sesión en cache.
+     */
     @Override
-    public String getAdminEmail() { return null; }
+    public Mono<String> refreshToken(String oldToken, String ip) {
+        return Mono.justOrEmpty(sessionCache.getIfPresent(oldToken))
+                .switchIfEmpty(Mono.error(new IllegalStateException("Sesión no encontrada")))
+                .flatMap(sess -> {
+                    // Validación de IP si está habilitada
+                    if (bindIp && sess.getIp() != null && !Objects.equals(sess.getIp(), ip)) {
+                        return Mono.error(new SecurityException("IP no coincide"));
+                    }
+                    if (!sess.isValid()) {
+                        // si marcas sesiones inválidas (logout, etc.)
+                        sessionCache.invalidate(oldToken);
+                        return Mono.error(new IllegalStateException("Sesión inválida"));
+                    }
+
+                    final LocalDateTime now = LocalDateTime.now();
+                    final LocalDateTime exp = sess.getExpirationTime();
+
+                    // Si está expirado, permite refrescar solo dentro de la ventana de gracia
+                    if (now.isAfter(exp)) {
+                        final LocalDateTime graceLimit = exp.plusMinutes(refreshGraceMinutes);
+                        if (now.isAfter(graceLimit)) {
+                            // fuera de la ventana -> forzar login completo
+                            sessionCache.invalidate(oldToken);
+                            return Mono.error(new IllegalStateException("Token expirado fuera de la ventana de gracia"));
+                        }
+                    }
+
+                    // Generar nuevo token con mismos claims/roles
+                    final String newToken = generateJWT(sess.getEmail(), sess.getRoles());
+                    final LocalDateTime newExpiresAt = LocalDateTime.now().plus(Duration.ofHours(jwtTtlHours));
+
+                    AuthenticationSession newSession = AuthenticationSession.builder()
+                            .token(newToken)
+                            .email(sess.getEmail())
+                            .roles(sess.getRoles())
+                            .ip(bindIp ? sess.getIp() : null)
+                            .expirationTime(newExpiresAt)
+                            .isValid(true)
+                            .build();
+
+                    // Rotar en cache: invalidar el viejo y guardar el nuevo
+                    sessionCache.invalidate(oldToken);
+                    sessionCache.put(newToken, newSession);
+
+                    return Mono.just(newToken);
+                });
+    }
+
 
     // -------------------- helpers --------------------
     private String generateJWT(String email, Set<String> roles) {

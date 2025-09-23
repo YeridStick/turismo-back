@@ -100,7 +100,6 @@ public class AuthenticateHandler {
         return request.bodyToMono(LoginReq.class)
                 .flatMap(req -> {
                     String email = normalize(req.email());
-                    // ✅ IP segura (evita NPE detrás de proxy/CDN)
                     String ip = ClientIp.resolve(request.exchange().getRequest());
                     return authenticateUseCase.authenticateTotp(email, req.totpCode(), ip);
                 })
@@ -116,6 +115,34 @@ public class AuthenticateHandler {
                 });
     }
 
+    // ---------- REFRESH: POST /api/auth/refresh ----------
+    public Mono<ServerResponse> refresh(ServerRequest request) {
+        // 1) Intentar por header Authorization: Bearer <token>
+        String bearer = request.headers().firstHeader("Authorization");
+        String oldToken = extractBearer(bearer);
+
+        Mono<String> bodyTokenMono = (oldToken != null)
+                ? Mono.just(oldToken)
+                : request.bodyToMono(RefreshReq.class).map(RefreshReq::token);
+
+        String ip = ClientIp.resolve(request.exchange().getRequest());
+
+        return bodyTokenMono
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Token requerido (Authorization Bearer o body)")))
+                .flatMap(tok -> authenticateUseCase.refreshSession(tok, ip))
+                .flatMap(newToken -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new TokenRes(newToken))))
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() == null ? "No fue posible refrescar el token" : e.getMessage();
+                    log.warn("Refresh token error: {}", msg);
+                    // Si está fuera de la ventana de gracia / IP no coincide, responde 401
+                    return ServerResponse.status(401)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new MessageRes(msg));
+                });
+    }
+
     // ---------- DTOs ----------
     public record EmailReq(String email) {}
     public record ConfirmReq(String email, int code) {}
@@ -124,8 +151,15 @@ public class AuthenticateHandler {
     public record TokenRes(String token) {}
     public record MessageRes(String message) {}
     public record StatusRes(boolean enabled) {}
+    public record RefreshReq(String token) {}
 
     private static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private static String extractBearer(String authorizationHeader) {
+        if (authorizationHeader == null) return null;
+        String prefix = "Bearer ";
+        return authorizationHeader.startsWith(prefix) ? authorizationHeader.substring(prefix.length()).trim() : null;
     }
 }

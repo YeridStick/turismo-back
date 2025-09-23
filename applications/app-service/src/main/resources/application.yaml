@@ -58,6 +58,11 @@ security:
   jwt:
     secret: "${JWT_SECRET:cambia-esto-por-una-clave-de-32+caracteres-para-HS256}"
 
+
+
+  session:
+    refresh-grace-minutes: ${SEC_REFRESH_GRACE_MINUTES:15}
+
 turismo:
   rate-limiter:
     enabled: ${RATE_LIMIT_ENABLED:true}
@@ -78,3 +83,5 @@ turismo:
       - /actuator/health
       - /favicon.ico
       - /
+
+
