@@ -1,4 +1,7 @@
 dependencies {
     implementation project(':model')
-    implementation 'org.springframework:spring-context'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
+    runtimeOnly 'io.projectreactor.netty:reactor-netty'
 }

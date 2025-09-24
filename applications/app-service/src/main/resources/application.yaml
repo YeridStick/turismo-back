@@ -84,4 +84,11 @@ turismo:
       - /favicon.ico
       - /
 
+locationiq:
+  key: pk.568c37ab0f335201297f305792b7fe13
+  base-url: https://us1.locationiq.com/v1
+  timeout-ms: 5000
 
+geocode:
+  daily-quota: 100
+  cache-ttl-days: 30

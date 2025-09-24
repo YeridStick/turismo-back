@@ -1,10 +1,7 @@
 package co.turismo.api;
 
 import co.turismo.api.config.ConstantsEntryPoint;
-import co.turismo.api.handler.AuthenticateHandler;
-import co.turismo.api.handler.PlacesHandler;
-import co.turismo.api.handler.UserHandler;
-import co.turismo.api.handler.VisitHandler;
+import co.turismo.api.handler.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
@@ -19,7 +16,8 @@ public class RouterRest {
             UserHandler userHandler,
             AuthenticateHandler authenticateHandler,
             PlacesHandler placesHandler,
-            VisitHandler visitHandler
+            VisitHandler visitHandler,
+            GeocodeHandler geocodeHandler
     ) {
         return route()
                 // Auth
@@ -47,6 +45,9 @@ public class RouterRest {
 
                 // Places - Admin
                 .PATCH(ConstantsEntryPoint.API_ADMIN + ConstantsEntryPoint.ADMIN_PLACES_VERIFY_PATH, placesHandler::verify)
+
+                // Geocode - Generar corrdenadas
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.GETCOORDINATES, geocodeHandler::geocode)
 
                 // Visits
                 .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.VISITS_CHECKIN_PATH, visitHandler::checkin)

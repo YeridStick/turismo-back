@@ -28,6 +28,9 @@ public class ConstantsEntryPoint {
     public static final String PLACES_ACTIVE_PATH  = "/places/{id}/active";
     public static final String PLACES_ID_PATH = "/places/{id}";
 
+    // gecode
+    public static final String GETCOORDINATES = "/tools/geocode";
+
     // Admin
     public static final String ADMIN_PLACES_VERIFY_PATH = "/places/{id}/verify";
 
