@@ -18,13 +18,10 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
         WITH user_point AS (
           SELECT ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography AS g
         )
-        SELECT CASE
-                 WHEN ST_DWithin(p.geom::geography, u.g, :radius)
-                 THEN CAST(ST_Distance(p.geom::geography, u.g) AS INTEGER)
-                 ELSE NULL
-               END AS distance_m
+        SELECT CAST(ST_Distance(p.geom::geography, u.g) AS INTEGER) AS distance_m
         FROM places p, user_point u
         WHERE p.id = :placeId
+          AND ST_DWithin(p.geom::geography, u.g, :radius)
       """)
     Mono<Integer> computeDistanceIfWithin(@Param("placeId") Long placeId,
                                           @Param("lat") double lat,
@@ -32,9 +29,17 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
                                           @Param("radius") int radius);
 
     @Query("""
-        INSERT INTO place_visits(place_id, user_id, device_id, started_at, status, distance_m, accuracy_m, meta)
-        VALUES (:placeId, :userId, :deviceId, now(), 'pending', :distanceM, :accuracyM, COALESCE(:meta::jsonb,'{}'::jsonb))
-        RETURNING *
+        INSERT INTO place_visits(
+             place_id, user_id, device_id,
+             started_at, started_on_utc, status,
+             distance_m, accuracy_m, meta
+           )
+           VALUES (
+             :placeId, :userId, :deviceId,
+             now(), CURRENT_DATE, 'pending',
+             :distanceM, :accuracyM, COALESCE(:meta::jsonb,'{}'::jsonb)
+           )
+           RETURNING *       
       """)
     Mono<PlaceVisitData> insertPending(@Param("placeId") Long placeId,
                                        @Param("userId") Long userId,
@@ -43,20 +48,32 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
                                        @Param("accuracyM") Integer accuracyM,
                                        @Param("meta") String metaJson);
 
+    // VisitRepository.java
     @Query("""
         UPDATE place_visits
-           SET status = 'confirmed', confirmed_at = now()
-         WHERE id = :visitId AND status = 'pending'
-        RETURNING *
+              SET status = 'confirmed',
+                  confirmed_at = now(),
+                  lat = :lat,
+                  lng = :lng,
+                  accuracy_m = :accuracyM,
+                  meta = COALESCE(:meta::jsonb, meta)
+            WHERE id = :visitId
+              AND status = 'pending'
+           RETURNING *
       """)
-    Mono<PlaceVisitData> confirmVisit(@Param("visitId") Long visitId);
+    Mono<PlaceVisitData> confirmVisit(@Param("visitId") Long visitId,
+                                      @Param("lat") double lat,
+                                      @Param("lng") double lng,
+                                      @Param("accuracyM") Integer accuracyM,
+                                      @Param("meta") String metaJson);
+
 
     @Query("""
         SELECT 1
           FROM place_visits
          WHERE place_id = :placeId
            AND device_id = :deviceId
-           AND date(started_at) = CURRENT_DATE
+           AND started_on_utc = CURRENT_DATE
            AND status = 'confirmed'
          LIMIT 1
       """)

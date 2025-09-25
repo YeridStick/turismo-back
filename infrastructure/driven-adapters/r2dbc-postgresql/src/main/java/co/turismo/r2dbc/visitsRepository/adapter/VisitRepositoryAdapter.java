@@ -75,9 +75,11 @@ public class VisitRepositoryAdapter
     }
 
     @Override
-    public Mono<PlaceVisit> confirmVisit(Long visitId) {
-        return repository.confirmVisit(visitId).map(VisitRepositoryAdapter::toDomain);
+    public Mono<PlaceVisit> confirmVisit(Long visitId, Double lat, Double lng, Integer accuracyM, String metaJson) {
+        return repository.confirmVisit(visitId, lat, lng, accuracyM, metaJson)
+                .map(VisitRepositoryAdapter::toDomain);
     }
+
 
     @Override
     public Mono<Boolean> existsConfirmedToday(Long placeId, String deviceId) {

@@ -45,6 +45,7 @@ public class VisitsUseCase {
     public record ConfirmCmd(Long visitId, double lat, double lng, Integer accuracyM) {}
     public record ConfirmRes(String status, Instant confirmedAt) {}
 
+    // VisitsUseCase.java
     public Mono<ConfirmRes> confirm(ConfirmCmd cmd) {
         return gateway.findById(cmd.visitId())
                 .switchIfEmpty(Mono.error(new IllegalStateException("Visita no encontrada")))
@@ -63,7 +64,7 @@ public class VisitsUseCase {
                                         if (Boolean.TRUE.equals(already)) {
                                             return Mono.error(new IllegalStateException("Ya registraste visita hoy"));
                                         }
-                                        return gateway.confirmVisit(cmd.visitId())
+                                        return gateway.confirmVisit(cmd.visitId(), cmd.lat(), cmd.lng(), cmd.accuracyM(), null)
                                                 .flatMap(ok -> gateway.upsertDaily(v.getPlaceId()).thenReturn(ok));
                                     }))
                             .map(ok -> new ConfirmRes(ok.getStatus().name(), ok.getConfirmedAt()));

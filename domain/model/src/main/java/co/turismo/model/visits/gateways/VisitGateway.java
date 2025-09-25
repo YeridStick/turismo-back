@@ -13,7 +13,7 @@ public interface VisitGateway {
     Mono<PlaceVisit> insertPending(Long placeId, Long userId, String deviceId,
                                    Integer distanceM, Integer accuracyM, String metaJson);
 
-    Mono<PlaceVisit> confirmVisit(Long visitId);
+    Mono<PlaceVisit> confirmVisit(Long visitId, Double lat, Double lng, Integer accuracyM, String metaJson);
 
     Mono<Boolean> existsConfirmedToday(Long placeId, String deviceId);
 
