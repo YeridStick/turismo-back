@@ -30,9 +30,13 @@ public class ConstantsEntryPoint {
 
     // gecode
     public static final String GETCOORDINATES = "/tools/geocode";
+    public static final String PLACES_NEARBY_PATH_PLACE = "/pruebas/places/nearby/getpalce";
 
     // Admin
     public static final String ADMIN_PLACES_VERIFY_PATH = "/places/{id}/verify";
+
+    //Debug
+    public static final String DEBUG = "/debug";
 
     // Visits
     public static final String VISITS_CHECKIN_PATH         = "/pruebas/places/{placeId}/checkin";

@@ -1,5 +1,7 @@
 package co.turismo.usecase.visit;
 
+import co.turismo.model.visits.PlaceBriefUC;
+import co.turismo.model.visits.PlaceNearby;
 import co.turismo.model.visits.TopPlace;
 import co.turismo.model.visits.VisitStatus;
 import co.turismo.model.visits.gateways.VisitGateway;
@@ -43,7 +45,7 @@ public class VisitsUseCase {
 
     /* ---------- CONFIRM ---------- */
     public record ConfirmCmd(Long visitId, double lat, double lng, Integer accuracyM) {}
-    public record ConfirmRes(String status, Instant confirmedAt) {}
+    public record ConfirmRes(String status, Instant confirmedAt, PlaceBriefUC place) {}
 
     // VisitsUseCase.java
     public Mono<ConfirmRes> confirm(ConfirmCmd cmd) {
@@ -58,17 +60,26 @@ public class VisitsUseCase {
                         return Mono.error(new IllegalStateException("Aún no cumples permanencia mínima"));
                     }
                     return gateway.computeDistanceIfWithin(v.getPlaceId(), cmd.lat(), cmd.lng(), RADIUS_M)
-                            .switchIfEmpty(Mono.error(new IllegalStateException("Ya no estás cerca del sitio")))
-                            .flatMap(d -> gateway.existsConfirmedToday(v.getPlaceId(), v.getDeviceId())
-                                    .flatMap(already -> {
-                                        if (Boolean.TRUE.equals(already)) {
-                                            return Mono.error(new IllegalStateException("Ya registraste visita hoy"));
-                                        }
-                                        return gateway.confirmVisit(cmd.visitId(), cmd.lat(), cmd.lng(), cmd.accuracyM(), null)
-                                                .flatMap(ok -> gateway.upsertDaily(v.getPlaceId()).thenReturn(ok));
-                                    }))
-                            .map(ok -> new ConfirmRes(ok.getStatus().name(), ok.getConfirmedAt()));
+                        .switchIfEmpty(Mono.error(new IllegalStateException("Ya no estás cerca del sitio")))
+                        .flatMap(d -> gateway.existsConfirmedToday(v.getPlaceId(), v.getDeviceId())
+                            .flatMap(already -> {
+                                if (Boolean.TRUE.equals(already)) {
+                                    return Mono.error(new IllegalStateException("Ya registraste visita hoy"));
+                                }
+                                return gateway.confirmVisit(cmd.visitId(), cmd.lat(), cmd.lng(), cmd.accuracyM(), null)
+                                        .flatMap(ok ->
+                                            gateway.getPlaceBrief(v.getPlaceId())                    // ← carga lugar
+                                                .flatMap(pb -> gateway.upsertDaily(v.getPlaceId()).thenReturn(
+                                                        new ConfirmRes(ok.getStatus().name(), ok.getConfirmedAt(), pb)
+                                                ))
+                                        );
+                            })
+                        );
                 });
+    }
+
+    public Flux<PlaceNearby> nearby(double lat, double lng, int radius, int limit) {
+        return gateway.findNearby(lat, lng, radius, limit);
     }
 
     /* ---------- TOP ---------- */

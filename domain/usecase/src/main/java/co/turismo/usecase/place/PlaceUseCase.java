@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.nio.file.AccessDeniedException;
+
 @RequiredArgsConstructor
 public class PlaceUseCase {
 
@@ -58,5 +60,27 @@ public class PlaceUseCase {
 
     public Mono<Place> setActive(long placeId, boolean active) {
         return placeRepository.setActive(placeId, active);
+    }
+
+    public Mono<Place> deleteById(long id) {
+        return placeRepository.deletePalce(id);
+    }
+
+    public Mono<Place> deleteByOwnerOrAdmin(String email, long placeId) {
+        return userRepository.findByEmail(email)
+            .switchIfEmpty(Mono.error(new RuntimeException("Usuario no encontrado")))
+            .flatMap(user ->
+                placeRepository.findByPlaces(placeId)
+                    .switchIfEmpty(Mono.error(new RuntimeException("Place no encontrado")))
+                    .flatMap(place -> {
+                        boolean isOwner = place.getOwnerUserId() != null
+                                && place.getOwnerUserId().equals(user.getId());
+
+                        if (!isOwner) {
+                            return Mono.error(new AccessDeniedException("No tienes permiso para eliminar este sitio"));
+                        }
+                        return placeRepository.deletePalce(placeId);
+                    })
+            );
     }
 }

@@ -1,5 +1,7 @@
 package co.turismo.model.visits.gateways;
 
+import co.turismo.model.visits.PlaceBriefUC;
+import co.turismo.model.visits.PlaceNearby;
 import co.turismo.model.visits.PlaceVisit;
 import co.turismo.model.visits.TopPlace;
 import reactor.core.publisher.Flux;
@@ -22,4 +24,7 @@ public interface VisitGateway {
     Flux<TopPlace> topPlaces(LocalDate from, LocalDate to, int limit);
 
     Mono<PlaceVisit> findById(Long visitId);
+    Mono<PlaceBriefUC> getPlaceBrief(Long placeId);
+
+    Flux<PlaceNearby> findNearby(double lat, double lng, int radius, int limit);
 }

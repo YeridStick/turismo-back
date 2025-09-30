@@ -14,6 +14,7 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 @Component
@@ -171,6 +172,47 @@ public class PlacesHandler {
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(list)));
     }
+
+    public Mono<ServerResponse> delete(ServerRequest req) {
+        long placeId = Long.parseLong(req.pathVariable("id"));
+
+        return req.principal()
+                .cast(Authentication.class)
+                .map(Authentication::getName)
+                .flatMap(email -> placeUseCase.deleteByOwnerOrAdmin(email, placeId))
+                .flatMap(deleted ->
+                        ServerResponse.ok()
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(ApiResponse.ok(deleted))
+                )
+                // 403: no es el dueño
+                .onErrorResume(AccessDeniedException.class, e ->
+                        ServerResponse.status(403)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(ApiResponse.error(403, e.getMessage()))
+                )
+                // 404: place o usuario no encontrado (según tu mensaje)
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() != null ? e.getMessage() : "Error";
+                    if (msg.toLowerCase().contains("no encontrado")) {
+                        return ServerResponse.status(404)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(ApiResponse.error(404, msg));
+                    }
+                    // Fallback: 400 con mensaje
+                    return ServerResponse.status(400)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(ApiResponse.error(400, msg));
+                });
+    }
+
+    public Mono<ServerResponse> debug(ServerRequest req) {
+        return req.principal()
+                .cast(Authentication.class)
+                .map(Authentication::getName)
+                .flatMap(email -> ServerResponse.ok().bodyValue("Email: " + email));
+    }
+
 
     public record Message(String message) {}
     public record VerifyRequest(boolean approve) {}

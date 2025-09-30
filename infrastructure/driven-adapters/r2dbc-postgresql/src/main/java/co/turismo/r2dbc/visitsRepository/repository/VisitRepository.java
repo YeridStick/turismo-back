@@ -1,5 +1,7 @@
 package co.turismo.r2dbc.visitsRepository.repository;
 
+import co.turismo.r2dbc.visitsRepository.dto.PlaceBriefRow;
+import co.turismo.r2dbc.visitsRepository.dto.PlaceNearbyRow;
 import co.turismo.r2dbc.visitsRepository.dto.TopPlaceRowDto;
 import co.turismo.r2dbc.visitsRepository.entity.PlaceVisitData;
 import org.springframework.data.r2dbc.repository.Query;
@@ -101,4 +103,37 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
     Flux<TopPlaceRowDto> topPlaces(@Param("from") LocalDate from,
                                    @Param("to")   LocalDate to,
                                    @Param("limit") int limit);
+
+    @Query("""
+      SELECT id, name, address, description, category_id, lat, lng, image_urls
+        FROM places
+       WHERE id = :placeId
+    """)
+    Mono<PlaceBriefRow> getPlaceBrief(@Param("placeId") Long placeId);
+
+    @Query("""
+      WITH u AS (
+        SELECT ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography AS g
+      )
+      SELECT
+          p.id,
+          p.name,
+          p.address,
+          p.description,
+          p.category_id,
+          ST_Y(p.geom::geometry) AS lat,
+          ST_X(p.geom::geometry) AS lng,
+          CAST(ST_Distance(p.geom::geography, u.g) AS INTEGER) AS distance_m
+      FROM places p, u
+      WHERE p.geom IS NOT NULL
+        AND ST_DWithin(p.geom::geography, u.g, :radius)
+      ORDER BY COALESCE(p.is_verified, FALSE) DESC, distance_m ASC
+      LIMIT :limit
+    """)
+    Flux<PlaceNearbyRow> findNearby(@Param("lat") double lat,
+                                    @Param("lng") double lng,
+                                    @Param("radius") int radius,
+                                    @Param("limit") int limit);
+
+
 }

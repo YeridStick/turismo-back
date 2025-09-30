@@ -1,8 +1,6 @@
 package co.turismo.r2dbc.visitsRepository.adapter;
 
-import co.turismo.model.visits.PlaceVisit;
-import co.turismo.model.visits.TopPlace;
-import co.turismo.model.visits.VisitStatus;
+import co.turismo.model.visits.*;
 import co.turismo.model.visits.gateways.VisitGateway;
 import co.turismo.r2dbc.helper.ReactiveAdapterOperations;
 import co.turismo.r2dbc.visitsRepository.entity.PlaceVisitData;
@@ -62,6 +60,16 @@ public class VisitRepositoryAdapter
      * ======================= */
 
     @Override
+    public Mono<PlaceBriefUC> getPlaceBrief(Long placeId) {
+        return repository.getPlaceBrief(placeId)
+                .map(r -> new PlaceBriefUC(
+                        r.getId(), r.getName(), r.getAddress(), r.getDescription(),
+                        r.getCategoryId(), r.getLat(), r.getLng(),
+                        r.getImageUrls() != null ? r.getImageUrls() : java.util.List.of()
+                ));
+    }
+
+    @Override
     public Mono<Integer> computeDistanceIfWithin(Long placeId, double lat, double lng, int radius) {
         return repository.computeDistanceIfWithin(placeId, lat, lng, radius);
     }
@@ -102,5 +110,18 @@ public class VisitRepositoryAdapter
     @Override
     public Mono<PlaceVisit> findById(Long visitId) {
         return repository.findById(visitId).map(VisitRepositoryAdapter::toDomain);
+    }
+
+    @Override
+    public Flux<PlaceNearby> findNearby(double lat, double lng, int radius, int limit) {
+        return repository.findNearby(lat, lng, radius, limit)
+                .map(r -> new co.turismo.model.visits.PlaceNearby(
+                        r.getId(), r.getName(),
+                        r.getLat(), r.getLng(),
+                        r.getAddress(), r.getDescription(),
+                        r.getCategoryId(),
+                        r.getImageUrls() != null ? r.getImageUrls() : java.util.List.of(),
+                        r.getDistanceM()
+                ));
     }
 }

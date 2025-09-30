@@ -42,12 +42,17 @@ public class RouterRest {
                 .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ID_PATH,     placesHandler::findByIdPlace)
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ACTIVE_PATH,   placesHandler::setActive)
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ID_PATH,       placesHandler::patch)
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ID_PATH, placesHandler::delete)
+
+                // Debug
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.DEBUG, placesHandler::debug)
 
                 // Places - Admin
                 .PATCH(ConstantsEntryPoint.API_ADMIN + ConstantsEntryPoint.ADMIN_PLACES_VERIFY_PATH, placesHandler::verify)
 
                 // Geocode - Generar corrdenadas
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.GETCOORDINATES, geocodeHandler::geocode)
+                .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH_PLACE, visitHandler::nearby)
 
                 // Visits
                 .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.VISITS_CHECKIN_PATH, visitHandler::checkin)

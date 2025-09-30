@@ -137,4 +137,11 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
     public Mono<Place> findByPlaces(Long id) {
         return findById(id);
     }
+
+    @Override
+    public Mono<Place> deletePalce(Long id) {
+        return findById(id)
+                .switchIfEmpty(Mono.error(new RuntimeException("Palce no encontrado")))
+                .flatMap(place ->  deleteById(id).thenReturn(place));
+    }
 }

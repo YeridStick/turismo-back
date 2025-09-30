@@ -11,6 +11,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -60,10 +61,46 @@ public class VisitHandler {
                 .flatMap(b -> visitsUseCase.confirm(new VisitsUseCase.ConfirmCmd(
                         visitId, b.lat(), b.lng(), b.accuracy_m()
                 )))
-                .map(r -> new ConfirmResponse(r.status(), r.confirmedAt()))
+                .map(r -> new ConfirmResponse(
+                        r.status(),
+                        r.confirmedAt(),
+                        new PlaceBrief(
+                                r.place().id(),
+                                r.place().name(),
+                                r.place().lat(),         // <-- primero lat
+                                r.place().lng(),         // <-- luego lng
+                                r.place().address(),
+                                r.place().description(),
+                                r.place().categoryId(),
+                                r.place().imageUrls()
+                        )
+                ))
                 .flatMap(HttpResponses::ok);
     }
 
+    public Mono<ServerResponse> nearby(ServerRequest req) {
+        double lat = Double.parseDouble(req.queryParam("lat").orElseThrow());
+        double lng = Double.parseDouble(req.queryParam("lng").orElseThrow());
+        int radius = Integer.parseInt(req.queryParam("radius").orElse("150"));
+        int limit  = Integer.parseInt(req.queryParam("limit").orElse("1"));
+
+        return visitsUseCase.nearby(lat, lng, radius, limit)
+                .map(r -> new PlaceNearbyDTO(
+                        new PlaceBrief(
+                                r.id(),
+                                r.name(),
+                                r.lat(),
+                                r.lng(),
+                                r.address(),
+                                r.description(),
+                                r.categoryId(),
+                                r.imageUrls() == null ? List.of() : r.imageUrls()
+                        ),
+                        r.distanceM()
+                ))
+                .collectList()
+                .flatMap(HttpResponses::ok);
+    }
     // GET /api/analytics/places/top?from&to&limit
     public Mono<ServerResponse> topPlaces(ServerRequest req) {
         LocalDate from = req.queryParam("from")
@@ -79,4 +116,5 @@ public class VisitHandler {
                 .collectList()
                 .flatMap(HttpResponses::ok);
     }
+
 }
