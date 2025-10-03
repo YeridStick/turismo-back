@@ -23,21 +23,17 @@ public class VisitHandler {
     public Mono<ServerResponse> checkin(ServerRequest req) {
         Long placeId = Long.valueOf(req.pathVariable("placeId"));
 
-        // Si hay principal, toma el email; si no, usa "" (evita NPE en defaultIfEmpty)
         Mono<String> emailMono = req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName)
-                .onErrorResume(e -> Mono.empty())
-                .defaultIfEmpty(""); // <- ¡clave!
+                .map(Authentication::getName) // ← email del usuario autenticado
+                .switchIfEmpty(Mono.error(new IllegalStateException("Usuario no autenticado")));
 
         return req.bodyToMono(CheckinRequest.class)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Body requerido")))
                 .zipWith(emailMono)
                 .flatMap(tuple -> {
                     CheckinRequest body = tuple.getT1();
-                    String email = tuple.getT2(); // "" si no hay sesión
-
-                    // Si luego expones userId desde el JWT, mapéalo aquí.
-                    Long userId = null;
+                    String email = tuple.getT2();
 
                     var cmd = new VisitsUseCase.CheckinCmd(
                             placeId,
@@ -45,19 +41,24 @@ public class VisitHandler {
                             body.accuracy_m(),
                             body.device_id(),
                             body.meta() != null ? body.meta() : "{}",
-                            userId
+                            email // ← ahora pasamos email, no userId
                     );
+
                     return visitsUseCase.checkin(cmd);
                 })
                 .map(r -> new CheckinResponse(r.visitId(), r.status(), r.minStaySeconds(), r.distanceM()))
-                .flatMap(HttpResponses::ok);
+                .flatMap(HttpResponses::ok)
+                .onErrorResume(IllegalArgumentException.class,
+                        e -> HttpResponses.badRequest(e.getMessage()))
+                .onErrorResume(IllegalStateException.class,
+                        e -> HttpResponses.conflict(e.getMessage()));
     }
-
 
     // PATCH /api/visits/{visitId}/confirm
     public Mono<ServerResponse> confirm(ServerRequest req) {
         Long visitId = Long.valueOf(req.pathVariable("visitId"));
         return req.bodyToMono(ConfirmRequest.class)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Body requerido")))
                 .flatMap(b -> visitsUseCase.confirm(new VisitsUseCase.ConfirmCmd(
                         visitId, b.lat(), b.lng(), b.accuracy_m()
                 )))
@@ -67,17 +68,22 @@ public class VisitHandler {
                         new PlaceBrief(
                                 r.place().id(),
                                 r.place().name(),
-                                r.place().lat(),         // <-- primero lat
-                                r.place().lng(),         // <-- luego lng
+                                r.place().lat(),   // primero lat
+                                r.place().lng(),   // luego lng
                                 r.place().address(),
                                 r.place().description(),
                                 r.place().categoryId(),
                                 r.place().imageUrls()
                         )
                 ))
-                .flatMap(HttpResponses::ok);
+                .flatMap(HttpResponses::ok)
+                .onErrorResume(IllegalArgumentException.class,
+                        e -> HttpResponses.badRequest(e.getMessage()))
+                .onErrorResume(IllegalStateException.class,
+                        e -> HttpResponses.conflict(e.getMessage()));
     }
 
+    // GET /api/places/nearby/getpalce?lat&lng&radius&limit
     public Mono<ServerResponse> nearby(ServerRequest req) {
         double lat = Double.parseDouble(req.queryParam("lat").orElseThrow());
         double lng = Double.parseDouble(req.queryParam("lng").orElseThrow());
@@ -101,7 +107,8 @@ public class VisitHandler {
                 .collectList()
                 .flatMap(HttpResponses::ok);
     }
-    // GET /api/analytics/places/top?from&to&limit
+
+    // GET /api/pruebas/analytics/places/top?from&to&limit
     public Mono<ServerResponse> topPlaces(ServerRequest req) {
         LocalDate from = req.queryParam("from")
                 .map(LocalDate::parse)
@@ -116,5 +123,4 @@ public class VisitHandler {
                 .collectList()
                 .flatMap(HttpResponses::ok);
     }
-
 }

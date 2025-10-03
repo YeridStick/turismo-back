@@ -17,7 +17,7 @@ public interface VisitGateway {
 
     Mono<PlaceVisit> confirmVisit(Long visitId, Double lat, Double lng, Integer accuracyM, String metaJson);
 
-    Mono<Boolean> existsConfirmedToday(Long placeId, String deviceId);
+    Mono<Boolean> existsConfirmedToday(Long placeId, Long userId, String deviceId);
 
     Mono<Void> upsertDaily(Long placeId);
 

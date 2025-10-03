@@ -32,17 +32,17 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
 
     @Query("""
         INSERT INTO place_visits(
-             place_id, user_id, device_id,
-             started_at, started_on_utc, status,
-             distance_m, accuracy_m, meta
-           )
-           VALUES (
-             :placeId, :userId, :deviceId,
-             now(), CURRENT_DATE, 'pending',
-             :distanceM, :accuracyM, COALESCE(:meta::jsonb,'{}'::jsonb)
-           )
-           RETURNING *       
-      """)
+           place_id, user_id, device_id,
+           started_at, status,
+           distance_m, accuracy_m, meta
+         )
+         VALUES (
+           :placeId, :userId, :deviceId,
+           now(), 'pending',
+           :distanceM, :accuracyM, COALESCE(:meta::jsonb,'{}'::jsonb)
+         )
+         RETURNING *
+    """)
     Mono<PlaceVisitData> insertPending(@Param("placeId") Long placeId,
                                        @Param("userId") Long userId,
                                        @Param("deviceId") String deviceId,
@@ -53,16 +53,16 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
     // VisitRepository.java
     @Query("""
         UPDATE place_visits
-              SET status = 'confirmed',
-                  confirmed_at = now(),
-                  lat = :lat,
-                  lng = :lng,
-                  accuracy_m = :accuracyM,
-                  meta = COALESCE(:meta::jsonb, meta)
-            WHERE id = :visitId
-              AND status = 'pending'
-           RETURNING *
-      """)
+         SET status = 'confirmed',
+             confirmed_at = now(),
+             lat = :lat,
+             lng = :lng,
+             accuracy_m = :accuracyM,
+             meta = COALESCE(:meta::jsonb, meta)
+       WHERE id = :visitId
+         AND status = 'pending'
+     RETURNING *
+    """)
     Mono<PlaceVisitData> confirmVisit(@Param("visitId") Long visitId,
                                       @Param("lat") double lat,
                                       @Param("lng") double lng,
@@ -71,22 +71,27 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
 
 
     @Query("""
-        SELECT 1
-          FROM place_visits
-         WHERE place_id = :placeId
-           AND device_id = :deviceId
-           AND started_on_utc = CURRENT_DATE
-           AND status = 'confirmed'
-         LIMIT 1
-      """)
-    Mono<Integer> existsConfirmedToday(@Param("placeId") Long placeId, @Param("deviceId") String deviceId);
+      SELECT 1
+        FROM place_visits
+       WHERE place_id = :placeId
+         AND status   = 'confirmed'
+         AND confirmed_on_utc = (now() AT TIME ZONE 'UTC')::date
+         AND (
+               (:userId IS NOT NULL AND user_id = :userId)
+            OR (:userId IS NULL    AND device_id = :deviceId)
+         )
+       LIMIT 1
+    """)
+    Mono<Integer> existsConfirmedToday(@Param("placeId") Long placeId,
+                                       @Param("userId") Long userId,
+                                       @Param("deviceId") String deviceId);
 
     @Query("""
         INSERT INTO place_visit_daily(day, place_id, visits)
         VALUES (CURRENT_DATE, :placeId, 1)
         ON CONFLICT (day, place_id) DO UPDATE
           SET visits = place_visit_daily.visits + 1
-      """)
+    """)
     Mono<Void> upsertDaily(@Param("placeId") Long placeId);
 
     @Query("""
@@ -105,7 +110,14 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
                                    @Param("limit") int limit);
 
     @Query("""
-      SELECT id, name, address, description, category_id, lat, lng, image_urls
+      SELECT id,
+             name,
+             address,
+             description,
+             category_id,
+             ST_Y(geom::geometry) AS lat,
+             ST_X(geom::geometry) AS lng,
+             image_urls
         FROM places
        WHERE id = :placeId
     """)

@@ -90,8 +90,8 @@ public class VisitRepositoryAdapter
 
 
     @Override
-    public Mono<Boolean> existsConfirmedToday(Long placeId, String deviceId) {
-        return repository.existsConfirmedToday(placeId, deviceId)
+    public Mono<Boolean> existsConfirmedToday(Long placeId, Long userId, String deviceId) {
+        return repository.existsConfirmedToday(placeId, userId, deviceId)
                 .map(x -> true)
                 .defaultIfEmpty(false);
     }

@@ -25,7 +25,9 @@ public class UserRepositoryAdapter
 
     @Override
     public Mono<User> findByEmail(String email) {
-        return repository.findByEmail(email).map(this::toEntity);
+        return repository.findByEmail(email)
+                .map(this::toEntity)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Email no encotrado")));
     }
 
     @Override

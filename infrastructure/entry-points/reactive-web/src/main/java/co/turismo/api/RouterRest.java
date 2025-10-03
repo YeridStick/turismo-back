@@ -17,7 +17,9 @@ public class RouterRest {
             AuthenticateHandler authenticateHandler,
             PlacesHandler placesHandler,
             VisitHandler visitHandler,
-            GeocodeHandler geocodeHandler
+            GeocodeHandler geocodeHandler,
+            ReviewsHandler reviewsHandler,
+            FeedbackHandler feedbackHandler
     ) {
         return route()
                 // Auth
@@ -58,6 +60,14 @@ public class RouterRest {
                 .POST (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.VISITS_CHECKIN_PATH, visitHandler::checkin)
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.VISITS_CONFIRM_PATH, visitHandler::confirm)
                 .GET  (ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.ANALYTICS_TOP_PLACES_PATH, visitHandler::topPlaces)
+
+                // Reviews
+                .GET ("/api/pruebas/places/{id}/reviews", reviewsHandler::list)
+                .POST("/api/pruebas/places/{id}/reviews", reviewsHandler::create)
+                .GET ("/api/pruebas/places/{id}/rating",  reviewsHandler::summary)
+
+                // Feedback
+                .POST("/api/pruebas/places/{id}/feedback", feedbackHandler::create)
 
                 .build();
     }

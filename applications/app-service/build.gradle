@@ -1,6 +1,7 @@
 apply plugin: 'org.springframework.boot'
 
 dependencies {
+	implementation project(':antispam')
 	implementation project(':locationiq')
 	implementation project(':reactive-web')
 	implementation project(':authenticate')
