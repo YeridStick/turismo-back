@@ -4,7 +4,7 @@ import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.Place;
 import co.turismo.model.place.UpdatePlaceRequest;
 import co.turismo.model.place.gateways.PlaceRepository;
-import co.turismo.model.user.gateways.UserRepository;
+import co.turismo.model.userIdentityPort.UserIdentityPort;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -15,10 +15,9 @@ import java.nio.file.AccessDeniedException;
 public class PlaceUseCase {
 
     private final PlaceRepository placeRepository;
-    private final UserRepository userRepository;
+    private final UserIdentityPort userIdentityPort;
 
     public Mono<Place> createPlace(CreatePlaceRequest cmd) {
-        // (Opcional) validaciones de negocio adicionales aquí
         return placeRepository.create(cmd);
     }
 
@@ -31,9 +30,9 @@ public class PlaceUseCase {
     }
 
     public Mono<Place> verifyPlaceByAdmin(String adminEmail, long placeId, boolean approve) {
-        return userRepository.findByEmail(adminEmail)
+        return userIdentityPort.getUserIdForEmail(adminEmail)
                 .switchIfEmpty(Mono.error(new RuntimeException("Admin no encontrado")))
-                .flatMap(admin -> placeRepository.verifyPlace(placeId, approve, approve, admin.getId()));
+                .flatMap(admin -> placeRepository.verifyPlace(placeId, approve, approve, admin.id()));
     }
 
     public Mono<Place> setActiveByOwner(String ownerEmail, long placeId, boolean active) {
@@ -67,14 +66,14 @@ public class PlaceUseCase {
     }
 
     public Mono<Place> deleteByOwnerOrAdmin(String email, long placeId) {
-        return userRepository.findByEmail(email)
+        return userIdentityPort.getUserIdForEmail(email)
             .switchIfEmpty(Mono.error(new RuntimeException("Usuario no encontrado")))
             .flatMap(user ->
                 placeRepository.findByPlaces(placeId)
                     .switchIfEmpty(Mono.error(new RuntimeException("Place no encontrado")))
                     .flatMap(place -> {
                         boolean isOwner = place.getOwnerUserId() != null
-                                && place.getOwnerUserId().equals(user.getId());
+                                && place.getOwnerUserId().equals(user.id());
 
                         if (!isOwner) {
                             return Mono.error(new AccessDeniedException("No tienes permiso para eliminar este sitio"));

@@ -2,7 +2,7 @@ package co.turismo.usecase.feedback;
 
 import co.turismo.model.feedback.Feedback;
 import co.turismo.model.feedback.gateways.FeedbackModelRepository;
-import co.turismo.model.user.gateways.UserRepository;
+import co.turismo.model.userIdentityPort.UserIdentityPort;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 
@@ -15,7 +15,8 @@ public class FeedbackUseCase {
             Set.of("update_info", "suggestion", "complaint", "issue");
 
     private final FeedbackModelRepository feedbackRepository;
-    private final UserRepository userRepository;
+    private final UserIdentityPort userIdentityPortGateway;
+
 
     public Mono<Feedback> create(
             Long placeId,
@@ -32,12 +33,12 @@ public class FeedbackUseCase {
 
         final String msg = message.trim();
 
-        return userRepository.findByEmail(email)
+        return userIdentityPortGateway.getUserIdForEmail(email)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Usuario no encontrado con email: " + email)))
                 .flatMap(user -> {
                     var feedback = Feedback.builder()
                             .placeId(placeId)
-                            .userId(user.getId())     // ← autenticado: seteamos userId
+                            .userId(user.id())     // ← autenticado: seteamos userId
                             .deviceId(null)           // ← ignoramos deviceId si hay email
                             .type(type)
                             .message(msg)

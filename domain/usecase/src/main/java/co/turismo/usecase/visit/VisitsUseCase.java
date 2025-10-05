@@ -1,7 +1,7 @@
 package co.turismo.usecase.visit;
 
-import co.turismo.model.user.User;
-import co.turismo.model.user.gateways.UserRepository;
+import co.turismo.model.userIdentityPort.UserIdentityPort;
+import co.turismo.model.userIdentityPort.UserSummary;
 import co.turismo.model.visits.PlaceBriefUC;
 import co.turismo.model.visits.PlaceNearby;
 import co.turismo.model.visits.TopPlace;
@@ -19,7 +19,7 @@ import java.time.LocalDate;
 public class VisitsUseCase {
 
     private final VisitGateway gateway;
-    private final UserRepository userRepository;
+    private final UserIdentityPort userIdentityPortGateway;
 
     // Podrías inyectar estos desde configuración
     private final int RADIUS_M = 80;
@@ -42,9 +42,9 @@ public class VisitsUseCase {
         Mono<Long> userIdMono = Mono.justOrEmpty(cmd.email())
                 .filter(e -> !e.isBlank())
                 .flatMap(email ->
-                        userRepository.findByEmail(email)
+                        userIdentityPortGateway.getUserIdForEmail(email)
                                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Usuario no encontrado con email: " + email)))
-                                .map(User::getId)
+                                .map(UserSummary::id)
                 );
 
         // 2) Validar distancia y crear pending

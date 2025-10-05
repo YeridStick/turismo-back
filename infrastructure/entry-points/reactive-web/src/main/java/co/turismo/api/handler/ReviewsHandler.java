@@ -22,7 +22,6 @@ public class ReviewsHandler {
     static class CreateReviewBody {
         private Short rating;
         private String comment;
-        private String device_id; // opcional (no se usará si hay email)
     }
 
     /** GET público: lista reseñas por lugar */
@@ -59,7 +58,7 @@ public class ReviewsHandler {
                 .flatMap(t -> {
                     String email = t.getT1();
                     CreateReviewBody b = t.getT2();
-                    return reviews.create(placeId, b.getRating(), b.getComment(), email, b.getDevice_id());
+                    return reviews.create(placeId, b.getRating(), b.getComment(), email);
                 })
                 .flatMap(r -> ServerResponse.status(201)
                         .contentType(MediaType.APPLICATION_JSON)

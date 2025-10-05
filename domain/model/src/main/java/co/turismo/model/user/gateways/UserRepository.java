@@ -2,7 +2,6 @@ package co.turismo.model.user.gateways;
 
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
-import co.turismo.model.user.UserProfileUpdate;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
