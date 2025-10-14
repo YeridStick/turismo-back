@@ -46,7 +46,7 @@ management:
         enabled: true
 
 cors:
-  allowed-origins: "http://localhost:4200,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app"
+  allowed-origins: "http://localhost:4200,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev"
 
 logging:
   level:
