@@ -1,0 +1,1203 @@
+openapi: 3.1.0
+info:
+  title: Turismo API
+  version: 1.0.0
+  description: |
+    API pública del backend de Turismo. Este documento describe los endpoints disponibles, los
+    parámetros esperados y los cuerpos de petición/respuesta más relevantes. Los modelos reflejan
+    la estructura actual de los manejadores reactivos implementados en el proyecto.
+servers:
+  - url: http://localhost:8080
+    description: Servidor local por defecto
+  - url: https://{host}
+    description: Servidor desplegado
+    variables:
+      host:
+        default: api.turismo.local
+        description: Host configurado para la aplicación
+tags:
+  - name: Autenticación
+  - name: Usuarios
+  - name: Lugares
+  - name: Visitas
+  - name: Reseñas
+  - name: Feedback
+  - name: Utilidades
+paths:
+  /api/auth/code/setup:
+    post:
+      tags: [Autenticación]
+      summary: Inicia el enrolamiento TOTP
+      description: Genera un secreto TOTP y la URL para configurar el segundo factor de autenticación.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '200':
+          description: Se generó correctamente el secreto
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TotpSetupResponse'
+        '400':
+          description: Error de validación
+        '409':
+          description: El usuario ya tiene TOTP activo
+  /api/auth/code/status:
+    get:
+      tags: [Autenticación]
+      summary: Consulta el estado del TOTP de un usuario
+      parameters:
+        - in: query
+          name: email
+          required: true
+          schema:
+            type: string
+            format: email
+          description: Correo electrónico del usuario a consultar
+      responses:
+        '200':
+          description: Estado obtenido
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TotpStatusResponse'
+        '400':
+          description: Parámetros incompletos
+        '404':
+          description: Usuario no encontrado
+  /api/auth/code/confirm:
+    post:
+      tags: [Autenticación]
+      summary: Confirma el enrolamiento TOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpConfirmRequest'
+      responses:
+        '200':
+          description: TOTP habilitado correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Error al confirmar el código
+  /api/auth/login-code:
+    post:
+      tags: [Autenticación]
+      summary: Inicia sesión con código TOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpLoginRequest'
+      responses:
+        '200':
+          description: Autenticación exitosa
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Credenciales inválidas
+  /api/auth/refresh:
+    post:
+      tags: [Autenticación]
+      summary: Genera un nuevo token JWT
+      description: El token puede enviarse mediante cabecera `Authorization: Bearer` o en el cuerpo JSON.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token renovado correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Sesión expirada o inválida
+  /api/auth/create/user:
+    post:
+      tags: [Usuarios]
+      summary: Crea un usuario en el sistema
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+  /api/info/user:
+    get:
+      tags: [Usuarios]
+      summary: Obtiene la información de un usuario por correo
+      parameters:
+        - in: query
+          name: userEmail
+          required: true
+          schema:
+            type: string
+            format: email
+          description: Correo a consultar
+      responses:
+        '200':
+          description: Información encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Usuario no encontrado
+  /api/admin/all/user:
+    get:
+      tags: [Usuarios]
+      summary: Lista todos los usuarios registrados
+      responses:
+        '200':
+          description: Listado completo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+  /api/users/me:
+    patch:
+      tags: [Usuarios]
+      summary: Actualiza el perfil del usuario autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserProfileRequest'
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Sesión inválida
+  /api/places:
+    post:
+      tags: [Lugares]
+      summary: Crea un nuevo lugar turístico
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceCreateRequest'
+      responses:
+        '201':
+          description: Lugar creado correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Place'
+  /api/places/{id}:
+    get:
+      tags: [Lugares]
+      summary: Obtiene la información de un lugar por su identificador
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      responses:
+        '200':
+          description: Lugar encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Place'
+        '404':
+          description: Lugar no encontrado
+    patch:
+      tags: [Lugares]
+      summary: Actualiza parcialmente un lugar
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceUpdateRequest'
+      responses:
+        '200':
+          description: Lugar actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Place'
+    delete:
+      tags: [Lugares]
+      summary: Elimina un lugar existente
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      responses:
+        '200':
+          description: Resultado de la eliminación
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: boolean
+                        description: Indica si el recurso fue eliminado
+        '403':
+          description: El usuario no tiene permisos sobre el lugar
+  /api/places/{id}/active:
+    patch:
+      tags: [Lugares]
+      summary: Activa o desactiva un lugar del usuario autenticado
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceActiveRequest'
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Place'
+  /admin/places/{id}/verify:
+    patch:
+      tags: [Lugares]
+      summary: Aprueba o rechaza un lugar (administrador)
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceVerifyRequest'
+      responses:
+        '200':
+          description: Estado de verificación actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Place'
+  /api/places/nearby:
+    get:
+      tags: [Lugares]
+      summary: Busca lugares cercanos a una ubicación
+      parameters:
+        - $ref: '#/components/parameters/LatQuery'
+        - $ref: '#/components/parameters/LngQuery'
+        - in: query
+          name: radiusMeters
+          schema:
+            type: number
+            format: double
+            default: 1000
+          description: Radio de búsqueda en metros. También se acepta el alias `r`.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+          description: Máximo de resultados a retornar
+        - in: query
+          name: categoryId
+          schema:
+            type: integer
+          description: Filtra por categoría específica
+      responses:
+        '200':
+          description: Resultados cercanos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Place'
+  /api/places/search:
+    get:
+      tags: [Lugares]
+      summary: Realiza una búsqueda avanzada de lugares
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Texto a buscar
+        - in: query
+          name: categoryId
+          schema:
+            type: integer
+        - in: query
+          name: onlyNearby
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/LatQuery'
+        - $ref: '#/components/parameters/LngQuery'
+        - in: query
+          name: radiusMeters
+          schema:
+            type: number
+            format: double
+          description: Radio de búsqueda cuando `onlyNearby` es verdadero (alias `r`).
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Resultado paginado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Place'
+  /api/places/all:
+    get:
+      tags: [Lugares]
+      summary: Devuelve todos los lugares registrados
+      responses:
+        '200':
+          description: Listado completo de lugares
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Place'
+  /api/places/mine:
+    get:
+      tags: [Lugares]
+      summary: Obtiene los lugares del propietario autenticado
+      responses:
+        '200':
+          description: Lugares del usuario
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Place'
+        '401':
+          description: Sesión inválida
+  /api/debug:
+    get:
+      tags: [Utilidades]
+      summary: Devuelve el correo del usuario autenticado (uso interno)
+      responses:
+        '200':
+          description: Texto con el correo electrónico
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/pruebas/places/{id}/reviews:
+    get:
+      tags: [Reseñas]
+      summary: Lista las reseñas de un lugar
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      responses:
+        '200':
+          description: Colección de reseñas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Review'
+    post:
+      tags: [Reseñas]
+      summary: Crea una reseña para un lugar
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+      responses:
+        '201':
+          description: Reseña creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400':
+          description: Datos inválidos
+  /api/pruebas/places/{id}/rating:
+    get:
+      tags: [Reseñas]
+      summary: Resumen de calificaciones del lugar
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      responses:
+        '200':
+          description: Estadísticas de calificación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceRatingSummary'
+  /api/pruebas/places/{id}/feedback:
+    post:
+      tags: [Feedback]
+      summary: Crea un comentario o reporte sobre un lugar
+      parameters:
+        - $ref: '#/components/parameters/PlaceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedbackRequest'
+      responses:
+        '201':
+          description: Feedback registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feedback'
+        '400':
+          description: Datos inválidos
+  /api/tools/geocode:
+    post:
+      tags: [Utilidades]
+      summary: Obtiene coordenadas a partir de una dirección textual
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeocodeRequest'
+      responses:
+        '200':
+          description: Resultados de geocodificación
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GeocodeResult'
+  /api/pruebas/places/nearby/getpalce:
+    get:
+      tags: [Visitas]
+      summary: Busca lugares cercanos para pruebas de visitas
+      parameters:
+        - $ref: '#/components/parameters/LatQuery'
+        - $ref: '#/components/parameters/LngQuery'
+        - in: query
+          name: radius
+          schema:
+            type: integer
+            default: 150
+          description: Radio en metros utilizado por el endpoint
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Lugares candidatos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PlaceNearby'
+  /api/pruebas/places/{placeId}/checkin:
+    post:
+      tags: [Visitas]
+      summary: Registra un check-in en un lugar
+      parameters:
+        - in: path
+          name: placeId
+          required: true
+          schema:
+            type: integer
+          description: Identificador del lugar a visitar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckinRequest'
+      responses:
+        '200':
+          description: Check-in procesado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CheckinResponse'
+        '400':
+          description: Datos inválidos
+        '409':
+          description: Conflicto con el estado actual de la visita
+  /api/pruebas/visits/{visitId}/confirm:
+    patch:
+      tags: [Visitas]
+      summary: Confirma una visita previamente registrada
+      parameters:
+        - in: path
+          name: visitId
+          required: true
+          schema:
+            type: integer
+          description: Identificador de la visita
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmRequest'
+      responses:
+        '200':
+          description: Visita confirmada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ConfirmResponse'
+        '400':
+          description: Petición inválida
+        '409':
+          description: La visita no puede confirmarse todavía
+  /api/pruebas/analytics/places/top:
+    get:
+      tags: [Visitas]
+      summary: Obtiene el ranking de lugares más visitados
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date
+          description: Fecha inicial (por defecto últimos 30 días)
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date
+          description: Fecha final (por defecto hoy)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Ranking calculado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TopPlace'
+components:
+  parameters:
+    PlaceIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Identificador numérico del lugar
+    LatQuery:
+      name: lat
+      in: query
+      required: true
+      schema:
+        type: number
+        format: double
+      description: Latitud en formato decimal
+    LngQuery:
+      name: lng
+      in: query
+      required: true
+      schema:
+        type: number
+        format: double
+      description: Longitud en formato decimal
+  schemas:
+    ApiResponse:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: integer
+          description: Código HTTP devuelto por el servicio
+        message:
+          type: string
+          description: Mensaje asociado al resultado
+        data:
+          nullable: true
+          description: Carga útil específica de cada endpoint
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    TotpSetupResponse:
+      type: object
+      required: [secretBase32, otpAuthUri, qrImage]
+      properties:
+        secretBase32:
+          type: string
+        otpAuthUri:
+          type: string
+          format: uri
+        qrImage:
+          type: string
+          description: Imagen QR codificada en base64 (data URL)
+    TotpStatusResponse:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+    TotpConfirmRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: integer
+          description: Código TOTP de 6 dígitos
+    TotpLoginRequest:
+      type: object
+      required: [email, totpCode]
+      properties:
+        email:
+          type: string
+          format: email
+        totpCode:
+          type: integer
+    RefreshRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Token JWT anterior
+    TokenResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        urlAvatar:
+          type: string
+          format: uri
+          nullable: true
+        identificationType:
+          type: string
+          nullable: true
+        identificationNumber:
+          type: string
+          nullable: true
+        lockedUntil:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    UpdateUserProfileRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        urlAvatar:
+          type: string
+        identificationType:
+          type: string
+        identificationNumber:
+          type: string
+    Place:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        ownerUserId:
+          type: integer
+          format: int64
+          nullable: true
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        imageUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+        isVerified:
+          type: boolean
+          nullable: true
+        isActive:
+          type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        distanceMeters:
+          type: number
+          format: double
+          nullable: true
+    PlaceCreateRequest:
+      type: object
+      required: [name, description, categoryId, lat, lng]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        imageUrls:
+          type: array
+          items:
+            type: string
+    PlaceUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        address:
+          type: string
+        phone:
+          type: string
+        website:
+          type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+    PlaceVerifyRequest:
+      type: object
+      required: [approve]
+      properties:
+        approve:
+          type: boolean
+    PlaceActiveRequest:
+      type: object
+      required: [active]
+      properties:
+        active:
+          type: boolean
+    CheckinRequest:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        accuracy_m:
+          type: integer
+          nullable: true
+        device_id:
+          type: string
+          nullable: true
+        meta:
+          type: string
+          nullable: true
+          description: Información adicional en formato JSON
+    CheckinResponse:
+      type: object
+      required: [visit_id, status, min_stay_seconds, distance_m]
+      properties:
+        visit_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+        min_stay_seconds:
+          type: integer
+        distance_m:
+          type: integer
+    ConfirmRequest:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        accuracy_m:
+          type: integer
+          nullable: true
+    ConfirmResponse:
+      type: object
+      required: [status, confirmedAt, place]
+      properties:
+        status:
+          type: string
+        confirmedAt:
+          type: string
+          format: date-time
+        place:
+          $ref: '#/components/schemas/PlaceBrief'
+    PlaceBrief:
+      type: object
+      required: [id, name, lat, lng]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        address:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        categoryId:
+          type: integer
+          nullable: true
+        imageUrls:
+          type: array
+          items:
+            type: string
+    PlaceNearby:
+      type: object
+      properties:
+        place:
+          $ref: '#/components/schemas/PlaceBrief'
+        distanceM:
+          type: integer
+          nullable: true
+    TopPlace:
+      type: object
+      properties:
+        place_id:
+          type: integer
+        name:
+          type: string
+        visits:
+          type: integer
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        placeId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        deviceId:
+          type: string
+          nullable: true
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        isVerified:
+          type: boolean
+          description: Indica si la reseña está verificada
+    CreateReviewRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+    PlaceRatingSummary:
+      type: object
+      properties:
+        placeId:
+          type: integer
+        avgRating:
+          type: number
+          format: double
+        reviewsCount:
+          type: integer
+          format: int64
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        placeId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+          nullable: true
+        deviceId:
+          type: string
+          nullable: true
+        type:
+          type: string
+        message:
+          type: string
+        contactEmail:
+          type: string
+          format: email
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateFeedbackRequest:
+      type: object
+      required: [type, message]
+      properties:
+        type:
+          type: string
+          description: update_info | suggestion | complaint | issue
+        message:
+          type: string
+        contact_email:
+          type: string
+          format: email
+          nullable: true
+        device_id:
+          type: string
+          nullable: true
+    GeocodeRequest:
+      type: object
+      required: [address]
+      properties:
+        address:
+          type: string
+        limit:
+          type: integer
+          default: 5
+    GeocodeResult:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+        lon:
+          type: number
+          format: double
+        wkt:
+          type: string
+        formatted:
+          type: string

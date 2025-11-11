@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
+import java.net.URI;
+
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
 @Configuration
@@ -22,6 +24,8 @@ public class RouterRest {
             FeedbackHandler feedbackHandler
     ) {
         return route()
+                // Docs
+                .GET("/docs", request -> ServerResponse.temporaryRedirect(URI.create("/docs/index.html")).build())
                 // Auth
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_STATUS_PATH, authenticateHandler::totpStatus)
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_SETUP_PATH,   authenticateHandler::totpSetup)
