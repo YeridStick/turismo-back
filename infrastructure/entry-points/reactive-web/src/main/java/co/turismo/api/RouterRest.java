@@ -4,6 +4,7 @@ import co.turismo.api.config.ConstantsEntryPoint;
 import co.turismo.api.handler.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
@@ -26,6 +27,7 @@ public class RouterRest {
         return route()
                 // Docs
                 .GET("/docs", request -> ServerResponse.temporaryRedirect(URI.create("/docs/index.html")).build())
+                .resources("/docs/**", new ClassPathResource("static/docs/"))
                 // Auth
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_STATUS_PATH, authenticateHandler::totpStatus)
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_SETUP_PATH,   authenticateHandler::totpSetup)
