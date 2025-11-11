@@ -28,6 +28,7 @@ public class RouterRest {
                 // Docs
                 .GET("/docs", request -> ServerResponse.temporaryRedirect(URI.create("/docs/index.html")).build())
                 .resources("/docs/**", new ClassPathResource("static/docs/"))
+                .resources("/webjars/**", new ClassPathResource("META-INF/resources/webjars/"))
                 // Auth
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_STATUS_PATH, authenticateHandler::totpStatus)
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_SETUP_PATH,   authenticateHandler::totpSetup)

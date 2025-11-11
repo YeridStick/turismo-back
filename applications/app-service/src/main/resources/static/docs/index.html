@@ -4,10 +4,6 @@
     <meta charset="utf-8" />
     <title>Turismo API – Documentación</title>
     <link rel="icon" href="data:," />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.95/dist/browser/scalar.css"
-    />
     <style>
       body {
         margin: 0;
@@ -53,22 +49,66 @@
     <main>
       <div id="scalar"></div>
     </main>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.95/dist/browser/standalone.js"></script>
     <script>
-      ScalarApiReference({
-        element: '#scalar',
-        spec: './openapi.yaml',
-        theme: 'kepler',
-        hideModels: false,
-        layout: 'modern',
-        hideSidebar: false,
-        tryItCredentialsPolicy: 'include',
-        defaultHttpClient: {
-          targetKey: 'default',
-          client: 'fetch',
-        },
-        hideClientButton: false,
-      });
+      (function () {
+        const localBase = '/webjars/scalar/0.1.0/dist/browser';
+        const cdnBase = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.95/dist/browser';
+        let initialized = false;
+
+        function initScalar() {
+          if (initialized || typeof ScalarApiReference !== 'function') {
+            return;
+          }
+          initialized = true;
+          ScalarApiReference({
+            element: '#scalar',
+            spec: './openapi.yaml',
+            theme: 'kepler',
+            hideModels: false,
+            layout: 'modern',
+            hideSidebar: false,
+            tryItCredentialsPolicy: 'include',
+            defaultHttpClient: {
+              targetKey: 'default',
+              client: 'fetch',
+            },
+            hideClientButton: false,
+          });
+        }
+
+        function loadScript(src, onload, onerror) {
+          const script = document.createElement('script');
+          script.src = src;
+          script.defer = true;
+          script.onload = onload;
+          script.onerror = onerror;
+          document.body.appendChild(script);
+        }
+
+        function appendStylesheet(href, onload, onerror) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = href;
+          if (onload) link.onload = onload;
+          if (onerror) link.onerror = onerror;
+          document.head.appendChild(link);
+        }
+
+        function loadScalar(base, fallback) {
+          let fallbackTriggered = false;
+          const triggerFallback = () => {
+            if (!fallbackTriggered && typeof fallback === 'function') {
+              fallbackTriggered = true;
+              fallback();
+            }
+          };
+
+          appendStylesheet(`${base}/scalar.css`, null, triggerFallback);
+          loadScript(`${base}/standalone.js`, initScalar, triggerFallback);
+        }
+
+        loadScalar(localBase, () => loadScalar(cdnBase));
+      })();
     </script>
   </body>
 </html>

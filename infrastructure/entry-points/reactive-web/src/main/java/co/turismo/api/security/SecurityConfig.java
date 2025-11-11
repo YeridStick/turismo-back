@@ -87,7 +87,7 @@ public class SecurityConfig {
 
                 .authorizeExchange(ex -> ex
                         // Público
-                        .pathMatchers("/docs", "/docs/", "/docs/**").permitAll()
+                        .pathMatchers("/docs", "/docs/", "/docs/**", "/webjars/**").permitAll()
                         .pathMatchers("/api/auth/**", "/actuator/health").permitAll()
                         .pathMatchers(HttpMethod.GET,  "/api/places/nearby").permitAll()
                         .pathMatchers(HttpMethod.GET,  "/api/places/all").permitAll()
