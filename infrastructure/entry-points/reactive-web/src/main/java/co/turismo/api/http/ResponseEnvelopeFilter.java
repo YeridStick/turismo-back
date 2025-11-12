@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE - 10)
@@ -26,12 +27,32 @@ public class ResponseEnvelopeFilter implements WebFilter {
     private static final String HEADER_SKIP    = "X-Envelope-Skip";
     private static final String HEADER_DISABLE = "X-Envelope-Disable";
 
+    // Rutas que NO deben tener envelope
+    private static final List<String> EXCLUDED_PATHS = List.of(
+            "/actuator",
+            "/v3/api-docs",
+            "/scalar",
+            "/swagger-ui",
+            "/webjars",
+            "/favicon.ico"
+    );
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        if (shouldSkip(exchange)) return chain.filter(exchange);
+        String path = exchange.getRequest().getPath().value();
+
+        // Verificar si debe omitirse por path
+        if (shouldSkipByPath(path)) {
+            return chain.filter(exchange);
+        }
+
+        // Verificar si debe omitirse por headers
+        if (shouldSkipByHeader(exchange)) {
+            return chain.filter(exchange);
+        }
 
         ServerHttpResponse original = exchange.getResponse();
-        DataBufferFactory bufferFactory = original.bufferFactory(); // ← usar este
+        DataBufferFactory bufferFactory = original.bufferFactory();
 
         ServerHttpResponseDecorator decorated = new ServerHttpResponseDecorator(original) {
             @Override
@@ -58,7 +79,6 @@ public class ResponseEnvelopeFilter implements WebFilter {
 
                                 // Si ya está en formato {status,...,data:...} no lo tocamos
                                 if (alreadyEnveloped(trimmed)) {
-                                    // mejor eliminar Content-Length si lo hubiera, para evitar desajustes
                                     getHeaders().remove("Content-Length");
                                     return super.writeWith(Mono.just(bufferFactory.wrap(trimmed.getBytes(StandardCharsets.UTF_8))));
                                 }
@@ -69,7 +89,7 @@ public class ResponseEnvelopeFilter implements WebFilter {
                                         "\"data\":" + (trimmed.isEmpty() ? "null" : trimmed) + "}";
 
                                 getHeaders().setContentType(MediaType.APPLICATION_JSON);
-                                getHeaders().remove("Content-Length"); // chunked
+                                getHeaders().remove("Content-Length");
                                 DataBuffer out = bufferFactory.wrap(wrapped.getBytes(StandardCharsets.UTF_8));
                                 return super.writeWith(Mono.just(out));
                             } finally {
@@ -82,7 +102,17 @@ public class ResponseEnvelopeFilter implements WebFilter {
         return chain.filter(exchange.mutate().response(decorated).build());
     }
 
-    private boolean shouldSkip(ServerWebExchange ex) {
+    /**
+     * Verifica si el path debe ser excluido del envelope
+     */
+    private boolean shouldSkipByPath(String path) {
+        return EXCLUDED_PATHS.stream().anyMatch(path::startsWith);
+    }
+
+    /**
+     * Verifica si los headers indican que debe omitirse el envelope
+     */
+    private boolean shouldSkipByHeader(ServerWebExchange ex) {
         var h = ex.getRequest().getHeaders();
         return "true".equalsIgnoreCase(h.getFirst(HEADER_SKIP))
                 || "true".equalsIgnoreCase(h.getFirst(HEADER_DISABLE));

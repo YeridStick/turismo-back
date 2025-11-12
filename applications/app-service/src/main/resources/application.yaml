@@ -20,30 +20,43 @@ spring:
     pool:
       initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
       max-size: "${CONN_POOL_MAX_SIZE:15}"
-      max-idle-time: "${CONN_POOL_IDLE_TIME:30m}"  # nota la unidad
+      max-idle-time: "${CONN_POOL_IDLE_TIME:30m}"
 
-  # ⚠️ Compat: claves antiguas que tu bean propio está leyendo
+  # compat si algún bean lee estas claves viejas
   connection-pool:
     initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
     max-size: "${CONN_POOL_MAX_SIZE:15}"
-    max-idle-time: "${CONN_POOL_IDLE_TIME:30}"   # si tu bean espera número "crudo", déjalo así
+    max-idle-time: "${CONN_POOL_IDLE_TIME:30}"
 
-management:
-  health:
-    redis:
-      enabled: false
-  endpoints:
-    web:
-      exposure:
-        include: "health,prometheus"
-  metrics:
-    export:
-      prometheus:
-        enabled: true
-  endpoint:
-    health:
-      probes:
-        enabled: true
+
+# ✅ CONFIGURACIÓN SCALAR OFICIAL
+scalar:
+  enabled: true
+  # URL del OpenAPI spec que genera SpringDoc
+  url: http://localhost:8082/v3/api-docs
+  # Path donde estará disponible Scalar
+  path: /api-docs
+  # UI customization
+  theme: deepSpace
+  layout: modern
+  darkMode: false
+  hideSearch: false
+  operationTitleSource: path
+  tagSorter: alpha
+  operationSorter: method
+  documentDownloadType: both
+
+# OpenAPI / SpringDoc Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+  show-actuator: false
 
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev"
@@ -57,9 +70,6 @@ logging:
 security:
   jwt:
     secret: "${JWT_SECRET:cambia-esto-por-una-clave-de-32+caracteres-para-HS256}"
-
-
-
   session:
     refresh-grace-minutes: ${SEC_REFRESH_GRACE_MINUTES:15}
 
@@ -81,8 +91,12 @@ turismo:
         refill-per-window: ${RATE_LIMIT_PLACES_REFILL:1500}
     skip-paths:
       - /actuator/health
+      - /actuator/prometheus
       - /favicon.ico
       - /
+      - /scalar
+      - /v3/api-docs
+      - /v3/api-docs/**
 
 locationiq:
   key: pk.568c37ab0f335201297f305792b7fe13
