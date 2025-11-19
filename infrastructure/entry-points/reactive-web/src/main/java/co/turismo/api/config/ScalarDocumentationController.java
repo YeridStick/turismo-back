@@ -1,8 +1,6 @@
 package co.turismo.api.config;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -17,9 +15,6 @@ import reactor.core.publisher.Mono;
  */
 @Controller
 public class ScalarDocumentationController {
-
-    @Value("${server.port:8082}")
-    private String serverPort;
 
     @Value("${scalar.title:Turismo API Documentation}")
     private String scalarTitle;
@@ -39,34 +34,29 @@ public class ScalarDocumentationController {
         String baseUrl = getBaseUrl(exchange);
         String openApiUrl = baseUrl + apiDocsPath;
 
-        String html = """
-            <!DOCTYPE html>
+        String html = String.format("""
+            <!doctype html>
             <html>
             <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>%s</title>
-                <style>
-                    body {
-                        margin: 0;
-                        padding: 0;
-                    }
-                </style>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
             </head>
             <body>
                 <script
                     id="api-reference"
-                    data-url="%s"
-                    data-configuration='%s'
-                ></script>
+                    data-url="%s"></script>
+                <script>
+                    var configuration = {
+                        theme: '%s'
+                    }
+
+                    document.getElementById('api-reference').dataset.configuration = JSON.stringify(configuration)
+                </script>
                 <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
             </body>
             </html>
-            """.formatted(
-                scalarTitle,
-                openApiUrl,
-                getScalarConfiguration()
-            );
+            """, scalarTitle, openApiUrl, scalarTheme);
 
         return Mono.just(html);
     }
@@ -100,36 +90,5 @@ public class ScalarDocumentationController {
         }
 
         return scheme + "://" + host;
-    }
-
-    /**
-     * Genera la configuración JSON para Scalar
-     */
-    private String getScalarConfiguration() {
-        return """
-            {
-                "theme": "%s",
-                "layout": "modern",
-                "showSidebar": true,
-                "hideModels": false,
-                "hideDownloadButton": false,
-                "darkMode": false,
-                "searchHotKey": "k",
-                "servers": [
-                    {
-                        "url": "http://localhost:%s",
-                        "description": "Local Development"
-                    }
-                ],
-                "authentication": {
-                    "preferredSecurityScheme": "bearerAuth",
-                    "http": {
-                        "bearer": {
-                            "token": ""
-                        }
-                    }
-                }
-            }
-            """.formatted(scalarTheme, serverPort).replaceAll("\\s+", " ");
     }
 }
