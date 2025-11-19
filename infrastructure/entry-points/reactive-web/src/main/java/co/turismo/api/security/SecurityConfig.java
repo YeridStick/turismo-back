@@ -159,6 +159,7 @@ public class SecurityConfig {
                 .authorizeExchange(ex -> ex
                         // ---- Público: documentación (IMPORTANTE: antes que todo) ----
                         .pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+                        .pathMatchers("/scalar", "/docs").permitAll()
 
                         // ---- Público: actuator y recursos ----
                         .pathMatchers("/actuator/health", "/actuator/prometheus").permitAll()
