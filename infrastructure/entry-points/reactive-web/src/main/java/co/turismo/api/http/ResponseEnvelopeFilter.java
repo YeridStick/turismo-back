@@ -31,7 +31,6 @@ public class ResponseEnvelopeFilter implements WebFilter {
     private static final List<String> EXCLUDED_PATHS = List.of(
             "/actuator",
             "/v3/api-docs",
-            "/scalar",
             "/swagger-ui",
             "/webjars",
             "/favicon.ico"

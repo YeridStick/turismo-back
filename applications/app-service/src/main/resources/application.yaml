@@ -7,7 +7,7 @@ spring:
     banner-mode: off
     log-startup-info: false
   application:
-    name: "${APP_NAME:portafolio}"
+    name: "${APP_NAME:turismo}"
 
   r2dbc:
     postgresql:
@@ -29,40 +29,20 @@ spring:
     max-idle-time: "${CONN_POOL_IDLE_TIME:30}"
 
 
-# ✅ CONFIGURACIÓN SCALAR OFICIAL
-scalar:
-  enabled: true
-  # URL del OpenAPI spec que genera SpringDoc
-  url: http://localhost:8082/v3/api-docs
-  # Path donde estará disponible Scalar
-  path: /api-docs
-  # UI customization
-  theme: deepSpace
-  layout: modern
-  darkMode: false
-  hideSearch: false
-  operationTitleSource: path
-  tagSorter: alpha
-  operationSorter: method
-  documentDownloadType: both
-
 # OpenAPI / SpringDoc Configuration
 springdoc:
   api-docs:
     path: /v3/api-docs
     enabled: true
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: true
-    operationsSorter: method
-    tagsSorter: alpha
   show-actuator: false
 
 cors:
-  allowed-origins: "http://localhost:4200,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev"
+  allowed-origins: "https://client.scalar.com,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173"
 
 logging:
   level:
+    org.springframework.web: DEBUG          # ← Agregar
+    org.springframework.security: DEBUG     # ← Agregar
     org.springframework.r2dbc: "${LOGGING_R2DBC:INFO}"
     org.yeridstick: "${LOGGING_YERIDSTICK:INFO}"
     root: "${LOGGING_ROOT:INFO}"
@@ -94,7 +74,6 @@ turismo:
       - /actuator/prometheus
       - /favicon.ico
       - /
-      - /scalar
       - /v3/api-docs
       - /v3/api-docs/**
 

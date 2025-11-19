@@ -1,37 +1,41 @@
 package co.turismo.api;
 
 import co.turismo.api.config.ConstantsEntryPoint;
-import co.turismo.api.config.ScalarDocumentationController;
+import co.turismo.api.dto.auth.RefreshTokenRequest;
+import co.turismo.api.dto.auth.TotpConfirmRequest;
+import co.turismo.api.dto.auth.TotpEmailRequest;
+import co.turismo.api.dto.auth.TotpLoginRequest;
+import co.turismo.api.dto.common.SimpleMessageResponse;
+import co.turismo.api.dto.response.docs.*;
+import co.turismo.api.dto.visit.CheckinRequest;
+import co.turismo.api.dto.visit.ConfirmRequest;
 import co.turismo.api.handler.*;
+import co.turismo.api.handler.PlacesHandler.ActiveRequest;
+import co.turismo.api.handler.PlacesHandler.PlaceCreateRequest;
+import co.turismo.api.handler.PlacesHandler.UpdateRequest;
+import co.turismo.api.handler.PlacesHandler.VerifyRequest;
+import co.turismo.model.feedback.Feedback;
+import co.turismo.model.place.Place;
+import co.turismo.model.reviews.Review;
+import co.turismo.model.user.UpdateUserProfileRequest;
+import co.turismo.model.user.User;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
-import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
-import static org.springdoc.webflux.core.fn.SpringdocRouteBuilder.route;
+import static org.springdoc.core.fn.builders.apiresponse.Builder.responseBuilder;
+import static org.springdoc.core.fn.builders.content.Builder.contentBuilder;
 import static org.springdoc.core.fn.builders.parameter.Builder.parameterBuilder;
 import static org.springdoc.core.fn.builders.requestbody.Builder.requestBodyBuilder;
-import static org.springdoc.core.fn.builders.content.Builder.contentBuilder;
-import static org.springdoc.core.fn.builders.apiresponse.Builder.responseBuilder;
-import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
+import static org.springdoc.core.fn.builders.schema.Builder.schemaBuilder;
+import static org.springdoc.webflux.core.fn.SpringdocRouteBuilder.route;
 
 @Configuration
 public class RouterRest {
 
     private static final String JSON = "application/json";
-
-    /**
-     * Ruta separada para Scalar UI (fuera de Springdoc)
-     */
-    @Bean
-    public RouterFunction<ServerResponse> scalarRoute() {
-        ScalarDocumentationController scalarController = new ScalarDocumentationController();
-
-        return RouterFunctions.route(GET("/scalar"), scalarController::serveScalarUI)
-                .andRoute(GET("/scalar/"), scalarController::serveScalarUI); // También con slash
-    }
 
     @Bean
     public RouterFunction<ServerResponse> routerFunction(
@@ -54,14 +58,10 @@ public class RouterRest {
                                 .summary("Estado TOTP por email")
                                 .description("Retorna si el usuario ya tiene TOTP habilitado.")
                                 .tag("Auth")
-                                .parameter(parameterBuilder()
-                                        .name("email")
-                                        .in(ParameterIn.QUERY)
-                                        .required(true)
-                                        .description("Email del usuario"))
-                                .response(responseBuilder().responseCode("200").description("OK"))
-                                .response(responseBuilder().responseCode("400").description("Parámetro inválido"))
-                                .response(responseBuilder().responseCode("404").description("Usuario no encontrado"))
+                                .parameter(queryParam("email", true, "Email del usuario", String.class, "ana@example.com"))
+                                .response(jsonResponse("200", "Estado actual de TOTP", ApiTotpStatusResponse.class))
+                                .response(messageResponse("400", "Parámetro inválido"))
+                                .response(messageResponse("404", "Usuario no encontrado"))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_SETUP_PATH,
@@ -70,12 +70,10 @@ public class RouterRest {
                                 .summary("Inicia setup TOTP")
                                 .description("Genera secreto Base32, URI otpauth y data URL del QR.")
                                 .tag("Auth")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("OK"))
-                                .response(responseBuilder().responseCode("409").description("Ya habilitado"))
-                                .response(responseBuilder().responseCode("400").description("Error en setup"))
+                                .requestBody(jsonBody(TotpEmailRequest.class, true))
+                                .response(jsonResponse("200", "Secreto generado", ApiTotpSetupResponse.class))
+                                .response(messageResponse("409", "Ya fue habilitado anteriormente"))
+                                .response(messageResponse("400", "Error en el proceso de setup"))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_TOTP_CONFIRM_PATH,
@@ -84,11 +82,9 @@ public class RouterRest {
                                 .summary("Confirma TOTP")
                                 .description("Verifica el primer código y habilita TOTP para el usuario.")
                                 .tag("Auth")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("Habilitado"))
-                                .response(responseBuilder().responseCode("400").description("Código inválido / error"))
+                                .requestBody(jsonBody(TotpConfirmRequest.class, true))
+                                .response(jsonResponse("200", "TOTP habilitado", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Código inválido o expirado"))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_LOGIN_TOTP_PATH,
@@ -97,11 +93,9 @@ public class RouterRest {
                                 .summary("Login con TOTP")
                                 .description("Devuelve JWT si la verificación TOTP es correcta.")
                                 .tag("Auth")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("Token emitido"))
-                                .response(responseBuilder().responseCode("400").description("Error en login TOTP"))
+                                .requestBody(jsonBody(TotpLoginRequest.class, true))
+                                .response(jsonResponse("200", "Token emitido", ApiTokenResponse.class))
+                                .response(messageResponse("400", "Error en login TOTP"))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_REFRESH_PATH,
@@ -110,11 +104,10 @@ public class RouterRest {
                                 .summary("Refrescar sesión")
                                 .description("Toma token por Authorization Bearer o en body y renueva si aplica.")
                                 .tag("Auth")
-                                .requestBody(requestBodyBuilder().required(false).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("Token renovado"))
-                                .response(responseBuilder().responseCode("401").description("No autorizado / fuera de ventana"))
+                                .parameter(headerParam("Authorization", false, "Bearer token que se desea refrescar", "Bearer eyJhbGciOiJIUzI1NiJ9..."))
+                                .requestBody(jsonBody(RefreshTokenRequest.class, false))
+                                .response(jsonResponse("200", "Token renovado", ApiTokenResponse.class))
+                                .response(messageResponse("401", "No autorizado o fuera de la ventana de gracia"))
                 )
 
                 // =========================
@@ -125,11 +118,9 @@ public class RouterRest {
                         ops -> ops.operationId("userCreate")
                                 .summary("Crear usuario")
                                 .tag("Users")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("Creado"))
-                                .response(responseBuilder().responseCode("400").description("Datos inválidos"))
+                                .requestBody(jsonBody(User.class, true))
+                                .response(jsonResponse("200", "Usuario creado", ApiUserResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.INFOUSER,
@@ -137,7 +128,8 @@ public class RouterRest {
                         ops -> ops.operationId("userInfo")
                                 .summary("Mi información")
                                 .tag("Users")
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(queryParam("userEmail", true, "Email a consultar", String.class, "ana@example.com"))
+                                .response(jsonResponse("200", "Información del usuario", User.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.ALLUSER,
@@ -145,7 +137,7 @@ public class RouterRest {
                         ops -> ops.operationId("userList")
                                 .summary("Listado de usuarios")
                                 .tag("Users")
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .response(jsonArrayResponse("200", "Usuarios registrados", User[].class))
                 )
 
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USERS_ME_PATH,
@@ -153,10 +145,8 @@ public class RouterRest {
                         ops -> ops.operationId("userUpdateMe")
                                 .summary("Actualizar mi perfil")
                                 .tag("Users")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("Actualizado"))
+                                .requestBody(jsonBody(UpdateUserProfileRequest.class, true))
+                                .response(jsonResponse("200", "Perfil actualizado", ApiUserResponse.class))
                 )
 
                 // =========================
@@ -168,24 +158,23 @@ public class RouterRest {
                                 .summary("Crear lugar")
                                 .description("Requiere rol OWNER o permisos.")
                                 .tag("Places")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("Creado"))
-                                .response(responseBuilder().responseCode("400").description("Datos inválidos"))
+                                .requestBody(jsonBody(PlaceCreateRequest.class, true))
+                                .response(jsonResponse("201", "Lugar creado", ApiPlaceResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH,
                         placesHandler::findNearby,
                         ops -> ops.operationId("placesNearby")
                                 .summary("Lugares cercanos")
-                                .description("Filtra por lat,lng,radius,categoryId, etc.")
+                                .description("Filtra por coordenadas, radio y categoría.")
                                 .tag("Places")
-                                .parameter(parameterBuilder().name("lat").in(ParameterIn.QUERY).required(true))
-                                .parameter(parameterBuilder().name("lng").in(ParameterIn.QUERY).required(true))
-                                .parameter(parameterBuilder().name("radius").in(ParameterIn.QUERY).required(false))
-                                .parameter(parameterBuilder().name("categoryId").in(ParameterIn.QUERY).required(false))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(queryParam("lat", true, "Latitud del usuario", Double.class, "6.25184"))
+                                .parameter(queryParam("lng", true, "Longitud del usuario", Double.class, "-75.56359"))
+                                .parameter(queryParam("radiusMeters", false, "Radio en metros (alias: r)", Double.class, "1000"))
+                                .parameter(queryParam("limit", false, "Número máximo de resultados", Integer.class, "20"))
+                                .parameter(queryParam("categoryId", false, "Filtra por categoría", Long.class, "5"))
+                                .response(jsonResponse("200", "Resultados por cercanía", ApiPlaceListResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_SEARCH_PATH,
@@ -193,18 +182,24 @@ public class RouterRest {
                         ops -> ops.operationId("placesSearch")
                                 .summary("Buscar lugares por texto")
                                 .tag("Places")
-                                .parameter(parameterBuilder().name("q").in(ParameterIn.QUERY).required(true).description("Texto de búsqueda"))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(queryParam("q", false, "Texto de búsqueda libre", String.class, "caf\u00e9"))
+                                .parameter(queryParam("categoryId", false, "Categoría a filtrar", Long.class, "5"))
+                                .parameter(queryParam("onlyNearby", false, "Limita a un radio respecto a lat/lng", Boolean.class, "false"))
+                                .parameter(queryParam("lat", false, "Latitud para onlyNearby", Double.class, "6.25"))
+                                .parameter(queryParam("lng", false, "Longitud para onlyNearby", Double.class, "-75.56"))
+                                .parameter(queryParam("radiusMeters", false, "Radio en metros para onlyNearby", Double.class, "1000"))
+                                .parameter(queryParam("page", false, "Página (0..N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad por página (<=100)", Integer.class, "20"))
+                                .response(jsonResponse("200", "Coincidencias por texto", ApiPlaceListResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ALL_PATH,
                         placesHandler::findAllPlaces,
                         ops -> ops.operationId("placesAll")
-                                .summary("Todos los lugares (paginado)")
+                                .summary("Todos los lugares")
+                                .description("Retorna el catálogo completo sin envoltorio paginado.")
                                 .tag("Places")
-                                .parameter(parameterBuilder().name("page").in(ParameterIn.QUERY).required(false))
-                                .parameter(parameterBuilder().name("size").in(ParameterIn.QUERY).required(false))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .response(jsonArrayResponse("200", "Listado completo", Place[].class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MINE_PATH,
@@ -212,7 +207,7 @@ public class RouterRest {
                         ops -> ops.operationId("placesMine")
                                 .summary("Mis lugares (OWNER)")
                                 .tag("Places")
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .response(jsonResponse("200", "Lugares del propietario autenticado", ApiPlaceListResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ID_PATH,
@@ -220,9 +215,9 @@ public class RouterRest {
                         ops -> ops.operationId("placeById")
                                 .summary("Obtener lugar por ID")
                                 .tag("Places")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
-                                .response(responseBuilder().responseCode("404").description("No encontrado"))
+                                .parameter(pathParam("id", "Identificador interno del lugar", Long.class))
+                                .response(jsonResponse("200", "Lugar encontrado", Place.class))
+                                .response(apiErrorResponse("404", "No encontrado"))
                 )
 
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ACTIVE_PATH,
@@ -230,10 +225,9 @@ public class RouterRest {
                         ops -> ops.operationId("placeSetActive")
                                 .summary("Activar/Desactivar lugar")
                                 .tag("Places")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("id", "Identificador interno del lugar", Long.class))
+                                .requestBody(jsonBody(ActiveRequest.class, true))
+                                .response(jsonResponse("200", "Estado actualizado", ApiPlaceResponse.class))
                 )
 
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ID_PATH,
@@ -241,9 +235,9 @@ public class RouterRest {
                         ops -> ops.operationId("placePatch")
                                 .summary("Patch lugar por ID")
                                 .tag("Places")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .requestBody(requestBodyBuilder().required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("id", "Identificador interno del lugar", Long.class))
+                                .requestBody(jsonBody(UpdateRequest.class, true))
+                                .response(jsonResponse("200", "Lugar actualizado", ApiPlaceResponse.class))
                 )
 
                 .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ID_PATH,
@@ -251,8 +245,10 @@ public class RouterRest {
                         ops -> ops.operationId("placeDelete")
                                 .summary("Eliminar lugar por ID")
                                 .tag("Places")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .response(responseBuilder().responseCode("200").description("Eliminado"))
+                                .parameter(pathParam("id", "Identificador interno del lugar", Long.class))
+                                .response(jsonResponse("200", "Eliminado", ApiBooleanResponse.class))
+                                .response(apiErrorResponse("403", "No es el propietario"))
+                                .response(apiErrorResponse("404", "Lugar o usuario no encontrado"))
                 )
 
                 // Debug
@@ -261,7 +257,7 @@ public class RouterRest {
                         ops -> ops.operationId("placesDebug")
                                 .summary("Debug places")
                                 .tag("Places")
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .response(jsonResponse("200", "Información del contexto autenticado", String.class))
                 )
 
                 // =========================
@@ -272,10 +268,10 @@ public class RouterRest {
                         ops -> ops.operationId("adminPlaceVerify")
                                 .summary("Verificar lugar (ADMIN)")
                                 .tag("Admin/Places")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .requestBody(requestBodyBuilder().required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
-                                .response(responseBuilder().responseCode("403").description("Forbidden"))
+                                .parameter(pathParam("id", "Identificador interno del lugar", Long.class))
+                                .requestBody(jsonBody(VerifyRequest.class, true))
+                                .response(jsonResponse("200", "Lugar verificado", ApiPlaceResponse.class))
+                                .response(apiErrorResponse("403", "Forbidden"))
                 )
 
                 // =========================
@@ -286,10 +282,8 @@ public class RouterRest {
                         ops -> ops.operationId("geocode")
                                 .summary("Geocodificar dirección")
                                 .tag("Geocode")
-                                .requestBody(requestBodyBuilder().required(true).content(
-                                        contentBuilder().mediaType(JSON)
-                                ))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .requestBody(jsonBody(GeocodeHandler.Req.class, true))
+                                .response(jsonResponse("200", "Resultados de geocodificación", ApiGeocodeResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH_PLACE,
@@ -297,9 +291,11 @@ public class RouterRest {
                         ops -> ops.operationId("visitsNearbyPlaces")
                                 .summary("Lugares cercanos (contexto visitas)")
                                 .tag("Visits")
-                                .parameter(parameterBuilder().name("lat").in(ParameterIn.QUERY).required(true))
-                                .parameter(parameterBuilder().name("lng").in(ParameterIn.QUERY).required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(queryParam("lat", true, "Latitud del usuario", Double.class, "6.25184"))
+                                .parameter(queryParam("lng", true, "Longitud del usuario", Double.class, "-75.56359"))
+                                .parameter(queryParam("radius", false, "Radio máximo en metros", Integer.class, "150"))
+                                .parameter(queryParam("limit", false, "Cantidad máxima de lugares", Integer.class, "5"))
+                                .response(jsonResponse("200", "Sugerencias cercanas", ApiNearbyPlacesResponse.class))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.VISITS_CHECKIN_PATH,
@@ -307,9 +303,11 @@ public class RouterRest {
                         ops -> ops.operationId("visitsCheckin")
                                 .summary("Check-in en lugar")
                                 .tag("Visits")
-                                .parameter(parameterBuilder().name("placeId").in(ParameterIn.PATH).required(true))
-                                .requestBody(requestBodyBuilder().required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("placeId", "Identificador del lugar visitado", Long.class))
+                                .requestBody(jsonBody(CheckinRequest.class, true))
+                                .response(jsonResponse("200", "Check-in registrado", ApiCheckinResponse.class))
+                                .response(apiErrorResponse("400", "Solicitud inválida"))
+                                .response(apiErrorResponse("409", "Conflicto con otro check-in"))
                 )
 
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.VISITS_CONFIRM_PATH,
@@ -317,9 +315,11 @@ public class RouterRest {
                         ops -> ops.operationId("visitsConfirm")
                                 .summary("Confirmar visita")
                                 .tag("Visits")
-                                .parameter(parameterBuilder().name("visitId").in(ParameterIn.PATH).required(true))
-                                .requestBody(requestBodyBuilder().required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("visitId", "Identificador del check-in", Long.class))
+                                .requestBody(jsonBody(ConfirmRequest.class, true))
+                                .response(jsonResponse("200", "Visita confirmada", ApiConfirmResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                                .response(apiErrorResponse("409", "No cumple los criterios de confirmación"))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.ANALYTICS_TOP_PLACES_PATH,
@@ -327,20 +327,22 @@ public class RouterRest {
                         ops -> ops.operationId("analyticsTopPlaces")
                                 .summary("Top lugares más visitados")
                                 .tag("Analytics")
-                                .parameter(parameterBuilder().name("limit").in(ParameterIn.QUERY).required(false))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(queryParam("from", false, "Fecha inicial (yyyy-MM-dd)", String.class, "2024-01-01"))
+                                .parameter(queryParam("to", false, "Fecha final (yyyy-MM-dd)", String.class, "2024-01-31"))
+                                .parameter(queryParam("limit", false, "Cantidad de resultados", Integer.class, "20"))
+                                .response(jsonResponse("200", "Ranking de visitas", ApiTopPlacesResponse.class))
                 )
 
                 // =========================
-                // Reviews & Feedback (pruebas)
+                // Reviews & Feedback
                 // =========================
                 .GET(ConstantsEntryPoint.API_BASE_PATH + "/pruebas/places/{id}/reviews",
                         reviewsHandler::list,
                         ops -> ops.operationId("reviewsList")
                                 .summary("Listar reviews por lugar")
                                 .tag("Reviews")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("id", "Identificador del lugar", Long.class))
+                                .response(jsonArrayResponse("200", "Reseñas del lugar", Review[].class))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + "/pruebas/places/{id}/reviews",
@@ -348,9 +350,10 @@ public class RouterRest {
                         ops -> ops.operationId("reviewsCreate")
                                 .summary("Crear review")
                                 .tag("Reviews")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .requestBody(requestBodyBuilder().required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("id", "Identificador del lugar", Long.class))
+                                .requestBody(jsonBody(ReviewsHandler.CreateReviewBody.class, true))
+                                .response(jsonResponse("201", "Reseña creada", Review.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + "/pruebas/places/{id}/rating",
@@ -358,8 +361,8 @@ public class RouterRest {
                         ops -> ops.operationId("reviewsSummary")
                                 .summary("Resumen de rating")
                                 .tag("Reviews")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("id", "Identificador del lugar", Long.class))
+                                .response(jsonResponse("200", "Estadísticas de calificación", ReviewsHandler.RatingSummaryResponse.class))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + "/pruebas/places/{id}/feedback",
@@ -367,11 +370,101 @@ public class RouterRest {
                         ops -> ops.operationId("feedbackCreate")
                                 .summary("Crear feedback para un lugar")
                                 .tag("Feedback")
-                                .parameter(parameterBuilder().name("id").in(ParameterIn.PATH).required(true))
-                                .requestBody(requestBodyBuilder().required(true))
-                                .response(responseBuilder().responseCode("200").description("OK"))
+                                .parameter(pathParam("id", "Identificador del lugar", Long.class))
+                                .requestBody(jsonBody(FeedbackHandler.CreateFeedbackBody.class, true))
+                                .response(jsonResponse("201", "Feedback almacenado", Feedback.class))
+                                .response(apiErrorResponse("400", "Solicitud inválida"))
                 )
 
                 .build();
+    }
+
+    private static org.springdoc.core.fn.builders.apiresponse.Builder jsonResponse(String code, String description, Class<?> schemaClass) {
+        var builder = responseBuilder()
+                .responseCode(code)
+                .description(description);
+        if (schemaClass != null) {
+            builder.content(jsonContent(schemaClass));
+        }
+        return builder;
+    }
+
+    private static org.springdoc.core.fn.builders.apiresponse.Builder jsonArrayResponse(String code, String description, Class<?> arrayClass) {
+        return responseBuilder()
+                .responseCode(code)
+                .description(description)
+                .content(jsonContent(arrayClass));
+    }
+
+    private static org.springdoc.core.fn.builders.apiresponse.Builder messageResponse(String code, String description) {
+        return responseBuilder()
+                .responseCode(code)
+                .description(description)
+                .content(jsonContent(SimpleMessageResponse.class));
+    }
+
+    private static org.springdoc.core.fn.builders.apiresponse.Builder apiErrorResponse(String code, String description) {
+        return jsonResponse(code, description, ApiErrorResponse.class);
+    }
+
+    private static org.springdoc.core.fn.builders.requestbody.Builder jsonBody(Class<?> schemaClass, boolean required) {
+        var builder = requestBodyBuilder().required(required);
+        if (schemaClass != null) {
+            builder.content(jsonContent(schemaClass));
+        }
+        return builder;
+    }
+
+    private static org.springdoc.core.fn.builders.parameter.Builder queryParam(String name, boolean required, String description, Class<?> schemaClass, String example) {
+        var builder = parameterBuilder()
+                .name(name)
+                .in(ParameterIn.QUERY)
+                .required(required);
+        if (description != null) {
+            builder.description(description);
+        }
+        if (schemaClass != null) {
+            builder.schema(schemaBuilder().implementation(schemaClass));
+        }
+        if (example != null) {
+            builder.example(example);
+        }
+        return builder;
+    }
+
+    private static org.springdoc.core.fn.builders.parameter.Builder pathParam(String name, String description, Class<?> schemaClass) {
+        var builder = parameterBuilder()
+                .name(name)
+                .in(ParameterIn.PATH)
+                .required(true);
+        if (description != null) {
+            builder.description(description);
+        }
+        if (schemaClass != null) {
+            builder.schema(schemaBuilder().implementation(schemaClass));
+        }
+        return builder;
+    }
+
+    private static org.springdoc.core.fn.builders.parameter.Builder headerParam(String name, boolean required, String description, String example) {
+        var builder = parameterBuilder()
+                .name(name)
+                .in(ParameterIn.HEADER)
+                .required(required);
+        if (description != null) {
+            builder.description(description);
+        }
+        if (example != null) {
+            builder.example(example);
+        }
+        return builder;
+    }
+
+    private static org.springdoc.core.fn.builders.content.Builder jsonContent(Class<?> schemaClass) {
+        var builder = contentBuilder().mediaType(JSON);
+        if (schemaClass != null) {
+            builder.schema(schemaBuilder().implementation(schemaClass));
+        }
+        return builder;
     }
 }

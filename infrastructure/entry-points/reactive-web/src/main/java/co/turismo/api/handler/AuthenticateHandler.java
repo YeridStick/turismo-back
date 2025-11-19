@@ -1,7 +1,10 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.auth.*;
+import co.turismo.api.dto.common.SimpleMessageResponse;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.http.ClientIp;
+import co.turismo.api.util.QrCodeUtil;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,9 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
-
-// Util para generar QR como data:image/png;base64
-import co.turismo.api.util.QrCodeUtil;
 
 @Component
 @RequiredArgsConstructor
@@ -23,13 +23,13 @@ public class AuthenticateHandler {
 
     // ---------- SETUP: POST /api/auth/code/setup ----------
     public Mono<ServerResponse> totpSetup(ServerRequest request) {
-        return request.bodyToMono(EmailReq.class)
+        return request.bodyToMono(TotpEmailRequest.class)
                 .map(req -> normalize(req.email()))
                 .flatMap(email ->
                         authenticateUseCase.setupTotp(email)
                                 .map(setup -> {
                                     String qrImage = QrCodeUtil.generateQrDataUrl(setup.otpAuthUri());
-                                    return new SetupRes(setup.secretBase32(), setup.otpAuthUri(), qrImage);
+                                    return new TotpSetupResponse(setup.secretBase32(), setup.otpAuthUri(), qrImage);
                                 })
                                 .flatMap(res -> ServerResponse.ok()
                                         .contentType(MediaType.APPLICATION_JSON)
@@ -41,11 +41,11 @@ public class AuthenticateHandler {
                                     if (msg.toLowerCase().contains("ya habilitado")) {
                                         return ServerResponse.status(409)
                                                 .contentType(MediaType.APPLICATION_JSON)
-                                                .bodyValue(new MessageRes(msg));
+                                                .bodyValue(new SimpleMessageResponse(msg));
                                     }
                                     return ServerResponse.badRequest()
                                             .contentType(MediaType.APPLICATION_JSON)
-                                            .bodyValue(new MessageRes(msg));
+                                            .bodyValue(new SimpleMessageResponse(msg));
                                 })
                 );
     }
@@ -59,45 +59,45 @@ public class AuthenticateHandler {
         if (email == null || email.isBlank()) {
             return ServerResponse.badRequest()
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(new MessageRes("El parámetro 'email' es requerido"));
+                    .bodyValue(new SimpleMessageResponse("El parámetro 'email' es requerido"));
         }
 
         return authenticateUseCase.totpStatus(email)
                 .flatMap(enabled -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new StatusRes(enabled))))
+                        .bodyValue(ApiResponse.ok(new TotpStatusResponse(enabled))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error consultando estado TOTP" : e.getMessage();
                     if (msg.toLowerCase().contains("no encontrado")) {
                         return ServerResponse.status(404)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(new MessageRes(msg));
+                                .bodyValue(new SimpleMessageResponse(msg));
                     }
                     return ServerResponse.badRequest()
                             .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new MessageRes(msg));
+                            .bodyValue(new SimpleMessageResponse(msg));
                 });
     }
 
     // ---------- CONFIRM: POST /api/auth/code/confirm ----------
     public Mono<ServerResponse> totpConfirm(ServerRequest request) {
-        return request.bodyToMono(ConfirmReq.class)
+        return request.bodyToMono(TotpConfirmRequest.class)
                 .flatMap(req -> authenticateUseCase.confirmTotp(normalize(req.email()), req.code()))
                 .then(ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new MessageRes("TOTP habilitado"))))
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("TOTP habilitado"))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error al confirmar TOTP" : e.getMessage();
                     log.error("TOTP confirm error: {}", msg);
                     return ServerResponse.badRequest()
                             .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new MessageRes(msg));
+                            .bodyValue(new SimpleMessageResponse(msg));
                 });
     }
 
     // ---------- LOGIN: POST /api/auth/login-code ----------
     public Mono<ServerResponse> loginTotp(ServerRequest request) {
-        return request.bodyToMono(LoginReq.class)
+        return request.bodyToMono(TotpLoginRequest.class)
                 .flatMap(req -> {
                     String email = normalize(req.email());
                     String ip = ClientIp.resolve(request.exchange().getRequest());
@@ -105,13 +105,13 @@ public class AuthenticateHandler {
                 })
                 .flatMap(token -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new TokenRes(token))))
+                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error en login TOTP" : e.getMessage();
                     log.error("Login TOTP error: {}", msg);
                     return ServerResponse.badRequest()
                             .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new MessageRes(msg));
+                            .bodyValue(new SimpleMessageResponse(msg));
                 });
     }
 
@@ -123,7 +123,7 @@ public class AuthenticateHandler {
 
         Mono<String> bodyTokenMono = (oldToken != null)
                 ? Mono.just(oldToken)
-                : request.bodyToMono(RefreshReq.class).map(RefreshReq::token);
+                : request.bodyToMono(RefreshTokenRequest.class).map(RefreshTokenRequest::token);
 
         String ip = ClientIp.resolve(request.exchange().getRequest());
 
@@ -132,26 +132,16 @@ public class AuthenticateHandler {
                 .flatMap(tok -> authenticateUseCase.refreshSession(tok, ip))
                 .flatMap(newToken -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new TokenRes(newToken))))
+                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(newToken))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "No fue posible refrescar el token" : e.getMessage();
                     log.warn("Refresh token error: {}", msg);
                     // Si está fuera de la ventana de gracia / IP no coincide, responde 401
                     return ServerResponse.status(401)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new MessageRes(msg));
+                            .bodyValue(new SimpleMessageResponse(msg));
                 });
     }
-
-    // ---------- DTOs ----------
-    public record EmailReq(String email) {}
-    public record ConfirmReq(String email, int code) {}
-    public record LoginReq(String email, int totpCode) {}
-    public record SetupRes(String secretBase32, String otpAuthUri, String qrImage) {}
-    public record TokenRes(String token) {}
-    public record MessageRes(String message) {}
-    public record StatusRes(boolean enabled) {}
-    public record RefreshReq(String token) {}
 
     private static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase();

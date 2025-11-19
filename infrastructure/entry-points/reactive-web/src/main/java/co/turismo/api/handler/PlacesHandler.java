@@ -4,6 +4,7 @@ import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.Place;
 import co.turismo.usecase.place.PlaceUseCase;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -214,31 +215,62 @@ public class PlacesHandler {
     }
 
 
-    public record Message(String message) {}
-    public record VerifyRequest(boolean approve) {}
-    public record ActiveRequest(boolean active) {}
+    @Schema(name = "VerifyPlaceRequest", description = "Aprobación o rechazo desde el panel de administración")
+    public record VerifyRequest(
+            @Schema(description = "true para aprobar, false para rechazar", example = "true")
+            boolean approve
+    ) {
+    }
 
+    @Schema(name = "SetPlaceActiveRequest", description = "Activa o desactiva un lugar publicado")
+    public record ActiveRequest(
+            @Schema(description = "true para activar, false para suspender", example = "false")
+            boolean active
+    ) {
+    }
+
+    @Schema(name = "PlaceCreateRequest", description = "Cuerpo necesario para registrar un nuevo lugar turístico")
     public record PlaceCreateRequest(
+            @Schema(description = "Nombre comercial del lugar", example = "Café del Parque")
             @NotBlank String name,
+            @Schema(description = "Descripción corta que se mostrará en las tarjetas", example = "Espacio cultural con cafés especiales")
             @NotBlank String description,
-            @NotNull  Long   categoryId,
-            @NotNull  Double lat,
-            @NotNull  Double lng,
+            @Schema(description = "Identificador de la categoría", example = "12")
+            @NotNull Long categoryId,
+            @Schema(description = "Latitud decimal", example = "6.25184")
+            @NotNull Double lat,
+            @Schema(description = "Longitud decimal", example = "-75.56359")
+            @NotNull Double lng,
+            @Schema(description = "Dirección legible", example = "Cra. 43 #8-31, Medellín")
             String address,
+            @Schema(description = "Número de contacto", example = "+57 3011234567")
             String phone,
+            @Schema(description = "Sitio web oficial", example = "https://cafedelparque.co")
             String website,
+            @Schema(description = "Listado de URLs de imágenes")
             String[] imageUrls
-    ) {}
+    ) {
+    }
 
+    @Schema(name = "PlaceUpdateRequest", description = "Campos opcionales para actualizar parcialmente un lugar")
     public record UpdateRequest(
+            @Schema(description = "Nombre comercial del lugar", example = "Café del Parque")
             String name,
+            @Schema(description = "Descripción corta que se mostrará en las tarjetas")
             String description,
+            @Schema(description = "Identificador de la categoría", example = "12")
             Long categoryId,
+            @Schema(description = "Latitud decimal", example = "6.25184")
             Double lat,
+            @Schema(description = "Longitud decimal", example = "-75.56359")
             Double lng,
+            @Schema(description = "Dirección legible", example = "Cra. 43 #8-31, Medellín")
             String address,
+            @Schema(description = "Número de contacto", example = "+57 3011234567")
             String phone,
+            @Schema(description = "Sitio web oficial", example = "https://cafedelparque.co")
             String website,
+            @Schema(description = "Listado de URLs de imágenes")
             List<String> imageUrls
     ) {
         public co.turismo.model.place.UpdatePlaceRequest toDomain() {

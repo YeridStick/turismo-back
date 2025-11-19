@@ -5,6 +5,8 @@ import co.turismo.api.security.jwt.JwtReactiveAuthenticationManager;
 import co.turismo.api.security.jwt.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,7 +19,14 @@ import org.springframework.security.web.server.authentication.AuthenticationWebF
 import org.springframework.security.web.server.ServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.authorization.ServerAccessDeniedHandler;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.springframework.security.config.web.server.SecurityWebFiltersOrder.AUTHENTICATION;
 
@@ -27,6 +36,68 @@ public class SecurityConfig {
 
     @Value("${security.jwt.secret}")
     private String jwtSecret;
+
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:8080}")
+    private String allowedOrigins;
+
+    /**
+     * Configuración de CORS desde propiedades del YAML
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Parse de los orígenes permitidos desde el YAML (separados por comas)
+        List<String> origins = new ArrayList<>();
+        if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
+            String[] originArray = allowedOrigins.split(",");
+            for (String origin : originArray) {
+                origins.add(origin.trim());
+            }
+        } else {
+            // Fallback si no está configurado
+            origins = Arrays.asList(
+                    "http://localhost:3000",
+                    "http://localhost:8080",
+                    "http://localhost:5173"
+            );
+        }
+
+        configuration.setAllowedOrigins(origins);
+
+        // Métodos HTTP permitidos
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
+        ));
+
+        // Headers permitidos
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With",
+                "X-CSRF-Token",
+                "Cache-Control"
+        ));
+
+        // Headers que puede exponer el navegador
+        configuration.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "X-Total-Count"
+        ));
+
+        // Permitir credenciales (cookies, auth headers)
+        configuration.setAllowCredentials(true);
+
+        // Máximo tiempo de cache de la preflight request (en segundos)
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+
+        return source;
+    }
 
     @Bean
     public ServerAuthenticationEntryPoint jsonAuthEntryPoint(ObjectMapper mapper) {
@@ -66,7 +137,8 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(
             ServerHttpSecurity http,
             ServerAuthenticationEntryPoint jsonAuthEntryPoint,
-            ServerAccessDeniedHandler jsonAccessDeniedHandler
+            ServerAccessDeniedHandler jsonAccessDeniedHandler,
+            CorsConfigurationSource corsConfigurationSource
     ) {
         var tokenProvider = new JwtTokenProvider(jwtSecret);
         var authManager   = new JwtReactiveAuthenticationManager(tokenProvider);
@@ -78,17 +150,15 @@ public class SecurityConfig {
 
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint(jsonAuthEntryPoint)
                         .accessDeniedHandler(jsonAccessDeniedHandler)
                 )
                 .authorizeExchange(ex -> ex
-                        // ---- Público: documentación ----
-                        .pathMatchers("/scalar", "/scalar/**").permitAll()
-                        .pathMatchers("/docs", "/docs/**").permitAll()
+                        // ---- Público: documentación (IMPORTANTE: antes que todo) ----
                         .pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
-                        .pathMatchers("/swagger-ui.html", "/swagger-ui/**").permitAll()
 
                         // ---- Público: actuator y recursos ----
                         .pathMatchers("/actuator/health", "/actuator/prometheus").permitAll()
@@ -96,6 +166,7 @@ public class SecurityConfig {
 
                         // ---- Público: endpoints de autenticación ----
                         .pathMatchers("/api/auth/**").permitAll()
+                        .pathMatchers("/admin/auth/**").permitAll()
 
                         // ---- Público: endpoints de places ----
                         .pathMatchers(HttpMethod.GET, "/api/places/nearby").permitAll()

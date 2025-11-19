@@ -1,7 +1,8 @@
 package co.turismo.api.handler;
 
-import co.turismo.model.geocode.GeocodeResult;
+import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.usecase.geocodeaddress.GeocodeAddressUseCase;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -15,8 +16,14 @@ public class GeocodeHandler {
 
     private final GeocodeAddressUseCase useCase;
 
-    public record Req(String address, Integer limit) {}
-    public record Resp<T>(int status, String message, T data) {}
+    @Schema(name = "GeocodeRequest", description = "Dirección que se desea transformar en coordenadas")
+    public record Req(
+            @Schema(description = "Texto completo de la dirección", example = "Cra. 7 #40-62, Bogotá")
+            String address,
+            @Schema(description = "Máximo de resultados a retornar (1-10)", example = "5")
+            Integer limit
+    ) {
+    }
 
     public Mono<ServerResponse> geocode(ServerRequest req) {
 
@@ -27,6 +34,6 @@ public class GeocodeHandler {
                 })
                 .flatMap(data -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(new Resp<>(200, "OK", data)));
+                        .bodyValue(ApiResponse.ok(data)));
     }
 }
