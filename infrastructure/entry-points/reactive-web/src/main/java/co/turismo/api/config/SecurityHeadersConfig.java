@@ -23,7 +23,7 @@ public class SecurityHeadersConfig implements WebFilter {
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
                 "font-src 'self' https://cdn.jsdelivr.net data:; " +
                 "img-src 'self' data: https:; " +
-                "connect-src 'self'; " +
+                "connect-src 'self' http://localhost:8082 http://127.0.0.1:8082; " +
                 "frame-ancestors 'self'; " +
                 "form-action 'self'"
             );

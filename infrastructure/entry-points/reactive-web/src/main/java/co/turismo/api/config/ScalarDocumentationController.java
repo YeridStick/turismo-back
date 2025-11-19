@@ -31,8 +31,8 @@ public class ScalarDocumentationController {
     @GetMapping(value = "/scalar", produces = MediaType.TEXT_HTML_VALUE)
     @ResponseBody
     public Mono<String> scalarUi(ServerWebExchange exchange) {
-        String baseUrl = getBaseUrl(exchange);
-        String openApiUrl = baseUrl + apiDocsPath;
+        // Usar URL relativa para evitar problemas con CSP y diferentes entornos
+        String openApiUrl = apiDocsPath;
 
         String html = String.format("""
             <!doctype html>
@@ -69,26 +69,5 @@ public class ScalarDocumentationController {
         exchange.getResponse().setStatusCode(HttpStatus.TEMPORARY_REDIRECT);
         exchange.getResponse().getHeaders().add("Location", "/scalar");
         return exchange.getResponse().setComplete();
-    }
-
-    /**
-     * Obtiene la URL base del servidor
-     */
-    private String getBaseUrl(ServerWebExchange exchange) {
-        String scheme = exchange.getRequest().getHeaders().getFirst("X-Forwarded-Proto");
-        if (scheme == null) {
-            scheme = exchange.getRequest().getURI().getScheme();
-        }
-
-        String host = exchange.getRequest().getHeaders().getFirst("Host");
-        if (host == null) {
-            host = exchange.getRequest().getURI().getHost();
-            int port = exchange.getRequest().getURI().getPort();
-            if (port > 0 && port != 80 && port != 443) {
-                host = host + ":" + port;
-            }
-        }
-
-        return scheme + "://" + host;
     }
 }
