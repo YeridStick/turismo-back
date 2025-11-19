@@ -143,10 +143,20 @@ public class SecurityConfig {
         var tokenProvider = new JwtTokenProvider(jwtSecret);
         var authManager   = new JwtReactiveAuthenticationManager(tokenProvider);
 
+        // Convertidor que solo intenta autenticar si hay un Bearer token presente
         var bearerConverter = new ServerBearerTokenAuthenticationConverter();
+        bearerConverter.setAllowUriQueryParameter(false);
+
         var jwtFilter = new AuthenticationWebFilter(authManager);
         jwtFilter.setServerAuthenticationConverter(bearerConverter);
         jwtFilter.setSecurityContextRepository(NoOpServerSecurityContextRepository.getInstance());
+
+        // IMPORTANTE: Configurar el filtro para que NO requiera autenticación en caso de fallo
+        jwtFilter.setRequiresAuthenticationMatcher(exchange -> {
+            // Solo intentar autenticar si hay un header Authorization
+            String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
+            return Mono.just(authHeader != null && authHeader.startsWith("Bearer "));
+        });
 
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
