@@ -19,6 +19,7 @@ import org.springframework.security.web.server.authentication.AuthenticationWebF
 import org.springframework.security.web.server.ServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.authorization.ServerAccessDeniedHandler;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -155,7 +156,11 @@ public class SecurityConfig {
         jwtFilter.setRequiresAuthenticationMatcher(exchange -> {
             // Solo intentar autenticar si hay un header Authorization
             String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
-            return Mono.just(authHeader != null && authHeader.startsWith("Bearer "));
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                return ServerWebExchangeMatcher.MatchResult.match();
+            } else {
+                return ServerWebExchangeMatcher.MatchResult.notMatch();
+            }
         });
 
         return http
