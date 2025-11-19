@@ -19,11 +19,11 @@ public class SecurityHeadersConfig implements WebFilter {
         if (isDocumentationPath(path)) {
             headers.set("Content-Security-Policy",
                 "default-src 'self'; " +
-                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+                "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; " +
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-                "font-src 'self' https://cdn.jsdelivr.net data:; " +
+                "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com data:; " +
                 "img-src 'self' data: https:; " +
-                "connect-src 'self' http://localhost:8082 http://127.0.0.1:8082; " +
+                "connect-src 'self' https://cdn.jsdelivr.net http://localhost:8082 http://127.0.0.1:8082; " +
                 "frame-ancestors 'self'; " +
                 "form-action 'self'"
             );
