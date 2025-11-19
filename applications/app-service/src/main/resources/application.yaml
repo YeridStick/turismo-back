@@ -36,6 +36,17 @@ springdoc:
     enabled: true
   show-actuator: false
 
+# Scalar API Reference Configuration
+scalar:
+  title: "${SCALAR_TITLE:Turismo API Documentation}"
+  theme: "${SCALAR_THEME:purple}"
+  dark-mode: "${SCALAR_DARK_MODE:false}"
+  layout: "${SCALAR_LAYOUT:modern}"
+  show-sidebar: "${SCALAR_SHOW_SIDEBAR:true}"
+  hide-models: "${SCALAR_HIDE_MODELS:false}"
+  hide-download-button: "${SCALAR_HIDE_DOWNLOAD_BUTTON:false}"
+  search-hot-key: "${SCALAR_SEARCH_HOT_KEY:k}"
+
 cors:
   allowed-origins: "https://client.scalar.com,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173"
 
@@ -76,6 +87,8 @@ turismo:
       - /
       - /v3/api-docs
       - /v3/api-docs/**
+      - /scalar
+      - /docs
 
 locationiq:
   key: pk.568c37ab0f335201297f305792b7fe13

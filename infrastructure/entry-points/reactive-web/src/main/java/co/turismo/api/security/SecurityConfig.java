@@ -19,6 +19,7 @@ import org.springframework.security.web.server.authentication.AuthenticationWebF
 import org.springframework.security.web.server.ServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.authorization.ServerAccessDeniedHandler;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -143,13 +144,29 @@ public class SecurityConfig {
         var tokenProvider = new JwtTokenProvider(jwtSecret);
         var authManager   = new JwtReactiveAuthenticationManager(tokenProvider);
 
+        // Convertidor que solo intenta autenticar si hay un Bearer token presente
         var bearerConverter = new ServerBearerTokenAuthenticationConverter();
+        bearerConverter.setAllowUriQueryParameter(false);
+
         var jwtFilter = new AuthenticationWebFilter(authManager);
         jwtFilter.setServerAuthenticationConverter(bearerConverter);
         jwtFilter.setSecurityContextRepository(NoOpServerSecurityContextRepository.getInstance());
 
+        // IMPORTANTE: Configurar el filtro para que NO requiera autenticación en caso de fallo
+        jwtFilter.setRequiresAuthenticationMatcher(exchange -> {
+            // Solo intentar autenticar si hay un header Authorization
+            String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                return ServerWebExchangeMatcher.MatchResult.match();
+            } else {
+                return ServerWebExchangeMatcher.MatchResult.notMatch();
+            }
+        });
+
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .exceptionHandling(eh -> eh
@@ -159,6 +176,7 @@ public class SecurityConfig {
                 .authorizeExchange(ex -> ex
                         // ---- Público: documentación (IMPORTANTE: antes que todo) ----
                         .pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+                        .pathMatchers("/scalar", "/docs").permitAll()
 
                         // ---- Público: actuator y recursos ----
                         .pathMatchers("/actuator/health", "/actuator/prometheus").permitAll()
