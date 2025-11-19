@@ -150,6 +150,8 @@ public class SecurityConfig {
 
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .exceptionHandling(eh -> eh
