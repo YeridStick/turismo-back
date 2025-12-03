@@ -50,6 +50,21 @@ public class UserRepositoryAdapter
     }
 
     @Override
+    protected UserData toData(User entity) {
+        UserData userData = super.toData(entity);
+
+        // Establecer valores por defecto para campos OTP si son null
+        if (userData.getOtpAttempts() == null) {
+            userData.setOtpAttempts(0);
+        }
+        if (userData.getOtpMaxAttempts() == null) {
+            userData.setOtpMaxAttempts(3);
+        }
+
+        return userData;
+    }
+
+    @Override
     public Mono<User> save(User user) {
         return Mono.just(user)
                 .map(this::toData)
