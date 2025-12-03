@@ -48,7 +48,7 @@ scalar:
   search-hot-key: "${SCALAR_SEARCH_HOT_KEY:k}"
 
 cors:
-  allowed-origins: "https://client.scalar.com,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173"
+  allowed-origins: "https://client.scalar.com,http://localhost:3000,http://localhost:8081,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173"
 
 logging:
   level:
