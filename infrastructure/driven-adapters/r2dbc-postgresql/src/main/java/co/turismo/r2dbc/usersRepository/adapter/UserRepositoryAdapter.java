@@ -12,6 +12,8 @@ import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.OffsetDateTime;
+
 @Repository
 public class UserRepositoryAdapter
         extends ReactiveAdapterOperations<User, UserData, Long, UserAdapterRepository>
@@ -53,16 +55,19 @@ public class UserRepositoryAdapter
     protected UserData toData(User entity) {
         UserData userData = super.toData(entity);
 
-        // Establecer valores por defecto para campos OTP si son null
         if (userData.getOtpAttempts() == null) {
             userData.setOtpAttempts(0);
         }
         if (userData.getOtpMaxAttempts() == null) {
             userData.setOtpMaxAttempts(3);
         }
+        if (userData.getCreatedAt() == null) {
+            userData.setCreatedAt(OffsetDateTime.now());
+        }
 
         return userData;
     }
+
 
     @Override
     public Mono<User> save(User user) {
