@@ -50,6 +50,7 @@ public class PlacesHandler {
                             .phone(dto.phone())
                             .website(dto.website())
                             .imageUrls(dto.imageUrls())
+                            .model3dUrls(dto.model3dUrls())
                             .build();
 
                     return placeUseCase.createPlace(cmd);
@@ -248,7 +249,9 @@ public class PlacesHandler {
             @Schema(description = "Sitio web oficial", example = "https://cafedelparque.co")
             String website,
             @Schema(description = "Listado de URLs de imágenes")
-            String[] imageUrls
+            String[] imageUrls,
+            @Schema(description = "Listado de URLs de modelos 3D")
+            String[] model3dUrls
     ) {
     }
 
@@ -271,7 +274,9 @@ public class PlacesHandler {
             @Schema(description = "Sitio web oficial", example = "https://cafedelparque.co")
             String website,
             @Schema(description = "Listado de URLs de imágenes")
-            List<String> imageUrls
+            List<String> imageUrls,
+            @Schema(description = "Listado de URLs de modelos 3D")
+            List<String> model3dUrls
     ) {
         public co.turismo.model.place.UpdatePlaceRequest toDomain() {
             return co.turismo.model.place.UpdatePlaceRequest.builder()
@@ -284,6 +289,7 @@ public class PlacesHandler {
                     .phone(phone)
                     .website(website)
                     .imageUrls(imageUrls == null ? null : imageUrls.toArray(String[]::new))
+                    .model3dUrls(model3dUrls == null ? null : model3dUrls.toArray(String[]::new))
                     .build();
         }
     }

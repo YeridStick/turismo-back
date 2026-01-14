@@ -14,7 +14,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
     // CREATE
     @Query("""
         INSERT INTO places(
-            owner_user_id, name, description, category_id, geom, address, phone, website, image_urls,
+            owner_user_id, name, description, category_id, geom, address, phone, website, image_urls, model_3d_urls,
             is_verified, is_active, created_at
         )
         VALUES (
@@ -22,6 +22,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_SetSRID(ST_MakePoint(:lng, :lat), 4326),
             :address, :phone, :website,
             COALESCE(:imageUrls::text[], '{}'::text[]),
+            COALESCE(:model3dUrls::text[], '{}'::text[]),
             FALSE, TRUE, NOW()
         )
         RETURNING
@@ -33,6 +34,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(geom) AS lng,
             address, phone, website,
             image_urls,
+            model_3d_urls,
             is_verified,
             is_active,
             created_at
@@ -47,7 +49,8 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             @Param("address") String address,
             @Param("phone") String phone,
             @Param("website") String website,
-            @Param("imageUrls") String[] imageUrls
+            @Param("imageUrls") String[] imageUrls,
+            @Param("model3dUrls") String[] model3dUrls
     );
 
     // NEARBY
@@ -61,6 +64,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(p.geom) AS lng,
             p.address, p.phone, p.website,
             p.image_urls,
+            p.model_3d_urls,
             p.is_verified,
             p.is_active,
             p.created_at,
@@ -95,6 +99,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(p.geom) AS lng,
             p.address, p.phone, p.website,
             p.image_urls,
+            p.model_3d_urls,
             p.is_verified,
             p.is_active,
             p.created_at
@@ -115,7 +120,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
         SELECT
           p.id, p.owner_user_id, p.name, p.description, p.category_id,
           ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
-          p.address, p.phone, p.website, p.image_urls, p.is_verified, p.is_active, p.created_at,
+          p.address, p.phone, p.website, p.image_urls, p.model_3d_urls, p.is_verified, p.is_active, p.created_at,
           CASE
             WHEN :lat IS NOT NULL AND :lng IS NOT NULL
             THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
@@ -184,6 +189,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             phone       = COALESCE(:phone,       phone),
             website     = COALESCE(:website,     website),
             image_urls  = COALESCE(:imageUrls::text[], image_urls),
+            model_3d_urls = COALESCE(:model3dUrls::text[], model_3d_urls),
             geom        = CASE
                            WHEN :lat IS NOT NULL AND :lng IS NOT NULL
                            THEN ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
@@ -199,6 +205,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(geom) AS lng,
             address, phone, website,
             image_urls,
+            model_3d_urls,
             is_verified,
             is_active,
             created_at
@@ -213,7 +220,8 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             @Param("address") String address,
             @Param("phone") String phone,
             @Param("website") String website,
-            @Param("imageUrls") String[] imageUrls
+            @Param("imageUrls") String[] imageUrls,
+            @Param("model3dUrls") String[] model3dUrls
     );
 
     // (Compat) Mis lugares por email – ya sin co-owners
@@ -227,6 +235,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(p.geom) AS lng,
             p.address, p.phone, p.website,
             p.image_urls,
+            p.model_3d_urls,
             p.is_verified,
             p.is_active,
             p.created_at
@@ -254,6 +263,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(geom) AS lng,
             address, phone, website,
             image_urls,
+            model_3d_urls,
             is_verified,
             is_active,
             created_at
@@ -279,6 +289,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(geom) AS lng,
             address, phone, website,
             image_urls,
+            model_3d_urls,
             is_verified,
             is_active,
             created_at
@@ -299,6 +310,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(p.geom) AS lng,
             p.address, p.phone, p.website,
             p.image_urls,
+            p.model_3d_urls,
             p.is_verified,
             p.is_active,
             p.created_at
@@ -318,6 +330,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(p.geom) AS lng,
             p.address, p.phone, p.website,
             p.image_urls,
+            p.model_3d_urls,
             p.is_verified,
             p.is_active,
             p.created_at
@@ -337,6 +350,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(p.geom) AS lng,
             p.address, p.phone, p.website,
             p.image_urls,
+            p.model_3d_urls,
             p.is_verified,
             p.is_active,
             p.created_at
@@ -360,6 +374,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(geom) AS lng,
             address, phone, website,
             image_urls,
+            model_3d_urls,
             is_verified,
             is_active,
             created_at
@@ -378,6 +393,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_X(p.geom) AS lng,
             p.address, p.phone, p.website,
             p.image_urls,
+            p.model_3d_urls,
             p.is_verified,
             p.is_active,
             p.created_at

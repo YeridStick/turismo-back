@@ -29,6 +29,7 @@ public class Place {
     private String website;
 
     private String[] imageUrls;
+    private String[] model3dUrls;
 
     private Boolean isVerified;
     private Boolean isActive;

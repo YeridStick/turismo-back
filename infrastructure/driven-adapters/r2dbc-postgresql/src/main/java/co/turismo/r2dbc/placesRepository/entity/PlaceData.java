@@ -36,6 +36,9 @@ public class PlaceData {
     @Column("image_urls")
     private String[] imageUrls;
 
+    @Column("model_3d_urls")
+    private String[] model3dUrls;
+
     @Column("is_verified")
     private Boolean isVerified;
 

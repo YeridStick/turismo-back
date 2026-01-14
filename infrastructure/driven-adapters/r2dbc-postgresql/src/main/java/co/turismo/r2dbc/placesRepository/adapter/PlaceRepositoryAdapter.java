@@ -49,7 +49,8 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
                             request.getAddress(),
                             request.getPhone(),
                             request.getWebsite(),
-                            request.getImageUrls() == null ? new String[0] : request.getImageUrls()
+                            request.getImageUrls() == null ? new String[0] : request.getImageUrls(),
+                            request.getModel3dUrls() == null ? new String[0] : request.getModel3dUrls()
                     );
                 })
                 .map(this::toEntity);
@@ -88,7 +89,8 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
                         req.getAddress(),
                         req.getPhone(),
                         req.getWebsite(),
-                        req.getImageUrls()
+                        req.getImageUrls(),
+                        req.getModel3dUrls()
                 )
                 .switchIfEmpty(Mono.error(new IllegalStateException("Lugar no encontrado")))
                 .map(this::toEntity);
