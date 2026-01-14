@@ -195,6 +195,7 @@ public class SecurityConfig {
                         // ---- Público: paquetes turísticos ----
                         .pathMatchers(HttpMethod.GET, "/api/packages").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/packages/{id}").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/agencies").permitAll()
 
                         // ---- Público: pruebas ----
                         .pathMatchers(HttpMethod.POST,  "/api/pruebas/places/*/checkin").permitAll()
@@ -216,7 +217,6 @@ public class SecurityConfig {
                         // ---- Protegido: Agencies ----
                         .pathMatchers(HttpMethod.POST, "/api/agencies").hasAnyRole("ADMIN", "AGENCY")
                         .pathMatchers(HttpMethod.POST, "/api/agencies/users").hasAnyRole("ADMIN", "AGENCY")
-                        .pathMatchers(HttpMethod.GET, "/api/agencies").hasRole("ADMIN")
 
                         // ---- Resto autenticado ----
                         .anyExchange().authenticated()
