@@ -45,7 +45,9 @@ public class RouterRest {
             VisitHandler visitHandler,
             GeocodeHandler geocodeHandler,
             ReviewsHandler reviewsHandler,
-            FeedbackHandler feedbackHandler
+            FeedbackHandler feedbackHandler,
+            TourPackageHandler tourPackageHandler,
+            AgencyHandler agencyHandler
     ) {
         return route()
 
@@ -258,6 +260,68 @@ public class RouterRest {
                                 .summary("Debug places")
                                 .tag("Places")
                                 .response(jsonResponse("200", "Información del contexto autenticado", String.class))
+                )
+
+                // =========================
+                // Agencies
+                // =========================
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_BASE_PATH,
+                        agencyHandler::create,
+                        ops -> ops.operationId("agencyCreate")
+                                .summary("Crear agencia")
+                                .tag("Agencies")
+                                .requestBody(jsonBody(AgencyHandler.CreateAgencyBody.class, true))
+                                .response(jsonResponse("201", "Agencia creada", ApiAgencyResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_USERS_PATH,
+                        agencyHandler::addUser,
+                        ops -> ops.operationId("agencyAddUser")
+                                .summary("Agregar usuario a mi agencia")
+                                .tag("Agencies")
+                                .requestBody(jsonBody(AgencyHandler.AddAgencyUserBody.class, true))
+                                .response(jsonResponse("200", "Usuario asociado", ApiAgencyResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_BASE_PATH,
+                        agencyHandler::list,
+                        ops -> ops.operationId("agencyList")
+                                .summary("Listado de agencias")
+                                .tag("Agencies")
+                                .response(jsonResponse("200", "Listado de agencias", ApiAgencyListResponse.class))
+                )
+
+                // =========================
+                // Tour Packages
+                // =========================
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PACKAGES_BASE_PATH,
+                        tourPackageHandler::create,
+                        ops -> ops.operationId("packageCreate")
+                                .summary("Crear paquete turístico")
+                                .tag("Packages")
+                                .requestBody(jsonBody(TourPackageHandler.CreatePackageRequest.class, true))
+                                .response(jsonResponse("201", "Paquete creado", ApiTourPackageResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PACKAGES_BASE_PATH,
+                        tourPackageHandler::list,
+                        ops -> ops.operationId("packagesList")
+                                .summary("Listado de paquetes turísticos")
+                                .tag("Packages")
+                                .response(jsonResponse("200", "Listado de paquetes", ApiTourPackageListResponse.class))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PACKAGES_ID_PATH,
+                        tourPackageHandler::findById,
+                        ops -> ops.operationId("packageById")
+                                .summary("Obtener paquete turístico por ID")
+                                .tag("Packages")
+                                .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
+                                .response(jsonResponse("200", "Paquete encontrado", ApiTourPackageResponse.class))
+                                .response(apiErrorResponse("404", "No encontrado"))
                 )
 
                 // =========================

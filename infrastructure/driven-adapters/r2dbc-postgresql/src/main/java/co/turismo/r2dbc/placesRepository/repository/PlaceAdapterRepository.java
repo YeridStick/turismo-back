@@ -327,6 +327,24 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
     """)
     Flux<PlaceData> findByOwnerId(@Param("ownerId") Long ownerId);
 
+    @Query("""
+        SELECT
+            p.id,
+            p.owner_user_id,
+            p.name, p.description,
+            p.category_id,
+            ST_Y(p.geom) AS lat,
+            ST_X(p.geom) AS lng,
+            p.address, p.phone, p.website,
+            p.image_urls,
+            p.is_verified,
+            p.is_active,
+            p.created_at
+        FROM places p
+        WHERE p.id = ANY(:ids)
+    """)
+    Flux<PlaceData> findByIds(@Param("ids") Long[] ids);
+
     // SET ACTIVE si es dueño (en una sola sentencia)
     @Query("""
         UPDATE places

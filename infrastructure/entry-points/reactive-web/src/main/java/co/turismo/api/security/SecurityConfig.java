@@ -192,6 +192,10 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/places/search").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/places/{id}").permitAll()
 
+                        // ---- Público: paquetes turísticos ----
+                        .pathMatchers(HttpMethod.GET, "/api/packages").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/packages/{id}").permitAll()
+
                         // ---- Público: pruebas ----
                         .pathMatchers(HttpMethod.POST,  "/api/pruebas/places/*/checkin").permitAll()
                         .pathMatchers(HttpMethod.PATCH, "/api/pruebas/visits/*/confirm").authenticated()
@@ -205,6 +209,14 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST,  "/api/places/*/owners").hasAnyRole("OWNER", "ADMIN")
                         .pathMatchers(HttpMethod.DELETE,"/api/places/*/owners/**").hasAnyRole("OWNER", "ADMIN")
                         .pathMatchers("/admin/**").hasRole("ADMIN")
+
+                        // ---- Protegido: Packages / Agency ----
+                        .pathMatchers(HttpMethod.POST, "/api/packages").hasRole("AGENCY")
+
+                        // ---- Protegido: Agencies ----
+                        .pathMatchers(HttpMethod.POST, "/api/agencies").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.POST, "/api/agencies/users").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.GET, "/api/agencies").hasRole("ADMIN")
 
                         // ---- Resto autenticado ----
                         .anyExchange().authenticated()

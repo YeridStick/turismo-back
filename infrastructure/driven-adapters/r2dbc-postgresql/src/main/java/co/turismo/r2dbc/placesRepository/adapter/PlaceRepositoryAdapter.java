@@ -124,6 +124,15 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
     }
 
     @Override
+    public Flux<Place> findByIds(Long[] ids) {
+        if (ids == null || ids.length == 0) {
+            return Flux.empty();
+        }
+        return repository.findByIds(ids)
+                .map(this::toEntity);
+    }
+
+    @Override
     public Mono<Void> addOwnerToPlace(String ownerEmailToAdd, long placeId) {
         return Mono.error(new UnsupportedOperationException("Co‑owners no soportados en la nueva lógica"));
     }

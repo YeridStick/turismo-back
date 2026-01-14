@@ -28,6 +28,14 @@ public class ConstantsEntryPoint {
     public static final String PLACES_ACTIVE_PATH  = "/places/{id}/active";
     public static final String PLACES_ID_PATH = "/places/{id}";
 
+    // Tour packages
+    public static final String PACKAGES_BASE_PATH = "/packages";
+    public static final String PACKAGES_ID_PATH = "/packages/{id}";
+
+    // Agencies
+    public static final String AGENCIES_BASE_PATH = "/agencies";
+    public static final String AGENCIES_USERS_PATH = "/agencies/users";
+
     // gecode
     public static final String GETCOORDINATES = "/tools/geocode";
     public static final String PLACES_NEARBY_PATH_PLACE = "/pruebas/places/nearby/getpalce";
