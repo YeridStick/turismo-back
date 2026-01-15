@@ -108,6 +108,12 @@ public class VisitRepositoryAdapter
     }
 
     @Override
+    public Flux<TopPlace> topPlacesByAgency(Long agencyId, LocalDate from, LocalDate to, int limit) {
+        return repository.topPlacesByAgency(agencyId, from, to, limit)
+                .map(r -> new TopPlace(r.getPlaceId(), r.getName(), r.getVisits()));
+    }
+
+    @Override
     public Mono<PlaceVisit> findById(Long visitId) {
         return repository.findById(visitId).map(VisitRepositoryAdapter::toDomain);
     }

@@ -1,5 +1,7 @@
 package co.turismo.r2dbc.tourpackage.repository;
 
+import co.turismo.r2dbc.tourpackage.dto.TopPackageRowDto;
+import co.turismo.r2dbc.tourpackage.dto.TourPackageSalesSummaryRow;
 import co.turismo.r2dbc.tourpackage.entity.TourPackageData;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -7,6 +9,8 @@ import org.springframework.data.repository.query.ReactiveQueryByExampleExecutor;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.time.LocalDate;
 
 public interface TourPackageAdapterRepository extends ReactiveCrudRepository<TourPackageData, Long>,
         ReactiveQueryByExampleExecutor<TourPackageData> {
@@ -169,4 +173,68 @@ public interface TourPackageAdapterRepository extends ReactiveCrudRepository<Tou
         WHERE p.id = :id
     """)
     Mono<TourPackageData> findByIdProjected(@Param("id") Long id);
+
+    @Query("""
+        SELECT
+            p.id,
+            p.agency_id,
+            p.title,
+            p.city,
+            p.description,
+            p.days,
+            p.nights,
+            p.people,
+            p.rating,
+            p.reviews,
+            p.price,
+            p.original_price,
+            p.discount,
+            p.tag,
+            p.includes,
+            p.image,
+            p.is_active,
+            p.created_at,
+            a.name AS agency_name,
+            COALESCE((
+                SELECT array_agg(pp.place_id)
+                FROM tour_package_places pp
+                WHERE pp.package_id = p.id
+            ), '{}'::bigint[]) AS place_ids
+        FROM tour_packages p
+        JOIN agencies a ON a.id = p.agency_id
+        WHERE p.agency_id = :agencyId
+        ORDER BY p.created_at DESC
+    """)
+    Flux<TourPackageData> findByAgencyProjected(@Param("agencyId") Long agencyId);
+
+    @Query("""
+        SELECT
+            p.id AS package_id,
+            p.title AS title,
+            COALESCE(SUM(s.quantity), 0)::int AS sold,
+            COALESCE(SUM(s.total_amount), 0)::bigint AS revenue
+        FROM tour_package_sales s
+        JOIN tour_packages p ON p.id = s.package_id
+        WHERE p.agency_id = :agencyId
+          AND s.sold_at::date BETWEEN :from AND :to
+        GROUP BY p.id, p.title
+        ORDER BY sold DESC
+        LIMIT :limit
+    """)
+    Flux<TopPackageRowDto> topSoldByAgency(@Param("agencyId") Long agencyId,
+                                           @Param("from") LocalDate from,
+                                           @Param("to") LocalDate to,
+                                           @Param("limit") int limit);
+
+    @Query("""
+        SELECT
+            COALESCE(SUM(s.quantity), 0)::bigint AS total_sold,
+            COALESCE(SUM(s.total_amount), 0)::bigint AS total_revenue
+        FROM tour_package_sales s
+        WHERE s.agency_id = :agencyId
+          AND s.sold_at::date BETWEEN :from AND :to
+    """)
+    Mono<TourPackageSalesSummaryRow> salesSummaryByAgency(@Param("agencyId") Long agencyId,
+                                                          @Param("from") LocalDate from,
+                                                          @Param("to") LocalDate to);
 }

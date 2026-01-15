@@ -22,6 +22,7 @@ public interface VisitGateway {
     Mono<Void> upsertDaily(Long placeId);
 
     Flux<TopPlace> topPlaces(LocalDate from, LocalDate to, int limit);
+    Flux<TopPlace> topPlacesByAgency(Long agencyId, LocalDate from, LocalDate to, int limit);
 
     Mono<PlaceVisit> findById(Long visitId);
     Mono<PlaceBriefUC> getPlaceBrief(Long placeId);

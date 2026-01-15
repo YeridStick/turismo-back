@@ -293,6 +293,29 @@ public class RouterRest {
                                 .response(jsonResponse("200", "Listado de agencias", ApiAgencyListResponse.class))
                 )
 
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_BY_USER_PATH,
+                        agencyHandler::findByUser,
+                        ops -> ops.operationId("agencyByUser")
+                                .summary("Consultar agencia por email")
+                                .tag("Agencies")
+                                .parameter(queryParam("email", false, "Email del usuario", String.class, "ana@example.com"))
+                                .response(jsonResponse("200", "Agencia encontrada", ApiAgencyResponse.class))
+                                .response(apiErrorResponse("404", "No encontrado"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_DASHBOARD_PATH,
+                        agencyHandler::dashboard,
+                        ops -> ops.operationId("agencyDashboard")
+                                .summary("Dashboard de agencia")
+                                .tag("Agencies")
+                                .parameter(queryParam("email", false, "Email del usuario", String.class, "ana@example.com"))
+                                .parameter(queryParam("from", false, "Fecha inicial (yyyy-MM-dd)", String.class, "2024-01-01"))
+                                .parameter(queryParam("to", false, "Fecha final (yyyy-MM-dd)", String.class, "2024-01-31"))
+                                .parameter(queryParam("limit", false, "Cantidad de resultados por ranking", Integer.class, "10"))
+                                .response(jsonResponse("200", "Dashboard de agencia", ApiAgencyDashboardResponse.class))
+                                .response(apiErrorResponse("404", "No encontrado"))
+                )
+
                 // =========================
                 // Tour Packages
                 // =========================

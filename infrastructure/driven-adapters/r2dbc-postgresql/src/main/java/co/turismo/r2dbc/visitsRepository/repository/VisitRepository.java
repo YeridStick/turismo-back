@@ -110,6 +110,25 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
                                    @Param("limit") int limit);
 
     @Query("""
+      SELECT p.id AS placeId,
+             p.name AS name,
+             SUM(d.visits)::int AS visits
+        FROM place_visit_daily d
+        JOIN places p ON p.id = d.place_id
+        JOIN tour_package_places tpp ON tpp.place_id = p.id
+        JOIN tour_packages tp ON tp.id = tpp.package_id
+       WHERE tp.agency_id = :agencyId
+         AND d.day BETWEEN :from AND :to
+       GROUP BY p.id, p.name
+       ORDER BY visits DESC
+       LIMIT :limit
+    """)
+    Flux<TopPlaceRowDto> topPlacesByAgency(@Param("agencyId") Long agencyId,
+                                           @Param("from") LocalDate from,
+                                           @Param("to")   LocalDate to,
+                                           @Param("limit") int limit);
+
+    @Query("""
       SELECT id,
              name,
              address,

@@ -217,6 +217,8 @@ public class SecurityConfig {
                         // ---- Protegido: Agencies ----
                         .pathMatchers(HttpMethod.POST, "/api/agencies").hasAnyRole("ADMIN", "AGENCY")
                         .pathMatchers(HttpMethod.POST, "/api/agencies/users").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/by-user").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/dashboard").hasAnyRole("ADMIN", "AGENCY")
 
                         // ---- Resto autenticado ----
                         .anyExchange().authenticated()
