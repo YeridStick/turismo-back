@@ -197,6 +197,10 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/packages/{id}").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/agencies").permitAll()
 
+                        // ---- Público: categorías ----
+                        .pathMatchers(HttpMethod.GET, "/api/categories").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/categories/{id}").permitAll()
+
                         // ---- Público: pruebas ----
                         .pathMatchers(HttpMethod.POST,  "/api/pruebas/places/*/checkin").permitAll()
                         .pathMatchers(HttpMethod.PATCH, "/api/pruebas/visits/*/confirm").authenticated()
@@ -210,6 +214,10 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST,  "/api/places/*/owners").hasAnyRole("OWNER", "ADMIN")
                         .pathMatchers(HttpMethod.DELETE,"/api/places/*/owners/**").hasAnyRole("OWNER", "ADMIN")
                         .pathMatchers("/admin/**").hasRole("ADMIN")
+
+                        // ---- Protegido: Categories ----
+                        .pathMatchers(HttpMethod.POST, "/api/categories").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.PATCH, "/api/categories/*").hasRole("ADMIN")
 
                         // ---- Protegido: Packages / Agency ----
                         .pathMatchers(HttpMethod.POST, "/api/packages").hasRole("AGENCY")

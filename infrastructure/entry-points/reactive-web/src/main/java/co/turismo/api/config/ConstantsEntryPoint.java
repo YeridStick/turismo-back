@@ -32,6 +32,10 @@ public class ConstantsEntryPoint {
     public static final String PACKAGES_BASE_PATH = "/packages";
     public static final String PACKAGES_ID_PATH = "/packages/{id}";
 
+    // Categories
+    public static final String CATEGORIES_BASE_PATH = "/categories";
+    public static final String CATEGORIES_ID_PATH = "/categories/{id}";
+
     // Agencies
     public static final String AGENCIES_BASE_PATH = "/agencies";
     public static final String AGENCIES_USERS_PATH = "/agencies/users";

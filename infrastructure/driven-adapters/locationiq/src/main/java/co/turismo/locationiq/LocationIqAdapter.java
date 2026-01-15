@@ -36,7 +36,7 @@ public class LocationIqAdapter implements GeocodingGateway {
                 .uri(uri -> uri.path("/search")
                         .queryParam("key", token)
                         .queryParam("format", "json")
-                        .queryParam("limit", Math.max(1, Math.min(limit, 10))) // LocationIQ aconseja límites bajos
+                        .queryParam("limit", Math.max(1, Math.min(limit, 100)))
                         .queryParam("q", q)
                         // Opcional: sesgar a Colombia
                         .queryParam("countrycodes", "co")

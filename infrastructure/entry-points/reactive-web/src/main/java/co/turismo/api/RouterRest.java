@@ -47,7 +47,8 @@ public class RouterRest {
             ReviewsHandler reviewsHandler,
             FeedbackHandler feedbackHandler,
             TourPackageHandler tourPackageHandler,
-            AgencyHandler agencyHandler
+            AgencyHandler agencyHandler,
+            CategoryHandler categoryHandler
     ) {
         return route()
 
@@ -344,6 +345,49 @@ public class RouterRest {
                                 .tag("Packages")
                                 .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
                                 .response(jsonResponse("200", "Paquete encontrado", ApiTourPackageResponse.class))
+                                .response(apiErrorResponse("404", "No encontrado"))
+                )
+
+                // =========================
+                // Categories
+                // =========================
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.CATEGORIES_BASE_PATH,
+                        categoryHandler::list,
+                        ops -> ops.operationId("categoryList")
+                                .summary("Listado de categorías")
+                                .tag("Categories")
+                                .response(jsonResponse("200", "Listado de categorías", ApiCategoryListResponse.class))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.CATEGORIES_ID_PATH,
+                        categoryHandler::findById,
+                        ops -> ops.operationId("categoryById")
+                                .summary("Obtener categoría por ID")
+                                .tag("Categories")
+                                .parameter(pathParam("id", "Identificador interno de la categoría", Long.class))
+                                .response(jsonResponse("200", "Categoría encontrada", ApiCategoryResponse.class))
+                                .response(apiErrorResponse("404", "No encontrado"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.CATEGORIES_BASE_PATH,
+                        categoryHandler::create,
+                        ops -> ops.operationId("categoryCreate")
+                                .summary("Crear categoría (ADMIN)")
+                                .tag("Categories")
+                                .requestBody(jsonBody(CategoryHandler.CreateCategoryBody.class, true))
+                                .response(jsonResponse("201", "Categoría creada", ApiCategoryResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.CATEGORIES_ID_PATH,
+                        categoryHandler::update,
+                        ops -> ops.operationId("categoryUpdate")
+                                .summary("Editar categoría (ADMIN)")
+                                .tag("Categories")
+                                .parameter(pathParam("id", "Identificador interno de la categoría", Long.class))
+                                .requestBody(jsonBody(CategoryHandler.UpdateCategoryBody.class, true))
+                                .response(jsonResponse("200", "Categoría actualizada", ApiCategoryResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
                                 .response(apiErrorResponse("404", "No encontrado"))
                 )
 

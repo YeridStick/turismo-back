@@ -20,7 +20,7 @@ public class GeocodeHandler {
     public record Req(
             @Schema(description = "Texto completo de la dirección", example = "Cra. 7 #40-62, Bogotá")
             String address,
-            @Schema(description = "Máximo de resultados a retornar (1-10)", example = "5")
+            @Schema(description = "Máximo de resultados a retornar (1-100)", example = "5")
             Integer limit
     ) {
     }
@@ -30,7 +30,8 @@ public class GeocodeHandler {
         return req.bodyToMono(Req.class)
                 .flatMap(b -> {
                     int limit = b.limit() == null ? 5 : b.limit();
-                    return useCase.GeoCodinMany(b.address(), limit);
+                    int clampedLimit = Math.min(100, Math.max(1, limit));
+                    return useCase.GeoCodinMany(b.address(), clampedLimit);
                 })
                 .flatMap(data -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
