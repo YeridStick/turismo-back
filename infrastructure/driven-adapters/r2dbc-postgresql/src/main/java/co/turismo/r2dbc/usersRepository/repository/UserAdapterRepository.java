@@ -1,5 +1,6 @@
 package co.turismo.r2dbc.usersRepository.repository;
 
+import co.turismo.r2dbc.usersRepository.dto.RecoveryStatusRow;
 import co.turismo.r2dbc.usersRepository.entity.UserData;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -84,4 +85,96 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
            AND locked_until < NOW()
     """)
     Mono<Void> resetLockIfExpired(@Param("email") String email);
+
+    // ======= Email verification =======
+    @Query("""
+        SELECT COALESCE(email_verified, FALSE)
+          FROM users
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<Boolean> isEmailVerified(@Param("email") String email);
+
+    @Query("""
+        UPDATE users
+           SET email_verification_token_hash = :tokenHash,
+               email_verification_expires_at = :expiresAt,
+               email_verified = FALSE
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<Void> saveEmailVerificationToken(@Param("email") String email,
+                                          @Param("tokenHash") String tokenHash,
+                                          @Param("expiresAt") java.time.OffsetDateTime expiresAt);
+
+    @Query("""
+        UPDATE users
+           SET email_verified = TRUE,
+               email_verification_token_hash = NULL,
+               email_verification_expires_at = NULL
+         WHERE email_verification_token_hash = :tokenHash
+           AND email_verification_expires_at > NOW()
+     RETURNING id
+    """)
+    Mono<Long> verifyEmailByToken(@Param("tokenHash") String tokenHash);
+
+    // ======= Recovery codes =======
+    @Query("""
+        UPDATE users
+           SET recovery_code_hash = :codeHash,
+               recovery_expires_at = :expiresAt,
+               recovery_attempts = 0
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<Void> saveRecoveryCode(@Param("email") String email,
+                                @Param("codeHash") String codeHash,
+                                @Param("expiresAt") java.time.OffsetDateTime expiresAt);
+
+    @Query("""
+        SELECT recovery_code_hash AS recoveryCodeHash,
+               recovery_expires_at AS recoveryExpiresAt,
+               recovery_attempts AS recoveryAttempts,
+               recovery_max_attempts AS recoveryMaxAttempts
+          FROM users
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<RecoveryStatusRow> getRecoveryStatus(@Param("email") String email);
+
+    @Query("""
+        UPDATE users
+           SET recovery_attempts = recovery_attempts + 1
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<Void> incrementRecoveryAttempts(@Param("email") String email);
+
+    @Query("""
+        UPDATE users
+           SET recovery_code_hash = NULL,
+               recovery_expires_at = NULL,
+               recovery_attempts = 0
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<Void> clearRecoveryCode(@Param("email") String email);
+
+    // ======= Password =======
+    @Query("""
+        SELECT password_hash
+          FROM users
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<String> getPasswordHash(@Param("email") String email);
+
+    @Query("""
+        UPDATE users
+           SET password_hash = :passwordHash,
+               password_enabled = TRUE
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<Void> updatePasswordHash(@Param("email") String email,
+                                  @Param("passwordHash") String passwordHash);
+
+    @Query("""
+        SELECT COALESCE(password_enabled, FALSE)
+          FROM users
+         WHERE lower(email)=lower(:email)
+    """)
+    Mono<Boolean> isPasswordEnabled(@Param("email") String email);
 }

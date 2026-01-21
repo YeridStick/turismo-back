@@ -30,3 +30,5 @@ include ':locationiq'
 project(':locationiq').projectDir = file('./infrastructure/driven-adapters/locationiq')
 include ':antispam'
 project(':antispam').projectDir = file('./infrastructure/driven-adapters/antispam')
+include ':brevo'
+project(':brevo').projectDir = file('./infrastructure/driven-adapters/brevo')

@@ -1,9 +1,11 @@
 package co.turismo.r2dbc.usersRepository.adapter;
 
+import co.turismo.model.user.RecoveryStatus;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.model.user.gateways.UserRepository;
 import co.turismo.r2dbc.helper.ReactiveAdapterOperations;
+import co.turismo.r2dbc.usersRepository.dto.RecoveryStatusRow;
 import co.turismo.r2dbc.usersRepository.entity.UserData;
 import co.turismo.r2dbc.usersRepository.repository.UserAdapterRepository;
 import org.reactivecommons.utils.ObjectMapper;
@@ -109,5 +111,67 @@ public class UserRepositoryAdapter
     @Override
     public Flux<User> findAllUser() {
         return findAll();
+    }
+
+    @Override
+    public Mono<Boolean> isEmailVerified(String email) {
+        return repository.isEmailVerified(email);
+    }
+
+    @Override
+    public Mono<Void> saveEmailVerificationToken(String email, String tokenHash, java.time.OffsetDateTime expiresAt) {
+        return repository.saveEmailVerificationToken(email, tokenHash, expiresAt);
+    }
+
+    @Override
+    public Mono<Boolean> verifyEmailByToken(String tokenHash) {
+        return repository.verifyEmailByToken(tokenHash)
+                .map(id -> true)
+                .defaultIfEmpty(false);
+    }
+
+    @Override
+    public Mono<Void> saveRecoveryCode(String email, String codeHash, java.time.OffsetDateTime expiresAt) {
+        return repository.saveRecoveryCode(email, codeHash, expiresAt);
+    }
+
+    @Override
+    public Mono<RecoveryStatus> getRecoveryStatus(String email) {
+        return repository.getRecoveryStatus(email)
+                .map(this::toRecoveryStatus);
+    }
+
+    @Override
+    public Mono<Void> incrementRecoveryAttempts(String email) {
+        return repository.incrementRecoveryAttempts(email);
+    }
+
+    @Override
+    public Mono<Void> clearRecoveryCode(String email) {
+        return repository.clearRecoveryCode(email);
+    }
+
+    @Override
+    public Mono<String> getPasswordHash(String email) {
+        return repository.getPasswordHash(email);
+    }
+
+    @Override
+    public Mono<Void> updatePasswordHash(String email, String passwordHash) {
+        return repository.updatePasswordHash(email, passwordHash);
+    }
+
+    @Override
+    public Mono<Boolean> isPasswordEnabled(String email) {
+        return repository.isPasswordEnabled(email);
+    }
+
+    private RecoveryStatus toRecoveryStatus(RecoveryStatusRow row) {
+        return new RecoveryStatus(
+                row.getRecoveryCodeHash(),
+                row.getRecoveryExpiresAt(),
+                row.getRecoveryAttempts(),
+                row.getRecoveryMaxAttempts()
+        );
     }
 }

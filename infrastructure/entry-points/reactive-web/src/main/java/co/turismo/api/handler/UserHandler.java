@@ -1,9 +1,10 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.auth.RegisterUserRequest;
 import co.turismo.api.http.HttpResponses;
-import co.turismo.model.place.Place;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
+import co.turismo.usecase.user.RegistrationUseCase;
 import co.turismo.usecase.user.UserUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -17,11 +18,21 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class UserHandler {
     private final UserUseCase userUseCase;
+    private final RegistrationUseCase registrationUseCase;
 
     public Mono<ServerResponse> createUser(ServerRequest request) {
-        return request.bodyToMono(User.class)
-                .flatMap(userUseCase::createUser)
-                .flatMap(HttpResponses::ok);
+        return request.bodyToMono(RegisterUserRequest.class)
+                .flatMap(req -> registrationUseCase.register(new RegistrationUseCase.RegisterUserCommand(
+                        req.full_name(),
+                        req.email(),
+                        req.url_avatar(),
+                        req.identification_type(),
+                        req.identification_number(),
+                        req.password()
+                )))
+                .flatMap(HttpResponses::ok)
+                .onErrorResume(IllegalArgumentException.class,
+                        e -> HttpResponses.badRequest(e.getMessage()));
     }
 
     public Mono<ServerResponse> getInfoUser(ServerRequest request) {

@@ -7,4 +7,5 @@ public interface TotpSecretRepository {
     Mono<Boolean> isTotpEnabledByEmail(String email);
     Mono<Void> saveSecretDraft(String email, String base32Secret);
     Mono<Void> enableTotp(String email);
+    Mono<Void> resetTotp(String email);
 }

@@ -1,7 +1,12 @@
 package co.turismo.api;
 
 import co.turismo.api.config.ConstantsEntryPoint;
+import co.turismo.api.dto.auth.EmailVerificationRequest;
+import co.turismo.api.dto.auth.PasswordLoginRequest;
+import co.turismo.api.dto.auth.RecoveryConfirmRequest;
+import co.turismo.api.dto.auth.RecoveryRequest;
 import co.turismo.api.dto.auth.RefreshTokenRequest;
+import co.turismo.api.dto.auth.RegisterUserRequest;
 import co.turismo.api.dto.auth.TotpConfirmRequest;
 import co.turismo.api.dto.auth.TotpEmailRequest;
 import co.turismo.api.dto.auth.TotpLoginRequest;
@@ -101,6 +106,57 @@ public class RouterRest {
                                 .response(messageResponse("400", "Error en login TOTP"))
                 )
 
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_LOGIN_PASSWORD_PATH,
+                        authenticateHandler::loginPassword,
+                        ops -> ops.operationId("authLoginPassword")
+                                .summary("Login con contraseña")
+                                .description("Devuelve JWT si la contraseña es correcta.")
+                                .tag("Auth")
+                                .requestBody(jsonBody(PasswordLoginRequest.class, true))
+                                .response(jsonResponse("200", "Token emitido", ApiTokenResponse.class))
+                                .response(messageResponse("400", "Error en login"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_EMAIL_REQUEST_PATH,
+                        authenticateHandler::requestEmailVerification,
+                        ops -> ops.operationId("authEmailRequest")
+                                .summary("Solicitar verificacion de correo")
+                                .tag("Auth")
+                                .requestBody(jsonBody(EmailVerificationRequest.class, true))
+                                .response(jsonResponse("200", "Correo de verificacion enviado", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Error enviando verificacion"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_EMAIL_VERIFY_PATH,
+                        authenticateHandler::verifyEmail,
+                        ops -> ops.operationId("authEmailVerify")
+                                .summary("Verificar correo")
+                                .tag("Auth")
+                                .parameter(queryParam("token", true, "Token de verificacion", String.class, "token"))
+                                .response(jsonResponse("200", "Correo verificado", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Token inválido o expirado"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_RECOVERY_REQUEST_PATH,
+                        authenticateHandler::requestRecovery,
+                        ops -> ops.operationId("authRecoveryRequest")
+                                .summary("Solicitar codigo de recuperación")
+                                .tag("Auth")
+                                .requestBody(jsonBody(RecoveryRequest.class, true))
+                                .response(jsonResponse("200", "Codigo enviado", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Error en recuperación"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_RECOVERY_CONFIRM_PATH,
+                        authenticateHandler::confirmRecovery,
+                        ops -> ops.operationId("authRecoveryConfirm")
+                                .summary("Confirmar codigo de recuperación")
+                                .tag("Auth")
+                                .requestBody(jsonBody(RecoveryConfirmRequest.class, true))
+                                .response(jsonResponse("200", "TOTP reiniciado", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Error en recuperación"))
+                )
+
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_REFRESH_PATH,
                         authenticateHandler::refresh,
                         ops -> ops.operationId("authRefresh")
@@ -121,7 +177,7 @@ public class RouterRest {
                         ops -> ops.operationId("userCreate")
                                 .summary("Crear usuario")
                                 .tag("Users")
-                                .requestBody(jsonBody(User.class, true))
+                                .requestBody(jsonBody(RegisterUserRequest.class, true))
                                 .response(jsonResponse("200", "Usuario creado", ApiUserResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )

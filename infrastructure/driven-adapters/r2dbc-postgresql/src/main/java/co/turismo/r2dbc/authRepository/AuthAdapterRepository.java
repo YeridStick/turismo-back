@@ -42,5 +42,14 @@ public interface AuthAdapterRepository extends ReactiveCrudRepository<UserData, 
          WHERE lower(email) = lower(:email)
         """)
     Mono<Integer> enableTotp(@Param("email") String email);
+
+    @Modifying
+    @Query("""
+        UPDATE users
+           SET totp_secret_encrypted = NULL,
+               totp_enabled = FALSE
+         WHERE lower(email) = lower(:email)
+        """)
+    Mono<Integer> resetTotp(@Param("email") String email);
 }
 

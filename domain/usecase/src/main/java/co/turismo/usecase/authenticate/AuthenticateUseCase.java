@@ -4,6 +4,7 @@ import co.turismo.model.authenticationsession.gateways.AuthenticationSessionRepo
 import co.turismo.model.user.gateways.UserRepository;
 import co.turismo.model.authenticationsession.gateways.TotpSecretRepository;
 import co.turismo.model.authenticationsession.gateways.TotpVerifier;
+import co.turismo.model.security.gateways.PasswordHasher;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 
@@ -22,6 +23,7 @@ public class AuthenticateUseCase {
 
     private final TotpSecretRepository totpSecretRepository;
     private final TotpVerifier totpVerifier;
+    private final PasswordHasher passwordHasher;
 
     // Proveedor del secreto Base32 (inyectado: p.ej. TotpSecretGenerator::generateBase32Secret)
     private final Supplier<String> secretGenerator;
@@ -121,6 +123,36 @@ public class AuthenticateUseCase {
                                             .flatMap(roles -> authenticationRepository.generateToken(email, roles, ip));
                                 })
                 );
+    }
+
+    // -------------------- LOGIN PASSWORD --------------------
+    public Mono<String> authenticatePassword(String emailRaw, String password, String ip) {
+        final String email = normalize(emailRaw);
+        Objects.requireNonNull(email, "email");
+        Objects.requireNonNull(password, "password");
+
+        return userRepository.isActiveByEmail(email)
+                .filter(Boolean::booleanValue)
+                .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
+                .then(userRepository.isPasswordEnabled(email))
+                .flatMap(enabled -> {
+                    if (Boolean.FALSE.equals(enabled)) {
+                        return Mono.error(new RuntimeException("Password no habilitado"));
+                    }
+                    return userRepository.getPasswordHash(email);
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("Password no configurado")))
+                .flatMap(hash -> {
+                    if (!passwordHasher.matches(password, hash)) {
+                        return userRepository.registerOtpFail(email)
+                                .then(Mono.error(new RuntimeException("Credenciales inválidas")));
+                    }
+                    return userRepository.registerSuccessfulLogin(email)
+                            .thenMany(userRepository.findRoleNamesByEmail(email))
+                            .collectList()
+                            .map(this::toRoleSetOrVisitor)
+                            .flatMap(roles -> authenticationRepository.generateToken(email, roles, ip));
+                });
     }
 
     // -------------------- REFRESH --------------------

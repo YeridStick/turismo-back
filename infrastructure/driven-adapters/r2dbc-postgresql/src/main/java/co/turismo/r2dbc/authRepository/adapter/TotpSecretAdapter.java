@@ -31,4 +31,9 @@ public class TotpSecretAdapter implements TotpSecretRepository {
     public Mono<Void> enableTotp(String email) {
         return repo.enableTotp(email).then();
     }
+
+    @Override
+    public Mono<Void> resetTotp(String email) {
+        return repo.resetTotp(email).then();
+    }
 }

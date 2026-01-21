@@ -2,6 +2,7 @@ package co.turismo.model.user.gateways;
 
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
+import co.turismo.model.user.RecoveryStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -23,4 +24,20 @@ public interface UserRepository {
     /** Útil para “confirmar” cambio de correo DESPUÉS de validar OTP por otro flujo. */
     Mono<User> updateEmailById(Long userId, String newEmail);
     Flux<User> findAllUser();
+
+    // Seguridad / verificación de correo
+    Mono<Boolean> isEmailVerified(String email);
+    Mono<Void> saveEmailVerificationToken(String email, String tokenHash, java.time.OffsetDateTime expiresAt);
+    Mono<Boolean> verifyEmailByToken(String tokenHash);
+
+    // Recuperación
+    Mono<Void> saveRecoveryCode(String email, String codeHash, java.time.OffsetDateTime expiresAt);
+    Mono<RecoveryStatus> getRecoveryStatus(String email);
+    Mono<Void> incrementRecoveryAttempts(String email);
+    Mono<Void> clearRecoveryCode(String email);
+
+    // Contraseña
+    Mono<String> getPasswordHash(String email);
+    Mono<Void> updatePasswordHash(String email, String passwordHash);
+    Mono<Boolean> isPasswordEnabled(String email);
 }

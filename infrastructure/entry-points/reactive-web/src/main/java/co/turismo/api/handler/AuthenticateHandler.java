@@ -5,6 +5,7 @@ import co.turismo.api.dto.common.SimpleMessageResponse;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.http.ClientIp;
 import co.turismo.api.util.QrCodeUtil;
+import co.turismo.usecase.authenticate.AccountRecoveryUseCase;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import reactor.core.publisher.Mono;
 public class AuthenticateHandler {
 
     private final AuthenticateUseCase authenticateUseCase;
+    private final AccountRecoveryUseCase accountRecoveryUseCase;
 
     // ---------- SETUP: POST /api/auth/code/setup ----------
     public Mono<ServerResponse> totpSetup(ServerRequest request) {
@@ -109,6 +111,87 @@ public class AuthenticateHandler {
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error en login TOTP" : e.getMessage();
                     log.error("Login TOTP error: {}", msg);
+                    return ServerResponse.badRequest()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new SimpleMessageResponse(msg));
+                });
+    }
+
+    // ---------- LOGIN: POST /api/auth/login-password ----------
+    public Mono<ServerResponse> loginPassword(ServerRequest request) {
+        return request.bodyToMono(PasswordLoginRequest.class)
+                .flatMap(req -> {
+                    String email = normalize(req.email());
+                    String ip = ClientIp.resolve(request.exchange().getRequest());
+                    return authenticateUseCase.authenticatePassword(email, req.password(), ip);
+                })
+                .flatMap(token -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))))
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() == null ? "Error en login" : e.getMessage();
+                    log.error("Login password error: {}", msg);
+                    return ServerResponse.badRequest()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new SimpleMessageResponse(msg));
+                });
+    }
+
+    // ---------- EMAIL VERIFY REQUEST: POST /api/auth/email/request ----------
+    public Mono<ServerResponse> requestEmailVerification(ServerRequest request) {
+        return request.bodyToMono(EmailVerificationRequest.class)
+                .flatMap(req -> accountRecoveryUseCase.sendVerificationEmail(normalize(req.email())))
+                .then(ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Correo de verificacion enviado"))))
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() == null ? "Error enviando verificacion" : e.getMessage();
+                    return ServerResponse.badRequest()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new SimpleMessageResponse(msg));
+                });
+    }
+
+    // ---------- EMAIL VERIFY: GET /api/auth/email/verify?token= ----------
+    public Mono<ServerResponse> verifyEmail(ServerRequest request) {
+        String token = request.queryParam("token").orElse(null);
+        return accountRecoveryUseCase.verifyEmailToken(token)
+                .then(ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Correo verificado"))))
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() == null ? "Error verificando correo" : e.getMessage();
+                    return ServerResponse.badRequest()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new SimpleMessageResponse(msg));
+                });
+    }
+
+    // ---------- RECOVERY: POST /api/auth/recovery/request ----------
+    public Mono<ServerResponse> requestRecovery(ServerRequest request) {
+        return request.bodyToMono(RecoveryRequest.class)
+                .flatMap(req -> accountRecoveryUseCase.requestRecoveryCode(normalize(req.email())))
+                .then(ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Codigo enviado"))))
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() == null ? "Error en recuperación" : e.getMessage();
+                    return ServerResponse.badRequest()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new SimpleMessageResponse(msg));
+                });
+    }
+
+    // ---------- RECOVERY: POST /api/auth/recovery/confirm ----------
+    public Mono<ServerResponse> confirmRecovery(ServerRequest request) {
+        return request.bodyToMono(RecoveryConfirmRequest.class)
+                .flatMap(req -> accountRecoveryUseCase.confirmRecoveryCode(
+                        normalize(req.email()), req.code()))
+                .then(ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("TOTP reiniciado"))))
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() == null ? "Error en recuperación" : e.getMessage();
                     return ServerResponse.badRequest()
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(new SimpleMessageResponse(msg));
