@@ -186,7 +186,7 @@ public class AuthenticateHandler {
                     String email = normalize(req.email());
                     String token = accountRecoveryUseCase.generateRecoveryToken();
                     String link = buildRecoveryLink(token);
-                    String html = "<p>Hola,</p><p>Link: <a href=\"" + link + "\">recuperar</a></p>";
+                    String html = "<p>Hola,</p><p>Link: <a href=\"" + link + "\">recuperar</a></p><p>O usa este c\u00f3digo: <strong>" + token + "</strong></p>";
                     return emailGateway.sendEmail(new EmailMessage(
                                     email,
                                     "Recupera tu cuenta",

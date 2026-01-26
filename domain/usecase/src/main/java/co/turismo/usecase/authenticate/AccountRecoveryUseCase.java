@@ -94,7 +94,7 @@ public class AccountRecoveryUseCase {
                     return emailGateway.sendEmail(new EmailMessage(
                             email,
                             "Recupera tu cuenta",
-                            buildRecoveryHtml(link)
+                            buildRecoveryHtml(token, link)
                     ));
                 })
                 .then();
@@ -231,11 +231,12 @@ public class AccountRecoveryUseCase {
         return normalized + "/recover-account?token=" + token;
     }
 
-    private static String buildRecoveryHtml(String link) {
+    private static String buildRecoveryHtml(String token, String link) {
         return """
                 <p>Hola,</p>
                 <p>Link: <a href="%s">recuperar</a></p>
-                """.formatted(link);
+                <p>O pega este c\u00f3digo en la app: <strong>%s</strong></p>
+                """.formatted(link, token);
     }
 
     private static String generateToken() {
