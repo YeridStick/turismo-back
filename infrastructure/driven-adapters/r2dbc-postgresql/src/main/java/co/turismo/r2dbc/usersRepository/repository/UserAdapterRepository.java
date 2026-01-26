@@ -141,12 +141,13 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
 
     @Query("""
         SELECT email,
-               recovery_code_hash AS recoveryCodeHash,
-               recovery_expires_at AS recoveryExpiresAt,
-               recovery_attempts AS recoveryAttempts,
-               recovery_max_attempts AS recoveryMaxAttempts
+               recovery_code_hash,
+               recovery_expires_at,
+               recovery_attempts,
+               recovery_max_attempts
           FROM users
          WHERE recovery_code_hash = :tokenHash
+           AND recovery_expires_at > NOW()
     """)
     Mono<RecoveryTokenStatusRow> getRecoveryStatusByTokenHash(@Param("tokenHash") String tokenHash);
 

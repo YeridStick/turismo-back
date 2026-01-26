@@ -130,11 +130,13 @@ public class AccountRecoveryUseCase {
         }
         String tokenHash = sha256(token);
         OffsetDateTime expiresAt = OffsetDateTime.now().plus(RECOVERY_TTL);
+        LOG.log(Level.INFO, "Saving recovery token email={0} hash={1} expiresAt={2}", new Object[]{email, tokenHash, expiresAt});
         return userRepository.saveRecoveryCode(email, tokenHash, expiresAt)
                 .flatMap(updated -> {
                     if (!Boolean.TRUE.equals(updated)) {
                         return Mono.error(new IllegalArgumentException("No fue posible guardar el codigo"));
                     }
+                    LOG.log(Level.INFO, "Recovery token stored email={0} expiresAt={1}", new Object[]{email, expiresAt});
                     return Mono.empty();
                 });
     }
@@ -153,8 +155,15 @@ public class AccountRecoveryUseCase {
         }
 
         String tokenHash = sha256(token);
+        LOG.log(Level.INFO, "Confirming recovery token hash={0}", tokenHash);
         return userRepository.getRecoveryStatusByTokenHash(tokenHash)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Token inválido o expirado")))
+                .doOnSubscribe(sub -> LOG.log(Level.INFO, "Fetching recovery token status hash={0}", tokenHash))
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Token invalido o expirado")))
+                .doOnNext(status -> LOG.log(
+                        Level.INFO,
+                        "Recovery token fetched email={0} expiresAt={1} attempts={2}/{3}",
+                        new Object[]{status.email(), status.expiresAt(), status.attempts(), status.maxAttempts()}
+                ))
                 .flatMap(status -> validateRecoveryToken(status)
                         .then(userRepository.updatePasswordHash(status.email(), passwordHasher.hash(newPassword)))
                         .then(totpSecretRepository.resetTotp(status.email()))
