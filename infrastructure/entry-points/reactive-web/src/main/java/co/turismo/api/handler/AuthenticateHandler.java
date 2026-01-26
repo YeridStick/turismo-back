@@ -5,6 +5,9 @@ import co.turismo.api.dto.common.SimpleMessageResponse;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.http.ClientIp;
 import co.turismo.api.util.QrCodeUtil;
+import co.turismo.model.common.AppUrlConfig;
+import co.turismo.model.notification.EmailMessage;
+import co.turismo.model.notification.gateways.EmailGateway;
 import co.turismo.usecase.authenticate.AccountRecoveryUseCase;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,8 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+import java.util.Map;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -22,6 +27,8 @@ public class AuthenticateHandler {
 
     private final AuthenticateUseCase authenticateUseCase;
     private final AccountRecoveryUseCase accountRecoveryUseCase;
+    private final AppUrlConfig appUrlConfig;
+    private final EmailGateway emailGateway;
 
     // ---------- SETUP: POST /api/auth/code/setup ----------
     public Mono<ServerResponse> totpSetup(ServerRequest request) {
@@ -140,10 +147,16 @@ public class AuthenticateHandler {
     // ---------- EMAIL VERIFY REQUEST: POST /api/auth/email/request ----------
     public Mono<ServerResponse> requestEmailVerification(ServerRequest request) {
         return request.bodyToMono(EmailVerificationRequest.class)
-                .flatMap(req -> accountRecoveryUseCase.sendVerificationEmail(normalize(req.email())))
-                .then(ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Correo de verificacion enviado"))))
+                .flatMap(req -> accountRecoveryUseCase.requestEmailVerification(normalize(req.email())))
+                .flatMap(result -> {
+                    String status = result.status().name().toLowerCase();
+                    String message = result.status() == AccountRecoveryUseCase.VerificationStatus.ALREADY_VERIFIED
+                            ? "Correo ya estaba verificado"
+                            : "Correo de verificacion enviado";
+                    return ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(ApiResponse.ok(new EmailVerificationResponse(status, message)));
+                })
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error enviando verificacion" : e.getMessage();
                     return ServerResponse.badRequest()
@@ -156,24 +169,41 @@ public class AuthenticateHandler {
     public Mono<ServerResponse> verifyEmail(ServerRequest request) {
         String token = request.queryParam("token").orElse(null);
         return accountRecoveryUseCase.verifyEmailToken(token)
-                .then(ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Correo verificado"))))
+                .then(redirectToFrontend(token, "ok", null))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error verificando correo" : e.getMessage();
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
+                    return redirectToFrontend(token, "error", msg)
+                            .switchIfEmpty(ServerResponse.badRequest()
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .bodyValue(new SimpleMessageResponse(msg)));
                 });
     }
 
     // ---------- RECOVERY: POST /api/auth/recovery/request ----------
     public Mono<ServerResponse> requestRecovery(ServerRequest request) {
         return request.bodyToMono(RecoveryRequest.class)
-                .flatMap(req -> accountRecoveryUseCase.requestRecoveryCode(normalize(req.email())))
-                .then(ServerResponse.ok()
+                .flatMap(req -> {
+                    String email = normalize(req.email());
+                    String token = accountRecoveryUseCase.generateRecoveryToken();
+                    String link = buildRecoveryLink(token);
+                    String html = "<p>Hola,</p><p>Link: <a href=\"" + link + "\">recuperar</a></p>";
+                    return emailGateway.sendEmail(new EmailMessage(
+                                    email,
+                                    "Recupera tu cuenta",
+                                    html
+                            ))
+                            .then(accountRecoveryUseCase.saveRecoveryToken(email, token))
+                            .thenReturn(Map.of(
+                                    "message", "Enlace enviado",
+                                    "link", link,
+                                    "token", token
+                            ));
+                })
+                .flatMap(payload -> ServerResponse.ok()
+                        .header("X-Recovery-Link", payload.get("link").toString())
+                        .header("X-Recovery-Token", payload.get("token").toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Codigo enviado"))))
+                        .bodyValue(ApiResponse.ok(payload)))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error en recuperación" : e.getMessage();
                     return ServerResponse.badRequest()
@@ -182,14 +212,28 @@ public class AuthenticateHandler {
                 });
     }
 
+    private String buildRecoveryLink(String token) {
+        String frontendBase = appUrlConfig.frontendBaseUrl();
+        if (frontendBase != null && !frontendBase.isBlank()) {
+            String normalized = frontendBase.endsWith("/") ? frontendBase.substring(0, frontendBase.length() - 1) : frontendBase;
+            return normalized + "/recover-account?token=" + token;
+        }
+
+        String backendBase = appUrlConfig.publicBaseUrl();
+        if (backendBase == null || backendBase.isBlank()) {
+            return "/recover-account?token=" + token;
+        }
+        String normalized = backendBase.endsWith("/") ? backendBase.substring(0, backendBase.length() - 1) : backendBase;
+        return normalized + "/recover-account?token=" + token;
+    }
+
     // ---------- RECOVERY: POST /api/auth/recovery/confirm ----------
     public Mono<ServerResponse> confirmRecovery(ServerRequest request) {
         return request.bodyToMono(RecoveryConfirmRequest.class)
-                .flatMap(req -> accountRecoveryUseCase.confirmRecoveryCode(
-                        normalize(req.email()), req.code()))
+                .flatMap(req -> accountRecoveryUseCase.confirmRecoveryCode(req.token(), req.newPassword()))
                 .then(ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("TOTP reiniciado"))))
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Contrasena actualizada y TOTP reiniciado"))))
                 .onErrorResume(e -> {
                     String msg = e.getMessage() == null ? "Error en recuperación" : e.getMessage();
                     return ServerResponse.badRequest()
@@ -234,5 +278,26 @@ public class AuthenticateHandler {
         if (authorizationHeader == null) return null;
         String prefix = "Bearer ";
         return authorizationHeader.startsWith(prefix) ? authorizationHeader.substring(prefix.length()).trim() : null;
+    }
+
+    private Mono<ServerResponse> redirectToFrontend(String token, String status, String message) {
+        String base = appUrlConfig.frontendBaseUrl();
+        if (base == null || base.isBlank()) {
+            return Mono.empty();
+        }
+        String normalized = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        StringBuilder url = new StringBuilder(normalized)
+                .append("/verify-email?status=").append(encode(status));
+        if (token != null && !token.isBlank()) {
+            url.append("&token=").append(encode(token));
+        }
+        if (message != null && !message.isBlank()) {
+            url.append("&message=").append(encode(message));
+        }
+        return ServerResponse.temporaryRedirect(java.net.URI.create(url.toString())).build();
+    }
+
+    private static String encode(String value) {
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 }

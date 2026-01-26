@@ -2,6 +2,7 @@ package co.turismo.api;
 
 import co.turismo.api.config.ConstantsEntryPoint;
 import co.turismo.api.dto.auth.EmailVerificationRequest;
+import co.turismo.api.dto.auth.PasswordUpdateRequest;
 import co.turismo.api.dto.auth.PasswordLoginRequest;
 import co.turismo.api.dto.auth.RecoveryConfirmRequest;
 import co.turismo.api.dto.auth.RecoveryRequest;
@@ -11,6 +12,8 @@ import co.turismo.api.dto.auth.TotpConfirmRequest;
 import co.turismo.api.dto.auth.TotpEmailRequest;
 import co.turismo.api.dto.auth.TotpLoginRequest;
 import co.turismo.api.dto.common.SimpleMessageResponse;
+import co.turismo.api.dto.response.UserInfoResponse;
+import co.turismo.api.dto.response.PasswordUpdateResponse;
 import co.turismo.api.dto.response.docs.*;
 import co.turismo.api.dto.visit.CheckinRequest;
 import co.turismo.api.dto.visit.ConfirmRequest;
@@ -53,7 +56,8 @@ public class RouterRest {
             FeedbackHandler feedbackHandler,
             TourPackageHandler tourPackageHandler,
             AgencyHandler agencyHandler,
-            CategoryHandler categoryHandler
+            CategoryHandler categoryHandler,
+            DebugEmailHandler debugEmailHandler
     ) {
         return route()
 
@@ -140,20 +144,20 @@ public class RouterRest {
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_RECOVERY_REQUEST_PATH,
                         authenticateHandler::requestRecovery,
                         ops -> ops.operationId("authRecoveryRequest")
-                                .summary("Solicitar codigo de recuperación")
+                                .summary("Solicitar enlace de recuperación")
                                 .tag("Auth")
                                 .requestBody(jsonBody(RecoveryRequest.class, true))
-                                .response(jsonResponse("200", "Codigo enviado", ApiMessageResponse.class))
+                                .response(jsonResponse("200", "Enlace enviado", ApiMessageResponse.class))
                                 .response(messageResponse("400", "Error en recuperación"))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_RECOVERY_CONFIRM_PATH,
                         authenticateHandler::confirmRecovery,
                         ops -> ops.operationId("authRecoveryConfirm")
-                                .summary("Confirmar codigo de recuperación")
+                                .summary("Confirmar token de recuperación")
                                 .tag("Auth")
                                 .requestBody(jsonBody(RecoveryConfirmRequest.class, true))
-                                .response(jsonResponse("200", "TOTP reiniciado", ApiMessageResponse.class))
+                                .response(jsonResponse("200", "Contrasena actualizada", ApiMessageResponse.class))
                                 .response(messageResponse("400", "Error en recuperación"))
                 )
 
@@ -188,7 +192,7 @@ public class RouterRest {
                                 .summary("Mi información")
                                 .tag("Users")
                                 .parameter(queryParam("userEmail", true, "Email a consultar", String.class, "ana@example.com"))
-                                .response(jsonResponse("200", "Información del usuario", User.class))
+                                .response(jsonResponse("200", "Información del usuario", UserInfoResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.ALLUSER,
@@ -206,6 +210,16 @@ public class RouterRest {
                                 .tag("Users")
                                 .requestBody(jsonBody(UpdateUserProfileRequest.class, true))
                                 .response(jsonResponse("200", "Perfil actualizado", ApiUserResponse.class))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USERS_ME_PASSWORD_PATH,
+                        userHandler::setMyPassword,
+                        ops -> ops.operationId("userSetPassword")
+                                .summary("Configurar o actualizar contraseña")
+                                .tag("Users")
+                                .requestBody(jsonBody(PasswordUpdateRequest.class, true))
+                                .response(jsonResponse("200", "Contraseña actualizada", PasswordUpdateResponse.class))
+                                .response(messageResponse("400", "Datos inválidos"))
                 )
 
                 // =========================
@@ -317,6 +331,26 @@ public class RouterRest {
                                 .summary("Debug places")
                                 .tag("Places")
                                 .response(jsonResponse("200", "Información del contexto autenticado", String.class))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.DEBUG_EMAIL,
+                        debugEmailHandler::sendTestEmail,
+                        ops -> ops.operationId("debugSendEmail")
+                                .summary("Enviar correo de prueba")
+                                .tag("Debug")
+                                .requestBody(jsonBody(DebugEmailHandler.DebugEmailRequest.class, true))
+                                .response(jsonResponse("200", "Correo enviado", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Error enviando correo"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.DEBUG_RECOVERY_EMAIL,
+                        debugEmailHandler::sendRecoveryTestEmail,
+                        ops -> ops.operationId("debugSendRecoveryEmail")
+                                .summary("Enviar correo de recuperación de prueba")
+                                .tag("Debug")
+                                .requestBody(jsonBody(DebugEmailHandler.RecoveryEmailRequest.class, true))
+                                .response(jsonResponse("200", "Correo enviado", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Error enviando correo"))
                 )
 
                 // =========================

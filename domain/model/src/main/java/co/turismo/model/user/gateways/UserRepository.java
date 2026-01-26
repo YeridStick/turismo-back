@@ -3,6 +3,7 @@ package co.turismo.model.user.gateways;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.model.user.RecoveryStatus;
+import co.turismo.model.user.RecoveryTokenStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -31,8 +32,9 @@ public interface UserRepository {
     Mono<Boolean> verifyEmailByToken(String tokenHash);
 
     // Recuperación
-    Mono<Void> saveRecoveryCode(String email, String codeHash, java.time.OffsetDateTime expiresAt);
+    Mono<Boolean> saveRecoveryCode(String email, String codeHash, java.time.OffsetDateTime expiresAt);
     Mono<RecoveryStatus> getRecoveryStatus(String email);
+    Mono<RecoveryTokenStatus> getRecoveryStatusByTokenHash(String tokenHash);
     Mono<Void> incrementRecoveryAttempts(String email);
     Mono<Void> clearRecoveryCode(String email);
 

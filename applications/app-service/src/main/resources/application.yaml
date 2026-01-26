@@ -50,14 +50,6 @@ scalar:
 cors:
   allowed-origins: "https://client.scalar.com,http://localhost:3000,http://localhost:8081,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173,https://turismo-eta-swart.vercel.app"
 
-logging:
-  level:
-    org.springframework.web: DEBUG          # ← Agregar
-    org.springframework.security: DEBUG     # ← Agregar
-    org.springframework.r2dbc: "${LOGGING_R2DBC:INFO}"
-    org.yeridstick: "${LOGGING_YERIDSTICK:INFO}"
-    root: "${LOGGING_ROOT:INFO}"
-
 security:
   jwt:
     secret: "${JWT_SECRET:cambia-esto-por-una-clave-de-32+caracteres-para-HS256}"
@@ -102,6 +94,11 @@ geocode:
 app:
   public-url: "${APP_PUBLIC_URL:http://localhost:8082}"
   frontend-url: "${APP_FRONTEND_URL:https://turismo-eta-swart.vercel.app}"
+
+logging:
+  level:
+    co.turismo.brevo: INFO
+    co.turismo.usecase.authenticate.AccountRecoveryUseCase: INFO
 
 brevo:
   base-url: "${BREVO_BASE_URL:https://api.brevo.com/v3}"

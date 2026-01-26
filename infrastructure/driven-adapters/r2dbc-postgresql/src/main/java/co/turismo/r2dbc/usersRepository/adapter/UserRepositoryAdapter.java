@@ -1,13 +1,17 @@
 package co.turismo.r2dbc.usersRepository.adapter;
 
 import co.turismo.model.user.RecoveryStatus;
+import co.turismo.model.user.RecoveryTokenStatus;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.model.user.gateways.UserRepository;
 import co.turismo.r2dbc.helper.ReactiveAdapterOperations;
 import co.turismo.r2dbc.usersRepository.dto.RecoveryStatusRow;
+import co.turismo.r2dbc.usersRepository.dto.RecoveryTokenStatusRow;
 import co.turismo.r2dbc.usersRepository.entity.UserData;
 import co.turismo.r2dbc.usersRepository.repository.UserAdapterRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.reactivecommons.utils.ObjectMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
@@ -20,6 +24,8 @@ import java.time.OffsetDateTime;
 public class UserRepositoryAdapter
         extends ReactiveAdapterOperations<User, UserData, Long, UserAdapterRepository>
         implements UserRepository {
+
+    private static final Logger LOG = LoggerFactory.getLogger(UserRepositoryAdapter.class);
 
     public UserRepositoryAdapter(UserAdapterRepository repository, ObjectMapper mapper) {
         super(repository, mapper, d -> mapper.map(d, User.class));
@@ -131,14 +137,38 @@ public class UserRepositoryAdapter
     }
 
     @Override
-    public Mono<Void> saveRecoveryCode(String email, String codeHash, java.time.OffsetDateTime expiresAt) {
-        return repository.saveRecoveryCode(email, codeHash, expiresAt);
+    public Mono<Boolean> saveRecoveryCode(String email, String codeHash, java.time.OffsetDateTime expiresAt) {
+        return repository.saveRecoveryCode(email, codeHash, expiresAt)
+                .map(updated -> updated != null && updated > 0)
+                .doOnNext(ok -> LOG.debug("saveRecoveryCode email={} updated={}", email, ok));
     }
 
     @Override
     public Mono<RecoveryStatus> getRecoveryStatus(String email) {
         return repository.getRecoveryStatus(email)
+                .doOnNext(row -> LOG.debug(
+                        "RecoveryStatusRow email={} hashPresent={} expiresAt={} attempts={}/{}",
+                        email,
+                        row.getRecoveryCodeHash() != null,
+                        row.getRecoveryExpiresAt(),
+                        row.getRecoveryAttempts(),
+                        row.getRecoveryMaxAttempts()
+                ))
                 .map(this::toRecoveryStatus);
+    }
+
+    @Override
+    public Mono<RecoveryTokenStatus> getRecoveryStatusByTokenHash(String tokenHash) {
+        return repository.getRecoveryStatusByTokenHash(tokenHash)
+                .doOnNext(row -> LOG.debug(
+                        "RecoveryTokenStatusRow email={} hashPresent={} expiresAt={} attempts={}/{}",
+                        row.getEmail(),
+                        row.getRecoveryCodeHash() != null,
+                        row.getRecoveryExpiresAt(),
+                        row.getRecoveryAttempts(),
+                        row.getRecoveryMaxAttempts()
+                ))
+                .map(this::toRecoveryTokenStatus);
     }
 
     @Override
@@ -169,6 +199,15 @@ public class UserRepositoryAdapter
     private RecoveryStatus toRecoveryStatus(RecoveryStatusRow row) {
         return new RecoveryStatus(
                 row.getRecoveryCodeHash(),
+                row.getRecoveryExpiresAt(),
+                row.getRecoveryAttempts(),
+                row.getRecoveryMaxAttempts()
+        );
+    }
+
+    private RecoveryTokenStatus toRecoveryTokenStatus(RecoveryTokenStatusRow row) {
+        return new RecoveryTokenStatus(
+                row.getEmail(),
                 row.getRecoveryExpiresAt(),
                 row.getRecoveryAttempts(),
                 row.getRecoveryMaxAttempts()

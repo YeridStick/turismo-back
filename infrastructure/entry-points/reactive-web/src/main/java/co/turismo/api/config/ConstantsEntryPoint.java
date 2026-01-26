@@ -23,6 +23,7 @@ public class ConstantsEntryPoint {
     public static final String INFOUSER = "/info/user";
     public static final String ALLUSER = "/admin/all/user";
     public static final String USERS_ME_PATH = "/users/me";
+    public static final String USERS_ME_PASSWORD_PATH = "/users/me/password";
 
     // Places
     public static final String PLACES_BASE_PATH    = "/places";
@@ -56,6 +57,8 @@ public class ConstantsEntryPoint {
 
     //Debug
     public static final String DEBUG = "/debug";
+    public static final String DEBUG_EMAIL = "/debug/email";
+    public static final String DEBUG_RECOVERY_EMAIL = "/debug/recovery-email";
 
     // Visits
     public static final String VISITS_CHECKIN_PATH         = "/pruebas/places/{placeId}/checkin";

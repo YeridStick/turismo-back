@@ -1,6 +1,7 @@
 package co.turismo.r2dbc.usersRepository.repository;
 
 import co.turismo.r2dbc.usersRepository.dto.RecoveryStatusRow;
+import co.turismo.r2dbc.usersRepository.dto.RecoveryTokenStatusRow;
 import co.turismo.r2dbc.usersRepository.entity.UserData;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -122,11 +123,11 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
            SET recovery_code_hash = :codeHash,
                recovery_expires_at = :expiresAt,
                recovery_attempts = 0
-         WHERE lower(email)=lower(:email)
+         WHERE lower(trim(email))=lower(trim(:email))
     """)
-    Mono<Void> saveRecoveryCode(@Param("email") String email,
-                                @Param("codeHash") String codeHash,
-                                @Param("expiresAt") java.time.OffsetDateTime expiresAt);
+    Mono<Integer> saveRecoveryCode(@Param("email") String email,
+                                   @Param("codeHash") String codeHash,
+                                   @Param("expiresAt") java.time.OffsetDateTime expiresAt);
 
     @Query("""
         SELECT recovery_code_hash AS recoveryCodeHash,
@@ -134,14 +135,25 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
                recovery_attempts AS recoveryAttempts,
                recovery_max_attempts AS recoveryMaxAttempts
           FROM users
-         WHERE lower(email)=lower(:email)
+         WHERE lower(trim(email))=lower(trim(:email))
     """)
     Mono<RecoveryStatusRow> getRecoveryStatus(@Param("email") String email);
 
     @Query("""
+        SELECT email,
+               recovery_code_hash AS recoveryCodeHash,
+               recovery_expires_at AS recoveryExpiresAt,
+               recovery_attempts AS recoveryAttempts,
+               recovery_max_attempts AS recoveryMaxAttempts
+          FROM users
+         WHERE recovery_code_hash = :tokenHash
+    """)
+    Mono<RecoveryTokenStatusRow> getRecoveryStatusByTokenHash(@Param("tokenHash") String tokenHash);
+
+    @Query("""
         UPDATE users
            SET recovery_attempts = recovery_attempts + 1
-         WHERE lower(email)=lower(:email)
+         WHERE lower(trim(email))=lower(trim(:email))
     """)
     Mono<Void> incrementRecoveryAttempts(@Param("email") String email);
 
@@ -150,7 +162,7 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
            SET recovery_code_hash = NULL,
                recovery_expires_at = NULL,
                recovery_attempts = 0
-         WHERE lower(email)=lower(:email)
+         WHERE lower(trim(email))=lower(trim(:email))
     """)
     Mono<Void> clearRecoveryCode(@Param("email") String email);
 

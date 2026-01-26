@@ -1,7 +1,10 @@
 package co.turismo.api.handler;
 
 import co.turismo.api.dto.auth.RegisterUserRequest;
+import co.turismo.api.dto.auth.PasswordUpdateRequest;
 import co.turismo.api.http.HttpResponses;
+import co.turismo.api.dto.response.UserInfoResponse;
+import co.turismo.api.dto.response.PasswordUpdateResponse;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.usecase.user.RegistrationUseCase;
@@ -37,8 +40,13 @@ public class UserHandler {
 
     public Mono<ServerResponse> getInfoUser(ServerRequest request) {
         String email = request.queryParam("userEmail").orElse("");
-        return userUseCase.getUserByEmail(email)
-                .flatMap(user -> ServerResponse.ok().bodyValue(user));
+        return userUseCase.getUserInfo(email)
+                .flatMap(info -> ServerResponse.ok()
+                        .bodyValue(new UserInfoResponse(
+                                info.user(),
+                                info.emailVerified(),
+                                info.passwordEnabled()
+                        )));
     }
 
     public Mono<ServerResponse> updateMyProfile(ServerRequest req) {
@@ -48,6 +56,25 @@ public class UserHandler {
                 .zipWith(req.bodyToMono(UpdateUserProfileRequest.class))
                 .flatMap(t -> userUseCase.updateMyProfile(t.getT1(), t.getT2()))
                 .flatMap(HttpResponses::ok);
+    }
+
+    public Mono<ServerResponse> setMyPassword(ServerRequest req) {
+        return req.principal()
+                .cast(Authentication.class)
+                .map(Authentication::getName)
+                .zipWith(req.bodyToMono(PasswordUpdateRequest.class))
+                .flatMap(t -> userUseCase.setPassword(t.getT1(), t.getT2().password()))
+                .flatMap(result -> {
+                    String status = result.name().toLowerCase();
+                    String message = result == UserUseCase.PasswordUpdateResult.CREATED
+                            ? "Contrasena configurada"
+                            : "Contrasena actualizada";
+                    return ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new PasswordUpdateResponse(status, message));
+                })
+                .onErrorResume(IllegalArgumentException.class,
+                        e -> HttpResponses.badRequest(e.getMessage()));
     }
 
     public Mono<ServerResponse> getAllUsers(ServerRequest req) {
