@@ -97,8 +97,6 @@ app:
 
 logging:
   level:
-    io.r2dbc.postgresql: DEBUG
-    org.springframework.r2dbc: DEBUG
     co.turismo.brevo: INFO
     co.turismo.usecase.authenticate.AccountRecoveryUseCase: DEBUG
     co.turismo.r2dbc.usersRepository.adapter.UserRepositoryAdapter: DEBUG
