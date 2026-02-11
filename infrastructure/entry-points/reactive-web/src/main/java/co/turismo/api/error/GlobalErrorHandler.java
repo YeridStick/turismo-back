@@ -4,7 +4,6 @@ import co.turismo.api.dto.response.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.server.*;
 import reactor.core.publisher.Mono;
+import org.springframework.web.server.WebExceptionHandler;
 
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
@@ -22,7 +22,7 @@ import java.util.NoSuchElementException;
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RequiredArgsConstructor
-public class GlobalErrorHandler implements ErrorWebExceptionHandler {
+public class GlobalErrorHandler implements WebExceptionHandler {
 
     private final ObjectMapper objectMapper;
 

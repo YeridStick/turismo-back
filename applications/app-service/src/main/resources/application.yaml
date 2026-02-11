@@ -11,8 +11,8 @@ spring:
 
   r2dbc:
     postgresql:
-      host: "${DB_HOST:shinkansen.proxy.rlwy.net}"
-      port: "${DB_PORT:44791}"
+      host: "${DB_HOST:postgis.railway.internal}"
+      port: "${DB_PORT:5432}"
       database: "${DB_NAME:railway}"
       schema: "${DB_SCHEMA:public}"
       username: "${DB_USER:postgres}"
@@ -97,13 +97,16 @@ app:
 
 logging:
   level:
+    io.r2dbc.postgresql: DEBUG
+    org.springframework.r2dbc: DEBUG
     co.turismo.brevo: INFO
-    co.turismo.usecase.authenticate.AccountRecoveryUseCase: INFO
+    co.turismo.usecase.authenticate.AccountRecoveryUseCase: DEBUG
+    co.turismo.r2dbc.usersRepository.adapter.UserRepositoryAdapter: DEBUG
 
 brevo:
   base-url: "${BREVO_BASE_URL:https://api.brevo.com/v3}"
-  api-key: "${BREVO_API_KEY}"
-  mcp-api-key: "${BREVO_MCP_API_KEY}"
+  api-key: "${BREVO_API_KEY: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}"
+  mcp-api-key: "${BREVO_MCP_API_KEY:eyJhcGlfa2V5IjoieGtleXNpYi0wMzI0ZmRkMDljYmNlMTkxNTkzZDI3MWEyYzk1Yzc4ZmZkNjYzN2YyMGE4NTA1YTUzODFkMTliMWMxNTRhZjkzLXF4djlwemljaFlVYUNRS1kifQ==}"
   sender:
     email: "${BREVO_SENDER_EMAIL:yeridstickramirez@gmail.com}"
     name: "${BREVO_SENDER_NAME:Turismo Huila}"

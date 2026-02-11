@@ -32,22 +32,39 @@ public class AuthenticateUseCase {
 
     // -------------------- SETUP --------------------
     /** Genera un secreto (draft) y devuelve datos para mostrar el QR. */
-    public Mono<SetupResponse> setupTotp(String emailRaw) {
+    public Mono<SetupResponse> setupTotp(String emailRaw, String password) {
         final String email = normalize(emailRaw);
         Objects.requireNonNull(email, "email");
+        if (password == null || password.isBlank()) {
+            return Mono.error(new RuntimeException("Password requerida para configurar TOTP"));
+        }
 
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
-                .then(totpSecretRepository.isTotpEnabledByEmail(email))
+                .then(userRepository.isPasswordEnabled(email))
                 .flatMap(enabled -> {
-                    if (Boolean.TRUE.equals(enabled)) {
-                        return Mono.error(new RuntimeException("TOTP ya habilitado para este usuario"));
+                    if (Boolean.FALSE.equals(enabled)) {
+                        return Mono.error(new RuntimeException("Password no habilitado"));
                     }
-                    final String secret = secretGenerator.get();
-                    final String otpAuthUri = buildOtpAuthUri(ISSUER, email, secret);
-                    return totpSecretRepository.saveSecretDraft(email, secret)
-                            .thenReturn(new SetupResponse(secret, otpAuthUri));
+                    return userRepository.getPasswordHash(email);
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("Password no configurado")))
+                .flatMap(hash -> {
+                    if (!passwordHasher.matches(password, hash)) {
+                        return userRepository.registerOtpFail(email)
+                                .then(Mono.error(new RuntimeException("Credenciales invalidas")));
+                    }
+                    return totpSecretRepository.isTotpEnabledByEmail(email)
+                            .flatMap(enabled -> {
+                                if (Boolean.TRUE.equals(enabled)) {
+                                    return Mono.error(new RuntimeException("TOTP ya habilitado para este usuario"));
+                                }
+                                final String secret = secretGenerator.get();
+                                final String otpAuthUri = buildOtpAuthUri(ISSUER, email, secret);
+                                return totpSecretRepository.saveSecretDraft(email, secret)
+                                        .thenReturn(new SetupResponse(secret, otpAuthUri));
+                            });
                 });
     }
 

@@ -33,29 +33,27 @@ public class AuthenticateHandler {
     // ---------- SETUP: POST /api/auth/code/setup ----------
     public Mono<ServerResponse> totpSetup(ServerRequest request) {
         return request.bodyToMono(TotpEmailRequest.class)
-                .map(req -> normalize(req.email()))
-                .flatMap(email ->
-                        authenticateUseCase.setupTotp(email)
-                                .map(setup -> {
-                                    String qrImage = QrCodeUtil.generateQrDataUrl(setup.otpAuthUri());
-                                    return new TotpSetupResponse(setup.secretBase32(), setup.otpAuthUri(), qrImage);
-                                })
-                                .flatMap(res -> ServerResponse.ok()
+                .flatMap(req -> authenticateUseCase.setupTotp(normalize(req.email()), req.password())
+                        .map(setup -> {
+                            String qrImage = QrCodeUtil.generateQrDataUrl(setup.otpAuthUri());
+                            return new TotpSetupResponse(setup.secretBase32(), setup.otpAuthUri(), qrImage);
+                        })
+                        .flatMap(res -> ServerResponse.ok()
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(ApiResponse.ok(res))
+                        )
+                        .onErrorResume(e -> {
+                            String msg = e.getMessage() == null ? "Error en setup" : e.getMessage();
+                            log.warn("TOTP setup error: {}", msg);
+                            if (msg.toLowerCase().contains("ya habilitado")) {
+                                return ServerResponse.status(409)
                                         .contentType(MediaType.APPLICATION_JSON)
-                                        .bodyValue(ApiResponse.ok(res))
-                                )
-                                .onErrorResume(e -> {
-                                    String msg = e.getMessage() == null ? "Error en setup" : e.getMessage();
-                                    log.warn("TOTP setup error: {}", msg);
-                                    if (msg.toLowerCase().contains("ya habilitado")) {
-                                        return ServerResponse.status(409)
-                                                .contentType(MediaType.APPLICATION_JSON)
-                                                .bodyValue(new SimpleMessageResponse(msg));
-                                    }
-                                    return ServerResponse.badRequest()
-                                            .contentType(MediaType.APPLICATION_JSON)
-                                            .bodyValue(new SimpleMessageResponse(msg));
-                                })
+                                        .bodyValue(new SimpleMessageResponse(msg));
+                            }
+                            return ServerResponse.badRequest()
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .bodyValue(new SimpleMessageResponse(msg));
+                        })
                 );
     }
 

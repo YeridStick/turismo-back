@@ -80,7 +80,7 @@ public class RouterRest {
                         authenticateHandler::totpSetup,
                         ops -> ops.operationId("authTotpSetup")
                                 .summary("Inicia setup TOTP")
-                                .description("Genera secreto Base32, URI otpauth y data URL del QR.")
+                                .description("Genera secreto Base32, URI otpauth y data URL del QR. Solicita password actual para validar la identidad.")
                                 .tag("Auth")
                                 .requestBody(jsonBody(TotpEmailRequest.class, true))
                                 .response(jsonResponse("200", "Secreto generado", ApiTotpSetupResponse.class))

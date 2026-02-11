@@ -1,6 +1,7 @@
 apply plugin: 'org.springframework.boot'
 
 dependencies {
+	testImplementation 'tools.jackson.core:jackson-databind'
 	implementation project(':antispam')
 	implementation project(':brevo')
 	implementation project(':locationiq')
