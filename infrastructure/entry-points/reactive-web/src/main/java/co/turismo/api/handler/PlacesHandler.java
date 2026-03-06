@@ -1,8 +1,11 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.place.SearchRequest;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.Place;
+import co.turismo.model.place.strategy.PlaceSearchCriteria;
+import co.turismo.model.place.strategy.PlaceSearchMode;
 import co.turismo.usecase.place.PlaceUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -11,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
@@ -79,65 +83,29 @@ public class PlacesHandler {
                 .body(placeUseCase.findByIdPlace(placeId), Place.class);
     }
 
-    public Mono<ServerResponse> findNearby(ServerRequest req) {
-        double lat = req.queryParam("lat").map(Double::parseDouble)
-                .orElseThrow(() -> new IllegalArgumentException("lat es obligatorio"));
-        double lng = req.queryParam("lng").map(Double::parseDouble)
-                .orElseThrow(() -> new IllegalArgumentException("lng es obligatorio"));
+    public Mono<ServerResponse> searchFilterPlace(ServerRequest request) {
+        PlaceSearchCriteria criteria = mapToCriteria(request);
 
-        double radiusMeters = req.queryParam("radiusMeters")
-                .or(() -> req.queryParam("r"))
-                .map(Double::parseDouble)
-                .orElse(1000.0);
-
-        int limit = req.queryParam("limit").map(Integer::parseInt).orElse(20);
-        Long categoryId = req.queryParam("categoryId").map(Long::parseLong).orElse(null);
-
-        return placeUseCase.findNearby(lat, lng, radiusMeters, limit, categoryId)
+        return placeUseCase.searchPlace(criteria)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(list)));
     }
 
-    public Mono<ServerResponse> search(ServerRequest req) {
-        String q = req.queryParam("q").orElse(null);
-        Long categoryId = req.queryParam("categoryId").map(Long::parseLong).orElse(null);
-
-        boolean onlyNearby = req.queryParam("onlyNearby").map(Boolean::parseBoolean).orElse(false);
-        Double lat = req.queryParam("lat").map(Double::parseDouble).orElse(null);
-        Double lng = req.queryParam("lng").map(Double::parseDouble).orElse(null);
-        Double radiusMeters = req.queryParam("radiusMeters")
-                .or(() -> req.queryParam("r"))
-                .map(Double::parseDouble)
-                .orElse(null);
-
-        int page = req.queryParam("page").map(Integer::parseInt).orElse(0);
-        int size = req.queryParam("size").map(Integer::parseInt).orElse(20);
-
-        // Validaciones mínimas
-        if (page < 0) page = 0;
-        if (size <= 0) size = 20;
-        if (size > 100) size = 100;
-
-        if (onlyNearby) {
-            if (lat == null || lng == null || radiusMeters == null) {
-                return Mono.error(new IllegalArgumentException(
-                        "Para onlyNearby=true debes enviar lat, lng y radiusMeters"));
-            }
-        }
-
-        return placeUseCase.search(q, categoryId, onlyNearby, lat, lng, radiusMeters, page, size)
-                .collectList()
-                .flatMap(list -> ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(list)));
-    }
-
-    public Mono<ServerResponse> findAllPlaces(ServerRequest request) {
-        return ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(placeUseCase.findAllPlaces(), Place.class);
+    public static PlaceSearchCriteria mapToCriteria(ServerRequest request) {
+        return PlaceSearchCriteria.builder()
+                // Mapeo dinámico: si no existe el parámetro, queda en null (gracias a los Wrappers)
+                .mode(request.queryParam("mode").map(PlaceSearchMode::valueOf).orElse(PlaceSearchMode.ALL))
+                .q(request.queryParam("q").orElse(null))
+                .categoryId(request.queryParam("categoryId").map(Long::valueOf).orElse(null))
+                .lat(request.queryParam("lat").map(Double::valueOf).orElse(null))
+                .lng(request.queryParam("lng").map(Double::valueOf).orElse(null))
+                .radiusMeters(request.queryParam("radius").map(Double::valueOf).orElse(null))
+                .onlyNearby(Boolean.parseBoolean(request.queryParam("onlyNearby").orElse("false")))
+                .page(Integer.parseInt(request.queryParam("page").orElse("0")))
+                .size(Integer.parseInt(request.queryParam("size").orElse("10")))
+                .build();
     }
 
     public Mono<ServerResponse> verify(ServerRequest req) {
@@ -165,10 +133,18 @@ public class PlacesHandler {
     }
 
     public Mono<ServerResponse> myPlaces(ServerRequest req) {
+        int limit = req.queryParam("limit")
+                .map(Integer::parseInt)
+                .orElse(10);
+
+        int offset = req.queryParam("offset")
+                .map(Integer::parseInt)
+                .orElse(0);
+
         return req.principal()
                 .cast(Authentication.class)
                 .map(Authentication::getName)
-                .flatMapMany(placeUseCase::findMine)
+                .flatMapMany(place -> placeUseCase.findMine(place, limit, offset))
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)

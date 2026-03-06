@@ -28,7 +28,7 @@ public class ConstantsEntryPoint {
     // Places
     public static final String PLACES_BASE_PATH    = "/places";
     public static final String PLACES_NEARBY_PATH  = "/places/nearby";
-    public static final String PLACES_SEARCH_PATH = "/places/search";
+    public static final String PLACES_SEARCH_FILTER_PATH = "/places/search";
     public static final String PLACES_ALL_PATH  = "/places/all";
     public static final String PLACES_MINE_PATH    = "/places/mine";
     public static final String PLACES_ACTIVE_PATH  = "/places/{id}/active";

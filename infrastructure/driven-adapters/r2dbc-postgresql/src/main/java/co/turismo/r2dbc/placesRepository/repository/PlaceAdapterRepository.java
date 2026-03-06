@@ -79,13 +79,15 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
           AND (:categoryId IS NULL OR p.category_id = :categoryId)
         ORDER BY distance_meters ASC
         LIMIT :limit
+        OFFSET :offset
     """)
     Flux<PlaceData> findNearby(
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radiusMeters") double radiusMeters,
+            @Param("categoryId") Long categoryId,
             @Param("limit") int limit,
-            @Param("categoryId") Long categoryId
+            @Param("offset") int offset
     );
 
 
@@ -104,8 +106,14 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             p.is_active,
             p.created_at
         FROM places p
+        ORDER BY p.created_at DESC
+        LIMIT :limit
+        OFFSET :offset
     """)
-    Flux<PlaceData> findAll();
+    Flux<PlaceData> findAll(
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
 
     @Query("""
         WITH inp AS (
@@ -164,7 +172,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ),
             0
           ) ASC NULLS LAST,
-          p.created_at DESC
+        ORDER BY p.created_at DESC
         LIMIT :limit
         OFFSET :offset
     """)
@@ -243,8 +251,13 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
         JOIN users u ON u.id = p.owner_user_id
         WHERE lower(u.email) = lower(:email)
         ORDER BY p.created_at DESC
+        LIMIT :limit                -- Cantidad de registros por página
+        OFFSET :offset;
     """)
-    Flux<PlaceData> findMine(@Param("email") String email);
+    Flux<PlaceData> findMine(
+            @Param("email") String email,
+            @Param("limit") int limit,
+            @Param("offset") int offset);
 
     // VERIFY (admin)
     @Query("""
@@ -317,7 +330,11 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
         FROM places p
         WHERE p.id = :id
     """)
-    Mono<PlaceData> findOneProjected(@Param("id") Long id);
+    Mono<PlaceData> findOneProjected(
+            @Param("id") Long id,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
 
     // BY OWNER ID (para /mine vía adapter)
     @Query("""
@@ -337,27 +354,34 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
         FROM places p
         WHERE p.owner_user_id = :ownerId
         ORDER BY p.created_at DESC
+        LIMIT :limit                -- Cantidad de registros por página
+        OFFSET :offset; 
     """)
-    Flux<PlaceData> findByOwnerId(@Param("ownerId") Long ownerId);
+    Flux<PlaceData> findByOwnerId(
+            @Param("ownerId") Long ownerId,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
 
     @Query("""
         SELECT
             p.id,
             p.owner_user_id,
-            p.name, p.description,
-            p.category_id,
+            p.name,
             ST_Y(p.geom) AS lat,
             ST_X(p.geom) AS lng,
-            p.address, p.phone, p.website,
-            p.image_urls,
-            p.model_3d_urls,
-            p.is_verified,
-            p.is_active,
             p.created_at
         FROM places p
         WHERE p.id = ANY(:ids)
+        ORDER BY p.created_at DESC  -- ¡Crucial para que la paginación sea consistente!
+        LIMIT :limit                -- Cantidad de registros por página
+        OFFSET :offset; 
     """)
-    Flux<PlaceData> findByIds(@Param("ids") Long[] ids);
+    Flux<PlaceData> findByIds(
+            @Param("ids") Long[] ids,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
 
     // SET ACTIVE si es dueño (en una sola sentencia)
     @Query("""

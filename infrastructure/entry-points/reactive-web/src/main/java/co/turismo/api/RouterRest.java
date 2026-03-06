@@ -24,6 +24,8 @@ import co.turismo.api.handler.PlacesHandler.UpdateRequest;
 import co.turismo.api.handler.PlacesHandler.VerifyRequest;
 import co.turismo.model.feedback.Feedback;
 import co.turismo.model.place.Place;
+import co.turismo.model.place.strategy.PlaceSearchCriteria;
+import co.turismo.model.place.strategy.PlaceSearchMode;
 import co.turismo.model.reviews.Review;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
@@ -236,43 +238,29 @@ public class RouterRest {
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
 
-                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_NEARBY_PATH,
-                        placesHandler::findNearby,
-                        ops -> ops.operationId("placesNearby")
-                                .summary("Lugares cercanos")
-                                .description("Filtra por coordenadas, radio y categoría.")
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_SEARCH_FILTER_PATH,
+                        placesHandler::searchFilterPlace,
+                        ops -> ops.operationId("placeSearchFilter")
+                                .summary("Filtrar lugares")
+                                .description("Permite buscar lugares por texto, categoría y geolocalización en la región del Huila.")
                                 .tag("Places")
-                                .parameter(queryParam("lat", true, "Latitud del usuario", Double.class, "6.25184"))
-                                .parameter(queryParam("lng", true, "Longitud del usuario", Double.class, "-75.56359"))
-                                .parameter(queryParam("radiusMeters", false, "Radio en metros (alias: r)", Double.class, "1000"))
-                                .parameter(queryParam("limit", false, "Número máximo de resultados", Integer.class, "20"))
-                                .parameter(queryParam("categoryId", false, "Filtra por categoría", Long.class, "5"))
-                                .response(jsonResponse("200", "Resultados por cercanía", ApiPlaceListResponse.class))
-                )
+                                // Parámetros principales
+                                .parameter(queryParam("mode", true, "Modo de búsqueda (ALL, NEARBY, TEXT)", PlaceSearchMode.class, "ALL"))
+                                .parameter(queryParam("q", false, "Texto de búsqueda (nombre, dirección o descripción)", String.class, null))
+                                .parameter(queryParam("categoryId", false, "ID de la categoría para filtrar", Long.class, null))
 
-                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_SEARCH_PATH,
-                        placesHandler::search,
-                        ops -> ops.operationId("placesSearch")
-                                .summary("Buscar lugares por texto")
-                                .tag("Places")
-                                .parameter(queryParam("q", false, "Texto de búsqueda libre", String.class, "caf\u00e9"))
-                                .parameter(queryParam("categoryId", false, "Categoría a filtrar", Long.class, "5"))
-                                .parameter(queryParam("onlyNearby", false, "Limita a un radio respecto a lat/lng", Boolean.class, "false"))
-                                .parameter(queryParam("lat", false, "Latitud para onlyNearby", Double.class, "6.25"))
-                                .parameter(queryParam("lng", false, "Longitud para onlyNearby", Double.class, "-75.56"))
-                                .parameter(queryParam("radiusMeters", false, "Radio en metros para onlyNearby", Double.class, "1000"))
-                                .parameter(queryParam("page", false, "Página (0..N)", Integer.class, "0"))
-                                .parameter(queryParam("size", false, "Cantidad por página (<=100)", Integer.class, "20"))
-                                .response(jsonResponse("200", "Coincidencias por texto", ApiPlaceListResponse.class))
-                )
+                                // Parámetros de Geolocalización
+                                .parameter(queryParam("lat", false, "Latitud del usuario", Double.class, null))
+                                .parameter(queryParam("lng", false, "Longitud del usuario", Double.class, null))
+                                .parameter(queryParam("radius", false, "Radio de búsqueda en metros", Double.class, "5000"))
+                                .parameter(queryParam("onlyNearby", false, "Si es true, filtra estrictamente por el radio", Boolean.class, "false"))
 
-                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_ALL_PATH,
-                        placesHandler::findAllPlaces,
-                        ops -> ops.operationId("placesAll")
-                                .summary("Todos los lugares")
-                                .description("Retorna el catálogo completo sin envoltorio paginado.")
-                                .tag("Places")
-                                .response(jsonArrayResponse("200", "Listado completo", Place[].class))
+                                // Paginación
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "10"))
+
+                                .response(jsonResponse("200", "Búsqueda exitosa", ApiPlaceListResponse.class))
+                                .response(jsonResponse("400", "Parámetros inválidos", ApiErrorResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MINE_PATH,
@@ -280,6 +268,8 @@ public class RouterRest {
                         ops -> ops.operationId("placesMine")
                                 .summary("Mis lugares (OWNER)")
                                 .tag("Places")
+                                .parameter(queryParam("offset", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("limit", false, "Cantidad de resultados por página", Integer.class, "10"))
                                 .response(jsonResponse("200", "Lugares del propietario autenticado", ApiPlaceListResponse.class))
                 )
 
@@ -425,6 +415,8 @@ public class RouterRest {
                         ops -> ops.operationId("packagesList")
                                 .summary("Listado de paquetes turísticos")
                                 .tag("Packages")
+                                .parameter(queryParam("offset", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("limit", false, "Cantidad de resultados por página", Integer.class, "10"))
                                 .response(jsonResponse("200", "Listado de paquetes", ApiTourPackageListResponse.class))
                 )
 

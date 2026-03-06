@@ -17,7 +17,9 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -60,7 +62,15 @@ public class TourPackageHandler {
     }
 
     public Mono<ServerResponse> list(ServerRequest req) {
-        return tourPackageUseCase.findAll()
+        int limit = req.queryParam("limit")
+                .map(Integer::parseInt)
+                .orElse(10);
+
+        int offset = req.queryParam("offset")
+                .map(Integer::parseInt)
+                .orElse(0);
+
+        return tourPackageUseCase.findAll(limit, offset)
                 .map(this::toResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
@@ -70,7 +80,14 @@ public class TourPackageHandler {
 
     public Mono<ServerResponse> findById(ServerRequest req) {
         long id = Long.parseLong(req.pathVariable("id"));
-        return tourPackageUseCase.findById(id)
+        int limit = req.queryParam("limit")
+                .map(Integer::parseInt)
+                .orElse(10);
+
+        int offset = req.queryParam("offset")
+                .map(Integer::parseInt)
+                .orElse(0);
+        return tourPackageUseCase.findById(id, limit, offset)
                 .map(this::toResponse)
                 .flatMap(pkg -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -79,7 +96,7 @@ public class TourPackageHandler {
 
     private TourPackageResponse toResponse(TourPackage pkg) {
         List<String> includes = pkg.getIncludes() == null ? List.of() : Arrays.asList(pkg.getIncludes());
-        List<Long> placeIds = pkg.getPlaceIds() == null ? List.of() : Arrays.asList(pkg.getPlaceIds());
+        List<Long> placeIds = List.of(normalizePlaceIds(pkg.getPlaceIds()));
         List<Place> places = pkg.getPlaces() == null ? List.of() : pkg.getPlaces();
 
         return new TourPackageResponse(
@@ -103,6 +120,19 @@ public class TourPackageHandler {
                 pkg.getAgencyName(),
                 places
         );
+    }
+
+    private static Long[] normalizePlaceIds(Long[] placeIds) {
+        if (placeIds == null || placeIds.length == 0) {
+            return new Long[0];
+        }
+        var set = new LinkedHashSet<Long>();
+        for (Long id : placeIds) {
+            if (id != null && id > 0) {
+                set.add(id);
+            }
+        }
+        return set.stream().filter(Objects::nonNull).toArray(Long[]::new);
     }
 
     @Schema(name = "TourPackageCreateRequest", description = "Cuerpo para crear un paquete turístico")

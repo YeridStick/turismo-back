@@ -2,9 +2,11 @@ package co.turismo.usecase.place;
 
 import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.Place;
+import co.turismo.model.place.strategy.PlaceSearchCriteria;
 import co.turismo.model.place.UpdatePlaceRequest;
 import co.turismo.model.place.gateways.PlaceRepository;
 import co.turismo.model.userIdentityPort.UserIdentityPort;
+import co.turismo.usecase.place.filterFactory.PlaceSearchFactory;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -16,17 +18,14 @@ public class PlaceUseCase {
 
     private final PlaceRepository placeRepository;
     private final UserIdentityPort userIdentityPort;
+    private final PlaceSearchFactory placeSearchFactory;
 
     public Mono<Place> createPlace(CreatePlaceRequest cmd) {
         return placeRepository.create(cmd);
     }
 
-    public Flux<Place> findNearby(double lat, double lng, double radiusMeters, int limit, Long categoryId) {
-        return placeRepository.findNearby(lat, lng, radiusMeters, limit, categoryId);
-    }
-
-    public Flux<Place> findAllPlaces(){
-        return placeRepository.findAllPlace();
+    public Flux<Place> searchPlace(PlaceSearchCriteria placeSearchCriteria) {
+        return placeSearchFactory.getStrategy(placeSearchCriteria.getMode()).execute(placeSearchCriteria);
     }
 
     public Mono<Place> verifyPlaceByAdmin(String adminEmail, long placeId, boolean approve) {
@@ -39,17 +38,12 @@ public class PlaceUseCase {
         return placeRepository.setActiveIfOwner(ownerEmail, placeId, active);
     }
 
-    public Flux<Place> findMine(String ownerEmail) {
-        return placeRepository.findPlacesByOwnerEmail(ownerEmail);
+    public Flux<Place> findMine(String ownerEmail, Integer Limit, Integer Offset) {
+        return placeRepository.findPlacesByOwnerEmail(ownerEmail, Limit, Offset);
     }
 
     public Mono<Place> patch(long id, UpdatePlaceRequest req) {
         return placeRepository.patch(id, req);
-    }
-
-    public Flux<Place> search(String q, Long categoryId, boolean onlyNearby,
-                              Double lat, Double lng, Double radiusMeters, int page, int size) {
-        return placeRepository.search(q, categoryId, onlyNearby, lat, lng, radiusMeters, page, size);
     }
 
     public Mono<Place> findByIdPlace(long id) {

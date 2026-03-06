@@ -22,7 +22,7 @@ public class TourPackageUseCase {
     private final PlaceRepository placeRepository;
 
     public Mono<TourPackage> create(String userEmail, CreateTourPackageRequest request) {
-        if (request == null) {
+        /*if (request == null) {
             return Mono.error(new IllegalArgumentException("Body requerido"));
         }
         if (request.getTitle() == null || request.getTitle().isBlank()) {
@@ -38,11 +38,15 @@ public class TourPackageUseCase {
         Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
         if (placeIds.length == 0) {
             return Mono.error(new IllegalArgumentException("placeIds es obligatorio"));
-        }
+        }*/
+        //Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
+        Long[] placeIds = request.getPlaceIds();
+        Integer limit = 10;
+        Integer offset = 0;
 
         return agencyRepository.findByUserEmail(userEmail)
                 .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
-                .flatMap(agency -> validatePlaces(placeIds)
+                .flatMap(agency -> validatePlaces(placeIds, limit, offset)
                         .then(tourPackageRepository.create(request.toBuilder()
                                 .agencyId(agency.getId())
                                 .placeIds(placeIds)
@@ -55,22 +59,22 @@ public class TourPackageUseCase {
                                     .defaultIfEmpty(created);
                         })
                 )
-                .flatMap(this::attachPlaces);
+                .flatMap(tourPackage -> attachPlaces(tourPackage, limit, offset));
     }
 
-    public Flux<TourPackage> findAll() {
+    public Flux<TourPackage> findAll(Integer limit, Integer offset) {
         return tourPackageRepository.findAll()
-                .concatMap(this::attachPlaces);
+                .concatMap(tourPackage -> attachPlaces(tourPackage, limit, offset));
     }
 
-    public Mono<TourPackage> findById(long id) {
+    public Mono<TourPackage> findById(long id, Integer limit, Integer offset) {
         return tourPackageRepository.findById(id)
                 .switchIfEmpty(Mono.error(new IllegalStateException("Paquete no encontrado")))
-                .flatMap(this::attachPlaces);
+                .flatMap(tourPackage -> attachPlaces(tourPackage, limit, offset));
     }
 
-    private Mono<Void> validatePlaces(Long[] placeIds) {
-        return placeRepository.findByIds(placeIds)
+    private Mono<Void> validatePlaces(Long[] placeIds, Integer limit, Integer offset) {
+        return placeRepository.findByIds(placeIds, limit, offset) // Limitar cantidad de sitios por Paquete
                 .collectList()
                 .flatMap(found -> {
                     if (found.size() != placeIds.length) {
@@ -80,12 +84,9 @@ public class TourPackageUseCase {
                 });
     }
 
-    private Mono<TourPackage> attachPlaces(TourPackage tourPackage) {
+    private Mono<TourPackage> attachPlaces(TourPackage tourPackage, Integer limit, Integer offset) {
         Long[] placeIds = tourPackage.getPlaceIds();
-        if (placeIds == null || placeIds.length == 0) {
-            return Mono.just(tourPackage.toBuilder().places(List.of()).build());
-        }
-        return placeRepository.findByIds(placeIds)
+        return placeRepository.findByIds(placeIds, limit, offset)
                 .collectList()
                 .map(places -> tourPackage.toBuilder().places(places).build());
     }

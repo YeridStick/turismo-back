@@ -10,9 +10,12 @@ import co.turismo.r2dbc.placesRepository.entity.PlaceData;
 import co.turismo.r2dbc.placesRepository.repository.PlaceAdapterRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivecommons.utils.ObjectMapper;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.Arrays;
 
 @Repository
 @Slf4j
@@ -57,15 +60,18 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
     }
 
     @Override
-    public Flux<Place> findNearby(double lat, double lng, double radiusMeters, int limit, Long categoryId) {
-        return repository.findNearby(lat, lng, radiusMeters, limit, categoryId)
+    public Flux<Place> findNearby(double lat, double lng, double radiusMeters, Long categoryId, Integer limit, Integer offset) {
+        return repository.findNearby(lat, lng, radiusMeters, categoryId,  limit != null ? limit : 10,
+                        offset != null ? offset : 0)
                 .map(this::toEntity);
     }
 
     @Override
-    public Flux<Place> findAllPlace() {
-        return super.findAll()
-                .doOnNext(p -> log.info("place={}", p.getName()));
+    public Flux<Place> findAllPlace(Integer limit, Integer offset) {
+        return repository.findAll(
+                limit != null ? limit : 10,
+                offset != null ? offset : 0
+        ).map(this::toEntity);
     }
 
     @Override
@@ -118,19 +124,26 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
     }
 
     @Override
-    public Flux<Place> findPlacesByOwnerEmail(String ownerEmail) {
+    public Flux<Place> findPlacesByOwnerEmail(String ownerEmail, Integer limit, Integer offset) {
         return userRepository.findByEmail(ownerEmail)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario no encontrado")))
-                .flatMapMany(u -> repository.findByOwnerId(u.getId()))
+                .flatMapMany(u -> repository.findByOwnerId(
+                        u.getId(),
+                        limit != null ? limit : 10,
+                        offset != null ? offset : 0
+                ))
                 .map(this::toEntity);
     }
 
     @Override
-    public Flux<Place> findByIds(Long[] ids) {
-        if (ids == null || ids.length == 0) {
-            return Flux.empty();
-        }
-        return repository.findByIds(ids)
+    public Flux<Place> findByIds(Long[] ids, Integer limit, Integer offset) {
+        return Mono.just(ids)
+                .filter(array -> array.length > 0 )
+                .flatMapMany(array -> repository.findByIds(
+                        ids,
+                        limit != null ? limit : 10,
+                        offset != null ? offset : 0
+                ))
                 .map(this::toEntity);
     }
 

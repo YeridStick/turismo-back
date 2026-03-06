@@ -8,8 +8,8 @@ import reactor.core.publisher.Mono;
 
 public interface PlaceRepository {
     Mono<Place> create(CreatePlaceRequest request);
-    Flux<Place> findNearby(double lat, double lng, double radiusMeters, int limit, Long categoryId);
-    Flux<Place> findAllPlace();
+    Flux<Place> findNearby(double lat, double lng, double radiusMeters, Long categoryId, Integer limit, Integer offset);
+    Flux<Place> findAllPlace(Integer limit, Integer offset);
     Flux<Place> search(String q, Long categoryId, boolean onlyNearby, Double lat, Double lng, Double radiusMeters, int page, int size);
     Mono<Place> patch(long id, UpdatePlaceRequest req);
     Mono<Place> verifyPlace(long id, boolean verified, boolean active, long adminId);
@@ -18,8 +18,8 @@ public interface PlaceRepository {
     Mono<Place> setActiveIfOwner(String ownerEmail, long placeId, boolean active);
     Mono<Void>  addOwnerToPlace(String ownerEmailToAdd, long placeId);
     Mono<Void>  removeOwnerFromPlace(String ownerEmailToRemove, long placeId);
-    Flux<Place> findPlacesByOwnerEmail(String ownerEmail);
-    Flux<Place> findByIds(Long[] ids);
+    Flux<Place> findPlacesByOwnerEmail(String ownerEmail, Integer limit, Integer offset);
+    Flux<Place> findByIds(Long[] ids, Integer limit, Integer offset);
     Mono<Place> findByPlaces(Long id);
     Mono<Place> deletePalce(Long id);
 }
