@@ -11,9 +11,14 @@ import java.time.LocalDate;
 
 public interface TourPackageRepository {
     Mono<TourPackage> create(CreateTourPackageRequest request);
-    Flux<TourPackage> findAll();
+
+    Flux<TourPackage> findAll(Integer limit, Integer offset);
+
     Mono<TourPackage> findById(Long id);
+
     Flux<TourPackage> findByAgencyId(Long agencyId);
+
     Flux<TopPackage> topSoldByAgency(Long agencyId, LocalDate from, LocalDate to, int limit);
+
     Mono<TourPackageSalesSummary> salesSummaryByAgency(Long agencyId, LocalDate from, LocalDate to);
 }

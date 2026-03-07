@@ -22,7 +22,7 @@ public class TourPackageUseCase {
     private final PlaceRepository placeRepository;
 
     public Mono<TourPackage> create(String userEmail, CreateTourPackageRequest request) {
-        /*if (request == null) {
+        if (request == null) {
             return Mono.error(new IllegalArgumentException("Body requerido"));
         }
         if (request.getTitle() == null || request.getTitle().isBlank()) {
@@ -38,10 +38,8 @@ public class TourPackageUseCase {
         Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
         if (placeIds.length == 0) {
             return Mono.error(new IllegalArgumentException("placeIds es obligatorio"));
-        }*/
-        //Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
-        Long[] placeIds = request.getPlaceIds();
-        Integer limit = 10;
+        }
+        Integer limit = 100;
         Integer offset = 0;
 
         return agencyRepository.findByUserEmail(userEmail)
@@ -57,20 +55,19 @@ public class TourPackageUseCase {
                             }
                             return tourPackageRepository.findById(created.getId())
                                     .defaultIfEmpty(created);
-                        })
-                )
+                        }))
                 .flatMap(tourPackage -> attachPlaces(tourPackage, limit, offset));
     }
 
     public Flux<TourPackage> findAll(Integer limit, Integer offset) {
-        return tourPackageRepository.findAll()
-                .concatMap(tourPackage -> attachPlaces(tourPackage, limit, offset));
+        return tourPackageRepository.findAll(limit, offset)
+                .concatMap(tourPackage -> attachPlaces(tourPackage, 100, 0));
     }
 
     public Mono<TourPackage> findById(long id, Integer limit, Integer offset) {
         return tourPackageRepository.findById(id)
                 .switchIfEmpty(Mono.error(new IllegalStateException("Paquete no encontrado")))
-                .flatMap(tourPackage -> attachPlaces(tourPackage, limit, offset));
+                .flatMap(tourPackage -> attachPlaces(tourPackage, 100, 0));
     }
 
     private Mono<Void> validatePlaces(Long[] placeIds, Integer limit, Integer offset) {

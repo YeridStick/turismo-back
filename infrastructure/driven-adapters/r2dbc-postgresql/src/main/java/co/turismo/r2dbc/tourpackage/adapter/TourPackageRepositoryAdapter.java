@@ -18,7 +18,8 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDate;
 
 @Repository
-public class TourPackageRepositoryAdapter extends ReactiveAdapterOperations<TourPackage, TourPackageData, Long, TourPackageAdapterRepository>
+public class TourPackageRepositoryAdapter
+        extends ReactiveAdapterOperations<TourPackage, TourPackageData, Long, TourPackageAdapterRepository>
         implements TourPackageRepository {
 
     protected TourPackageRepositoryAdapter(TourPackageAdapterRepository repository, ObjectMapper mapper) {
@@ -28,29 +29,28 @@ public class TourPackageRepositoryAdapter extends ReactiveAdapterOperations<Tour
     @Override
     public Mono<TourPackage> create(CreateTourPackageRequest request) {
         return repository.insertPackage(
-                        request.getAgencyId(),
-                        request.getTitle(),
-                        request.getCity(),
-                        request.getDescription(),
-                        request.getDays(),
-                        request.getNights(),
-                        request.getPeople(),
-                        request.getRating(),
-                        request.getReviews(),
-                        request.getPrice(),
-                        request.getOriginalPrice(),
-                        request.getDiscount(),
-                        request.getTag(),
-                        request.getIncludes(),
-                        request.getImage(),
-                        request.getPlaceIds()
-                )
+                request.getAgencyId(),
+                request.getTitle(),
+                request.getCity(),
+                request.getDescription(),
+                request.getDays(),
+                request.getNights(),
+                request.getPeople(),
+                request.getRating(),
+                request.getReviews(),
+                request.getPrice(),
+                request.getOriginalPrice(),
+                request.getDiscount(),
+                request.getTag(),
+                request.getIncludes(),
+                request.getImage(),
+                request.getPlaceIds())
                 .map(this::toEntity);
     }
 
     @Override
-    public Flux<TourPackage> findAll() {
-        return repository.findAllProjected()
+    public Flux<TourPackage> findAll(Integer limit, Integer offset) {
+        return repository.findAllProjected(limit != null ? limit : 10, offset != null ? offset : 0)
                 .map(this::toEntity);
     }
 
