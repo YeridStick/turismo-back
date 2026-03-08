@@ -63,7 +63,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)) AS distance_meters
         FROM places p
         WHERE p.is_active = TRUE
-          AND (:categoryId IS NULL OR p.category_id = :categoryId)
+          AND (CAST(:categoryId AS BIGINT) IS NULL OR p.category_id = :categoryId)
           AND ST_DWithin(
                 p.geom::geography, 
                 ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, 
@@ -119,14 +119,14 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
             p.address, p.phone, p.website, p.image_urls, p.model_3d_urls, p.is_verified, p.is_active, p.created_at,
             CASE
-              WHEN :lat IS NOT NULL AND :lng IS NOT NULL
-              THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+              WHEN CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL
+              THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(CAST(:lng AS FLOAT8), CAST(:lat AS FLOAT8)), 4326))
               ELSE NULL
             END AS distance_meters
           FROM places p
           CROSS JOIN inp
           WHERE p.is_active = TRUE
-            AND (:categoryId IS NULL OR p.category_id = :categoryId)
+            AND (CAST(:categoryId AS BIGINT) IS NULL OR p.category_id = :categoryId)
             AND (
               (SELECT qnorm FROM inp) IS NULL
               OR
@@ -138,18 +138,18 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
             AND (
               :onlyNearby = FALSE
               OR (
-                :lat IS NOT NULL AND :lng IS NOT NULL AND :radiusMeters IS NOT NULL
+                CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL AND CAST(:radiusMeters AS FLOAT8) IS NOT NULL
                 AND ST_DWithin(
                   p.geom::geography,
-                  ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
-                  :radiusMeters
+                  ST_SetSRID(ST_MakePoint(CAST(:lng AS FLOAT8), CAST(:lat AS FLOAT8)), 4326)::geography,
+                  CAST(:radiusMeters AS FLOAT8)
                 )
               )
             )
           ORDER BY
             CASE
-              WHEN :onlyNearby = TRUE AND :lat IS NOT NULL AND :lng IS NOT NULL
-                THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+              WHEN :onlyNearby = TRUE AND CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL
+                THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(CAST(:lng AS FLOAT8), CAST(:lat AS FLOAT8)), 4326))
             END ASC NULLS LAST,
             NULLIF(
               position(
@@ -187,8 +187,8 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               image_urls  = COALESCE(:imageUrls::text[], image_urls),
               model_3d_urls = COALESCE(:model3dUrls::text[], model_3d_urls),
               geom        = CASE
-                             WHEN :lat IS NOT NULL AND :lng IS NOT NULL
-                             THEN ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+                             WHEN CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL
+                             THEN ST_SetSRID(ST_MakePoint(CAST(:lng AS FLOAT8), CAST(:lat AS FLOAT8)), 4326)
                              ELSE geom
                             END
           WHERE id = :id
