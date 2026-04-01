@@ -49,7 +49,7 @@ public class PostgreSQLConnectionPool {
                 .database(database)
                 .username(username)
                 .password(password)
-                .sslMode(SSLMode.VERIFY_FULL)
+                .sslMode(SSLMode.REQUIRE)
                 .build();
 
         ConnectionPoolConfiguration poolConfiguration = ConnectionPoolConfiguration.builder()
