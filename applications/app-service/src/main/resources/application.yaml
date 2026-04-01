@@ -12,7 +12,7 @@ spring:
   r2dbc:
     postgresql:
       host: "${DB_HOST:db.egfossuqhgxgpnxovdpt.supabase.co}"
-      port: "${DB_PORT:6543}"
+      port: "${DB_PORT:5432}"
       database: "${DB_NAME:postgres}"
       schema: "${DB_SCHEMA:public}"
       username: "${DB_USER:postgres}"
