@@ -13,8 +13,8 @@ import java.util.Map;
 public class RateLimiterProperties {
     private boolean enabled = true;
     private long windowSeconds = 60;
-    private long capacity = 120;
-    private long refillPerWindow = 120;
+    private long capacity = 50;
+    private long refillPerWindow = 50;
 
     // límites por prefijo de ruta (ej: "/api/auth")
     private Map<String, PathLimit> perPath;

@@ -3,6 +3,7 @@ FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /app
 
+# Copiar archivos necesarios para el build
 COPY ./gradlew ./gradlew.bat /app/
 COPY ./gradle /app/gradle
 COPY ./settings.gradle ./build.gradle ./gradle.properties ./main.gradle /app/
@@ -13,19 +14,27 @@ COPY ./infrastructure /app/infrastructure
 RUN chmod +x ./gradlew
 RUN apk add --no-cache bash
 
-RUN ./gradlew :app-service:bootJar -x test -x validateStructure && \
-    ls -la applications/app-service/build/libs/ && \
-    if [ ! -f applications/app-service/build/libs/turismo-back.jar ]; then echo "JAR no encontrado" && exit 1; fi
+# Generar el JAR de la aplicación
+RUN ./gradlew :app-service:bootJar -x test -x validateStructure
 
 # Etapa de ejecución
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
+# Crear un usuario no-root para seguridad (Hugging Face usa UID 1000)
+RUN adduser -D -u 1000 hfuser
+USER 1000
+
+# Copiar el JAR desde la etapa de construcción
 COPY --from=builder /app/applications/app-service/build/libs/turismo-back.jar app.jar
 
-# Exponer el puerto configurado desde Railway (SERVER_PORT)
-EXPOSE 8080
+# Hugging Face Spaces requiere exponer el puerto 7860
+EXPOSE 7860
 
-# Usar la variable JAVA_OPTS y otras variables de entorno en tiempo de ejecución
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Configurar variables por defecto para el puerto y memoria
+ENV SERVER_PORT=7860
+ENV JAVA_OPTS="-Xmx1536m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+# ENTRYPOINT para ejecutar la aplicación
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -Dserver.port=${SERVER_PORT} -jar app.jar"]
