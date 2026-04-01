@@ -1,5 +1,6 @@
 package co.turismo.r2dbc.usersRepository.adapter;
 
+import co.turismo.model.error.NotFoundException;
 import co.turismo.model.user.RecoveryStatus;
 import co.turismo.model.user.RecoveryTokenStatus;
 import co.turismo.model.user.UpdateUserProfileRequest;
@@ -188,7 +189,9 @@ public class UserRepositoryAdapter
 
     @Override
     public Mono<Void> updatePasswordHash(String email, String passwordHash) {
-        return repository.updatePasswordHash(email, passwordHash);
+        return repository.findByEmail(email)
+                .switchIfEmpty(Mono.error(new NotFoundException("Usuario no econtrado")))
+                .flatMap(user -> repository.updatePasswordHash(email, passwordHash));
     }
 
 

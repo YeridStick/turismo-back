@@ -1,5 +1,5 @@
 package co.turismo.usecase.authenticate;
-
+ 
 import co.turismo.model.authenticationsession.gateways.AuthenticationSessionRepository;
 import co.turismo.model.user.gateways.UserRepository;
 import co.turismo.model.authenticationsession.gateways.TotpSecretRepository;
@@ -7,38 +7,34 @@ import co.turismo.model.authenticationsession.gateways.TotpVerifier;
 import co.turismo.model.security.gateways.PasswordHasher;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
-
+ 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
-
+ 
 @RequiredArgsConstructor
 public class AuthenticateUseCase {
-
+ 
     private final AuthenticationSessionRepository authenticationRepository;
     private final UserRepository userRepository;
-
+ 
     private final TotpSecretRepository totpSecretRepository;
     private final TotpVerifier totpVerifier;
     private final PasswordHasher passwordHasher;
-
+ 
     // Proveedor del secreto Base32 (inyectado: p.ej. TotpSecretGenerator::generateBase32Secret)
     private final Supplier<String> secretGenerator;
-
+ 
     private static final String ISSUER = "TurismoApp"; // cámbialo por tu marca si quieres
-
+ 
     // -------------------- SETUP --------------------
     /** Genera un secreto (draft) y devuelve datos para mostrar el QR. */
     public Mono<SetupResponse> setupTotp(String emailRaw, String password) {
         final String email = normalize(emailRaw);
-        Objects.requireNonNull(email, "email");
-        if (password == null || password.isBlank()) {
-            return Mono.error(new RuntimeException("Password requerida para configurar TOTP"));
-        }
-
+        // Validaciones básicas (email no nulo, password no vacía) ya se hicieron en el DTO
+ 
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
@@ -61,12 +57,11 @@ public class AuthenticateUseCase {
                             });
                 });
     }
-
+ 
     /** Consulta si el usuario tiene TOTP habilitado (y no está bloqueado). */
     public Mono<Boolean> totpStatus(String emailRaw) {
         final String email = normalize(emailRaw);
-        Objects.requireNonNull(email, "email");
-
+ 
         return userRepository.findByEmail(email)
                 .switchIfEmpty(Mono.error(new Exception("Usuario no encontrado")))
                 .flatMap(u -> {
@@ -80,13 +75,13 @@ public class AuthenticateUseCase {
                             .defaultIfEmpty(false);
                 });
     }
-
+ 
     // -------------------- CONFIRM --------------------
     /** Confirma el primer código y habilita TOTP. */
-    public Mono<Void> confirmTotp(String emailRaw, int code) {
+    public Mono<Void> confirmTotp(String emailRaw, String codeStr) {
         final String email = normalize(emailRaw);
-        Objects.requireNonNull(email, "email");
-
+        int code = Integer.parseInt(codeStr);
+ 
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
@@ -100,13 +95,13 @@ public class AuthenticateUseCase {
                             .then(Mono.error(new RuntimeException("Código TOTP inválido")));
                 });
     }
-
+ 
     // -------------------- LOGIN --------------------
     /** Autenticación con TOTP (ya habilitado) -> emite token de sesión. */
-    public Mono<String> authenticateTotp(String emailRaw, int totpCode, String ip) {
+    public Mono<String> authenticateTotp(String emailRaw, String codeStr, String ip) {
         final String email = normalize(emailRaw);
-        Objects.requireNonNull(email, "email");
-
+        int totpCode = Integer.parseInt(codeStr);
+ 
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
@@ -135,13 +130,11 @@ public class AuthenticateUseCase {
                                 })
                 );
     }
-
+ 
     // -------------------- LOGIN PASSWORD --------------------
     public Mono<String> authenticatePassword(String emailRaw, String password, String ip) {
         final String email = normalize(emailRaw);
-        Objects.requireNonNull(email, "email");
-        Objects.requireNonNull(password, "password");
-
+ 
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
@@ -157,44 +150,43 @@ public class AuthenticateUseCase {
                             .collectList()
                             .map(this::toRoleSetOrVisitor)
                             .flatMap(roles -> authenticationRepository.generateToken(email, roles, ip));
-                });
+                 });
     }
-
+ 
     // -------------------- REFRESH --------------------
     /**
      * Refresca un token (vencido o por vencer) sin pasar por todo el login.
      * Delegado directo al repositorio de autenticación.
      */
     public Mono<String> refreshSession(String oldToken, String ip) {
-        Objects.requireNonNull(oldToken, "oldToken");
         return authenticationRepository.refreshToken(oldToken, ip);
     }
-
+ 
     // -------------------- VALIDACIÓN DE SESIÓN --------------------
     public Mono<Boolean> validateSession(String token, String ip) {
         return authenticationRepository.validateToken(token, ip);
     }
-
+ 
     // -------------------- HELPERS --------------------
     private Set<String> toRoleSetOrVisitor(List<String> list) {
         return (list == null || list.isEmpty()) ? Set.of("VISITOR") : Set.copyOf(list);
     }
-
+ 
     private static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }
-
+ 
     private static String url(String s) {
         return URLEncoder.encode(s, StandardCharsets.UTF_8);
     }
-
+ 
     private static String buildOtpAuthUri(String issuer, String email, String base32Secret) {
         return "otpauth://totp/" + url(issuer) + ":" + url(email)
                 + "?secret=" + base32Secret
                 + "&issuer=" + url(issuer)
                 + "&period=30&digits=6&algorithm=SHA1";
     }
-
+ 
     // DTO para setup
     public record SetupResponse(String secretBase32, String otpAuthUri) {}
 }

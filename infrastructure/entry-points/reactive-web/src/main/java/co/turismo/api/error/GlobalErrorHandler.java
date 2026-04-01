@@ -1,9 +1,14 @@
 package co.turismo.api.error;
 
 import co.turismo.api.dto.response.ApiResponse;
+import co.turismo.model.error.ConflictException;
+import co.turismo.model.error.NotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.webflux.error.ErrorWebExceptionHandler;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,77 +22,122 @@ import reactor.core.publisher.Mono;
 import org.springframework.web.server.WebExceptionHandler;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RequiredArgsConstructor
-public class GlobalErrorHandler implements WebExceptionHandler {
+public class GlobalErrorHandler implements ErrorWebExceptionHandler {
 
     private final ObjectMapper objectMapper;
+
+    // Mapeo declarativo: tipo → status
+    private static final List<Map.Entry<Class<?>, HttpStatus>> STATUS_RULES = List.of(
+            Map.entry(WebExchangeBindException.class,            HttpStatus.BAD_REQUEST),
+            Map.entry(ServerWebInputException.class,             HttpStatus.BAD_REQUEST),
+            Map.entry(IllegalArgumentException.class,            HttpStatus.BAD_REQUEST),
+            Map.entry(ConstraintViolationException.class,        HttpStatus.BAD_REQUEST),
+            Map.entry(MethodNotAllowedException.class,           HttpStatus.METHOD_NOT_ALLOWED),
+            Map.entry(UnsupportedMediaTypeStatusException.class, HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+            Map.entry(DuplicateKeyException.class,               HttpStatus.CONFLICT),
+            Map.entry(DataIntegrityViolationException.class,     HttpStatus.CONFLICT),
+            Map.entry(ConflictException.class,                   HttpStatus.CONFLICT),
+            Map.entry(NotFoundException.class,                   HttpStatus.NOT_FOUND),
+            Map.entry(NoSuchElementException.class,              HttpStatus.NOT_FOUND)
+    );
+
+    // Reglas adicionales con predicado arbitrario
+    private static final List<Map.Entry<Predicate<Throwable>, HttpStatus>> PREDICATE_RULES = List.of(
+            Map.entry(
+                    e -> e instanceof IllegalStateException &&
+                            Stream.of("no existe", "no encontrado", "no encontrada")
+                                    .anyMatch(kw -> Optional.ofNullable(e.getMessage())
+                                            .map(String::toLowerCase)
+                                            .filter(m -> m.contains(kw))
+                                            .isPresent()),
+                    HttpStatus.NOT_FOUND
+            )
+    );
+
+    // Mapeo declarativo: tipo → mensaje
+    private static final List<Map.Entry<Class<?>, Function<Throwable, String>>> MESSAGE_RULES = List.of(
+            Map.entry(WebExchangeBindException.class,      e -> "Error de validación"),
+            Map.entry(ServerWebInputException.class,       e -> "Solicitud inválida"),
+            Map.entry(ConstraintViolationException.class,  e -> ((ConstraintViolationException) e)
+                    .getConstraintViolations().stream()
+                    .map(ConstraintViolation::getMessage)
+                    .findFirst()
+                    .orElse("Error de validación"))
+    );
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
         if (exchange.getResponse().isCommitted()) return Mono.error(ex);
 
-        HttpStatusCode status = mapStatus(ex);
-        String message        = mapMessage(ex);
+        return Mono.just(ex)
+                .map(this::resolveStatus)
+                .zipWith(Mono.just(ex).map(this::resolveMessage))
+                .flatMap(t -> writeResponse(exchange, t.getT1(), t.getT2(), ex));
+    }
 
+    private HttpStatusCode resolveStatus(Throwable e) {
+        if (e instanceof ResponseStatusException rse) return rse.getStatusCode();
+
+        return STATUS_RULES.stream()
+                .filter(rule -> rule.getKey().isInstance(e))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .or(() -> PREDICATE_RULES.stream()
+                        .filter(rule -> rule.getKey().test(e))
+                        .map(Map.Entry::getValue)
+                        .findFirst())
+                .orElse(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private String resolveMessage(Throwable e) {
+        return MESSAGE_RULES.stream()
+                .filter(rule -> rule.getKey().isInstance(e))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .map(fn -> fn.apply(e))
+                .orElseGet(() -> Optional.ofNullable(e.getMessage()).orElse("Error inesperado"));
+    }
+
+    private Mono<Void> writeResponse(ServerWebExchange exchange, HttpStatusCode status, String message, Throwable ex) {
         logError(exchange, ex, status, message);
 
         var resp = exchange.getResponse();
         resp.setStatusCode(status);
         resp.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
-        byte[] bytes;
-        try {
-            bytes = objectMapper.writeValueAsBytes(ApiResponse.error(status.value(), message));
-        } catch (Exception e) {
-            var fallback = """
-                {"status":%d,"message":"%s","data":null}
-                """.formatted(status.value(), safe(message));
-            bytes = fallback.getBytes(StandardCharsets.UTF_8);
-        }
-        return resp.writeWith(Mono.just(resp.bufferFactory().wrap(bytes)));
+        return Mono.fromCallable(() -> objectMapper.writeValueAsBytes(ApiResponse.error(status.value(), message)))
+                .onErrorReturn(fallbackBytes(status, message))
+                .flatMap(bytes -> resp.writeWith(Mono.just(resp.bufferFactory().wrap(bytes))));
     }
 
-    private static String safe(String s) { return s == null ? "" : s.replace("\"","\\\""); }
-
-    private HttpStatusCode mapStatus(Throwable e) {
-        if (e instanceof ResponseStatusException rse) return rse.getStatusCode();
-
-        if (e instanceof WebExchangeBindException)            return HttpStatus.BAD_REQUEST;            // 400
-        if (e instanceof ServerWebInputException)             return HttpStatus.BAD_REQUEST;            // 400
-        if (e instanceof MethodNotAllowedException)           return HttpStatus.METHOD_NOT_ALLOWED;     // 405
-        if (e instanceof UnsupportedMediaTypeStatusException) return HttpStatus.UNSUPPORTED_MEDIA_TYPE; // 415
-
-        if (e instanceof DuplicateKeyException)               return HttpStatus.CONFLICT;               // 409
-        if (e instanceof DataIntegrityViolationException)     return HttpStatus.CONFLICT;               // 409
-
-        if (e instanceof NoSuchElementException)              return HttpStatus.NOT_FOUND;              // 404
-        if (e instanceof IllegalStateException ise &&
-                containsAny(ise.getMessage(), "no existe", "no encontrado", "no encontrada"))
-            return HttpStatus.NOT_FOUND;              // 404
-        if (e instanceof IllegalArgumentException)            return HttpStatus.BAD_REQUEST;            // 400
-
-        return HttpStatus.INTERNAL_SERVER_ERROR;                                                     // 500
+    private static byte[] fallbackBytes(HttpStatusCode status, String message) {
+        return """
+            {"status":%d,"message":"%s","data":null}
+            """.formatted(status.value(), sanitize(message))
+                .getBytes(StandardCharsets.UTF_8);
     }
 
-    private String mapMessage(Throwable e) {
-        if (e instanceof WebExchangeBindException) return "Error de validación";
-        if (e instanceof ServerWebInputException)  return "Solicitud inválida";
-        return e.getMessage() == null ? "Error" : e.getMessage();
+    private static String sanitize(String s) {
+        return Optional.ofNullable(s).orElse("").replace("\"", "\\\"");
     }
 
-    private static boolean containsAny(String s, String... parts) {
-        if (s == null) return false;
-        var x = s.toLowerCase();
-        for (var p : parts) if (x.contains(p)) return true;
-        return false;
-    }
-
-    private void logError(ServerWebExchange ex, Throwable err, HttpStatusCode status, String message) {
-        var path = ex.getRequest().getPath().pathWithinApplication().value();
-        log.error("HTTP {} {} -> {} : {}", ex.getRequest().getMethod(), path, status.value(), message, err);
+    private void logError(ServerWebExchange ex, Throwable err, HttpStatusCode status, String msg) {
+        var req = ex.getRequest();
+        var path = req.getPath().pathWithinApplication().value();
+        if (status.is5xxServerError())
+            log.error("HTTP {} {} → {} : {}", req.getMethod(), path, status.value(), msg, err);
+        else
+            log.warn ("HTTP {} {} → {} : {}", req.getMethod(), path, status.value(), msg);
     }
 }

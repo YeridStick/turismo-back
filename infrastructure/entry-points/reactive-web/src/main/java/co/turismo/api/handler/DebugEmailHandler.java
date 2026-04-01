@@ -93,6 +93,33 @@ public class DebugEmailHandler {
                 });
     }
 
+    public Mono<ServerResponse> sendSimpleTestEmail(ServerRequest request) {
+        String to = request.queryParam("to").orElse(null);
+        if (to == null || to.isBlank()) {
+            return ServerResponse.badRequest()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new SimpleMessageResponse("Falta parámetro 'to'"));
+        }
+
+        EmailMessage message = new EmailMessage(
+                to,
+                "Prueba de Conexión Brevo - Turismo App",
+                "<h1>¡Funciona!</h1><p>Este es un correo de prueba enviado desde el backend.</p>"
+        );
+
+        return emailGateway.sendEmail(message)
+                .then(ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Correo enviado a " + to))))
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() == null ? "Error enviando correo" : e.getMessage();
+                    log.warn("Debug simple email error: {}", msg);
+                    return ServerResponse.badRequest()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(new SimpleMessageResponse(msg));
+                });
+    }
+
     private static String safe(String value) {
         return value == null ? null : value.trim();
     }

@@ -1,13 +1,15 @@
-package co.turismo.usecase.place.filterStrategy;
+package co.turismo.r2dbc.placesRepository.strategy.filterStrategy;
 
 import co.turismo.model.place.Place;
-import co.turismo.model.place.strategy.PlaceSearchCriteria;
 import co.turismo.model.place.gateways.PlaceRepository;
+import co.turismo.model.place.strategy.PlaceSearchCriteria;
 import co.turismo.model.place.strategy.PlaceSearchMode;
 import co.turismo.model.place.strategy.PlaceSearchStrategy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+@Component
 @RequiredArgsConstructor
 public class AllPlacesStrategy implements PlaceSearchStrategy {
 

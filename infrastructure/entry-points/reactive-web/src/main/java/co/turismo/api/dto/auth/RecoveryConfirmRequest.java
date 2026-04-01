@@ -1,12 +1,18 @@
 package co.turismo.api.dto.auth;
-
+ 
 import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(name = "RecoveryConfirmRequest", description = "Confirma un token de recuperacion y reinicia el TOTP")
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+ 
+@Schema(name = "RecoveryConfirmRequest", description = "Datos para confirmar recuperación con token")
 public record RecoveryConfirmRequest(
-        @Schema(example = "of2wM9Ai7koygak6GHxQL4N3luKjXBjPaHPG85Kw2vI")
+        @Schema(example = "ABCDEF")
+        @NotBlank(message = "El token es requerido")
         String token,
-        @Schema(example = "MiPasswordSegura123")
+ 
+        @Schema(example = "MiNuevaPassword123")
+        @NotBlank(message = "La nueva contraseña es requerida")
+        @Size(min = 8, message = "La nueva contraseña debe tener al menos 8 caracteres")
         String newPassword
 ) {
 }

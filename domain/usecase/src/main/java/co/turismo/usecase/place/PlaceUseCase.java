@@ -1,12 +1,13 @@
 package co.turismo.usecase.place;
 
+import co.turismo.model.error.NotFoundException;
 import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.Place;
 import co.turismo.model.place.strategy.PlaceSearchCriteria;
 import co.turismo.model.place.UpdatePlaceRequest;
 import co.turismo.model.place.gateways.PlaceRepository;
+import co.turismo.model.place.strategy.PlaceSearchFactoryGateway;
 import co.turismo.model.userIdentityPort.UserIdentityPort;
-import co.turismo.usecase.place.filterFactory.PlaceSearchFactory;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -18,7 +19,7 @@ public class PlaceUseCase {
 
     private final PlaceRepository placeRepository;
     private final UserIdentityPort userIdentityPort;
-    private final PlaceSearchFactory placeSearchFactory;
+    private final PlaceSearchFactoryGateway placeSearchFactory;
 
     public Mono<Place> createPlace(CreatePlaceRequest cmd) {
         return placeRepository.create(cmd);
@@ -30,7 +31,7 @@ public class PlaceUseCase {
 
     public Mono<Place> verifyPlaceByAdmin(String adminEmail, long placeId, boolean approve) {
         return userIdentityPort.getUserIdForEmail(adminEmail)
-                .switchIfEmpty(Mono.error(new RuntimeException("Admin no encontrado")))
+                .switchIfEmpty(Mono.error(new NotFoundException("Admin no encontrado")))
                 .flatMap(admin -> placeRepository.verifyPlace(placeId, approve, approve, admin.id()));
     }
 
@@ -48,7 +49,7 @@ public class PlaceUseCase {
 
     public Mono<Place> findByIdPlace(long id) {
         return placeRepository.findByPlaces(id)
-                .switchIfEmpty(Mono.error(new RuntimeException("Place no encontrado")));
+                .switchIfEmpty(Mono.error(new NotFoundException("Place no encontrado")));
     }
 
     public Mono<Place> setActive(long placeId, boolean active) {
@@ -61,10 +62,10 @@ public class PlaceUseCase {
 
     public Mono<Place> deleteByOwnerOrAdmin(String email, long placeId) {
         return userIdentityPort.getUserIdForEmail(email)
-            .switchIfEmpty(Mono.error(new RuntimeException("Usuario no encontrado")))
+            .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado")))
             .flatMap(user ->
                 placeRepository.findByPlaces(placeId)
-                    .switchIfEmpty(Mono.error(new RuntimeException("Place no encontrado")))
+                    .switchIfEmpty(Mono.error(new NotFoundException("Place no encontrado")))
                     .flatMap(place -> {
                         boolean isOwner = place.getOwnerUserId() != null
                                 && place.getOwnerUserId().equals(user.id());

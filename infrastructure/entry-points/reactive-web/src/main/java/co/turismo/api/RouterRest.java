@@ -333,6 +333,15 @@ public class RouterRest {
                                 .response(messageResponse("400", "Error enviando correo"))
                 )
 
+                .GET(ConstantsEntryPoint.API_BASE_PATH + "/debug/email/test",
+                        debugEmailHandler::sendSimpleTestEmail,
+                        ops -> ops.operationId("debugSendEmailSimple")
+                                .summary("Enviar correo de prueba rápido (GET)")
+                                .tag("Debug")
+                                .parameter(queryParam("to", true, "Email de destino", String.class, "tu@correo.com"))
+                                .response(jsonResponse("200", "Correo enviado", ApiMessageResponse.class))
+                )
+
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.DEBUG_RECOVERY_EMAIL,
                         debugEmailHandler::sendRecoveryTestEmail,
                         ops -> ops.operationId("debugSendRecoveryEmail")

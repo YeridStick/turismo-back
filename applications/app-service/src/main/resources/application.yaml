@@ -11,11 +11,11 @@ spring:
 
   r2dbc:
     postgresql:
-      host: "${DB_HOST:aws-0-us-west-2.pooler.supabase.com}"
+      host: "${DB_HOST:db.egfossuqhgxgpnxovdpt.supabase.co}"
       port: "${DB_PORT:5432}"
       database: "${DB_NAME:postgres}"
       schema: "${DB_SCHEMA:public}"
-      username: "${DB_USER:postgres.egfossuqhgxgpnxovdpt}"
+      username: "${DB_USER:postgres}"
       password: "${DB_PASSWORD:turismo-db@2006.}"
     pool:
       initial-size: "${CONN_POOL_INITIAL_SIZE:12}"

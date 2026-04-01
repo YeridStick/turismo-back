@@ -1,10 +1,11 @@
 package co.turismo.api.handler;
-
+ 
 import co.turismo.api.dto.auth.*;
 import co.turismo.api.dto.common.SimpleMessageResponse;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.http.ClientIp;
 import co.turismo.api.util.QrCodeUtil;
+import co.turismo.api.error.RequestValidator;
 import co.turismo.model.common.AppUrlConfig;
 import co.turismo.model.notification.EmailMessage;
 import co.turismo.model.notification.gateways.EmailGateway;
@@ -17,22 +18,24 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
-
+ 
 import java.util.Map;
-
+ 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class AuthenticateHandler {
-
+ 
     private final AuthenticateUseCase authenticateUseCase;
     private final AccountRecoveryUseCase accountRecoveryUseCase;
     private final AppUrlConfig appUrlConfig;
     private final EmailGateway emailGateway;
-
+    private final RequestValidator requestValidator;
+ 
     // ---------- SETUP: POST /api/auth/code/setup ----------
     public Mono<ServerResponse> totpSetup(ServerRequest request) {
         return request.bodyToMono(TotpEmailRequest.class)
+                .flatMap(requestValidator::validate)
                 .flatMap(req -> authenticateUseCase.setupTotp(normalize(req.email()), req.password())
                         .map(setup -> {
                             String qrImage = QrCodeUtil.generateQrDataUrl(setup.otpAuthUri());
@@ -42,69 +45,41 @@ public class AuthenticateHandler {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .bodyValue(ApiResponse.ok(res))
                         )
-                        .onErrorResume(e -> {
-                            String msg = e.getMessage() == null ? "Error en setup" : e.getMessage();
-                            log.warn("TOTP setup error: {}", msg);
-                            if (msg.toLowerCase().contains("ya habilitado")) {
-                                return ServerResponse.status(409)
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .bodyValue(new SimpleMessageResponse(msg));
-                            }
-                            return ServerResponse.badRequest()
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .bodyValue(new SimpleMessageResponse(msg));
-                        })
                 );
     }
-
+ 
     // GET /api/auth/code/status?email=
     public Mono<ServerResponse> totpStatus(ServerRequest request) {
         String email = request.queryParam("email")
                 .map(e -> e.trim().toLowerCase())
                 .orElse(null);
-
+ 
         if (email == null || email.isBlank()) {
             return ServerResponse.badRequest()
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new SimpleMessageResponse("El parámetro 'email' es requerido"));
         }
-
+ 
         return authenticateUseCase.totpStatus(email)
                 .flatMap(enabled -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new TotpStatusResponse(enabled))))
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error consultando estado TOTP" : e.getMessage();
-                    if (msg.toLowerCase().contains("no encontrado")) {
-                        return ServerResponse.status(404)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(new SimpleMessageResponse(msg));
-                    }
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                        .bodyValue(ApiResponse.ok(new TotpStatusResponse(enabled))));
     }
-
+ 
     // ---------- CONFIRM: POST /api/auth/code/confirm ----------
     public Mono<ServerResponse> totpConfirm(ServerRequest request) {
         return request.bodyToMono(TotpConfirmRequest.class)
+                .flatMap(requestValidator::validate)
                 .flatMap(req -> authenticateUseCase.confirmTotp(normalize(req.email()), req.code()))
                 .then(ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("TOTP habilitado"))))
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error al confirmar TOTP" : e.getMessage();
-                    log.error("TOTP confirm error: {}", msg);
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("TOTP habilitado"))));
     }
-
+ 
     // ---------- LOGIN: POST /api/auth/login-code ----------
     public Mono<ServerResponse> loginTotp(ServerRequest request) {
         return request.bodyToMono(TotpLoginRequest.class)
+                .flatMap(requestValidator::validate)
                 .flatMap(req -> {
                     String email = normalize(req.email());
                     String ip = ClientIp.resolve(request.exchange().getRequest());
@@ -112,19 +87,13 @@ public class AuthenticateHandler {
                 })
                 .flatMap(token -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))))
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error en login TOTP" : e.getMessage();
-                    log.error("Login TOTP error: {}", msg);
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))));
     }
-
+ 
     // ---------- LOGIN: POST /api/auth/login-password ----------
     public Mono<ServerResponse> loginPassword(ServerRequest request) {
         return request.bodyToMono(PasswordLoginRequest.class)
+                .flatMap(requestValidator::validate)
                 .flatMap(req -> {
                     String email = normalize(req.email());
                     String ip = ClientIp.resolve(request.exchange().getRequest());
@@ -132,19 +101,13 @@ public class AuthenticateHandler {
                 })
                 .flatMap(token -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))))
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error en login" : e.getMessage();
-                    log.error("Login password error: {}", msg);
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))));
     }
-
+ 
     // ---------- EMAIL VERIFY REQUEST: POST /api/auth/email/request ----------
     public Mono<ServerResponse> requestEmailVerification(ServerRequest request) {
         return request.bodyToMono(EmailVerificationRequest.class)
+                .flatMap(requestValidator::validate)
                 .flatMap(req -> accountRecoveryUseCase.requestEmailVerification(normalize(req.email())))
                 .flatMap(result -> {
                     String status = result.status().name().toLowerCase();
@@ -154,15 +117,9 @@ public class AuthenticateHandler {
                     return ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(ApiResponse.ok(new EmailVerificationResponse(status, message)));
-                })
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error enviando verificacion" : e.getMessage();
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
                 });
     }
-
+ 
     // ---------- EMAIL VERIFY: GET /api/auth/email/verify?token= ----------
     public Mono<ServerResponse> verifyEmail(ServerRequest request) {
         String token = request.queryParam("token").orElse(null);
@@ -176,47 +133,42 @@ public class AuthenticateHandler {
                                     .bodyValue(new SimpleMessageResponse(msg)));
                 });
     }
-
+ 
     // ---------- RECOVERY: POST /api/auth/recovery/request ----------
     public Mono<ServerResponse> requestRecovery(ServerRequest request) {
         return request.bodyToMono(RecoveryRequest.class)
+                .flatMap(requestValidator::validate)
                 .flatMap(req -> {
                     String email = normalize(req.email());
                     String token = accountRecoveryUseCase.generateRecoveryToken();
                     String link = buildRecoveryLink(token);
-                    String html = "<p>Hola,</p><p>Link: <a href=\"" + link + "\">recuperar</a></p><p>O usa este c\u00f3digo: <strong>" + token + "</strong></p>";
+                    String html = "<p>Hola,</p><p>Link: <a href=\"" + link + "\">recuperar</a></p><p>O usa este código: <strong>" + token + "</strong></p>";
                     return emailGateway.sendEmail(new EmailMessage(
-                                    email,
-                                    "Recupera tu cuenta",
-                                    html
-                            ))
+                                     email,
+                                     "Recupera tu cuenta",
+                                     html
+                             ))
                             .then(accountRecoveryUseCase.saveRecoveryToken(email, token))
                             .thenReturn(Map.of(
-                                    "message", "Enlace enviado",
-                                    "link", link,
-                                    "token", token
-                            ));
-                })
+                                     "message", "Enlace enviado",
+                                     "link", link,
+                                     "token", token
+                             ));
+                 })
                 .flatMap(payload -> ServerResponse.ok()
                         .header("X-Recovery-Link", payload.get("link").toString())
                         .header("X-Recovery-Token", payload.get("token").toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(payload)))
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error en recuperación" : e.getMessage();
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                        .bodyValue(ApiResponse.ok(payload)));
     }
-
+ 
     private String buildRecoveryLink(String token) {
         String frontendBase = appUrlConfig.frontendBaseUrl();
         if (frontendBase != null && !frontendBase.isBlank()) {
             String normalized = frontendBase.endsWith("/") ? frontendBase.substring(0, frontendBase.length() - 1) : frontendBase;
             return normalized + "/recover-account?token=" + token;
         }
-
+ 
         String backendBase = appUrlConfig.publicBaseUrl();
         if (backendBase == null || backendBase.isBlank()) {
             return "/recover-account?token=" + token;
@@ -224,34 +176,29 @@ public class AuthenticateHandler {
         String normalized = backendBase.endsWith("/") ? backendBase.substring(0, backendBase.length() - 1) : backendBase;
         return normalized + "/recover-account?token=" + token;
     }
-
+ 
     // ---------- RECOVERY: POST /api/auth/recovery/confirm ----------
     public Mono<ServerResponse> confirmRecovery(ServerRequest request) {
         return request.bodyToMono(RecoveryConfirmRequest.class)
+                .flatMap(requestValidator::validate)
                 .flatMap(req -> accountRecoveryUseCase.confirmRecoveryCode(req.token(), req.newPassword()))
                 .then(ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Contrasena actualizada y TOTP reiniciado"))))
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error en recuperación" : e.getMessage();
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Contrasena actualizada y TOTP reiniciado"))));
     }
-
+ 
     // ---------- REFRESH: POST /api/auth/refresh ----------
     public Mono<ServerResponse> refresh(ServerRequest request) {
         // 1) Intentar por header Authorization: Bearer <token>
         String bearer = request.headers().firstHeader("Authorization");
         String oldToken = extractBearer(bearer);
-
+ 
         Mono<String> bodyTokenMono = (oldToken != null)
                 ? Mono.just(oldToken)
                 : request.bodyToMono(RefreshTokenRequest.class).map(RefreshTokenRequest::token);
-
+ 
         String ip = ClientIp.resolve(request.exchange().getRequest());
-
+ 
         return bodyTokenMono
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Token requerido (Authorization Bearer o body)")))
                 .flatMap(tok -> authenticateUseCase.refreshSession(tok, ip))
@@ -267,17 +214,17 @@ public class AuthenticateHandler {
                             .bodyValue(new SimpleMessageResponse(msg));
                 });
     }
-
+ 
     private static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }
-
+ 
     private static String extractBearer(String authorizationHeader) {
         if (authorizationHeader == null) return null;
         String prefix = "Bearer ";
         return authorizationHeader.startsWith(prefix) ? authorizationHeader.substring(prefix.length()).trim() : null;
     }
-
+ 
     private Mono<ServerResponse> redirectToFrontend(String token, String status, String message) {
         String base = appUrlConfig.frontendBaseUrl();
         if (base == null || base.isBlank()) {
@@ -294,7 +241,7 @@ public class AuthenticateHandler {
         }
         return ServerResponse.temporaryRedirect(java.net.URI.create(url.toString())).build();
     }
-
+ 
     private static String encode(String value) {
         return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }

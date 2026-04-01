@@ -1,13 +1,18 @@
 package co.turismo.api.dto.auth;
-
+ 
 import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(name = "TotpSetupRequest", description = "Datos para iniciar el enrolamiento TOTP")
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+ 
+@Schema(name = "TotpEmailRequest", description = "Solicitud de setup TOTP")
 public record TotpEmailRequest(
-        @Schema(description = "Correo electronico normalizado", example = "ana@example.com")
+        @Schema(example = "ana@example.com")
+        @NotBlank(message = "El email es requerido")
+        @Email(message = "Email con formato inválido")
         String email,
-
-        @Schema(description = "Contrasena actual del usuario para validar identidad", example = "P4ssw0rd!")
+ 
+        @Schema(example = "Password123")
+        @NotBlank(message = "La contraseña es requerida")
         String password
 ) {
 }

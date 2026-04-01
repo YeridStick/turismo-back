@@ -1,12 +1,16 @@
 package co.turismo.api.dto.auth;
-
+ 
 import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(name = "TotpConfirmRequest", description = "Código inicial para confirmar y activar TOTP")
+import jakarta.validation.constraints.NotBlank;
+ 
+@Schema(name = "TotpConfirmRequest", description = "Confirmación de código OTP")
 public record TotpConfirmRequest(
-        @Schema(description = "Correo electrónico del usuario", example = "ana@example.com")
+        @Schema(example = "ana@example.com")
+        @NotBlank(message = "El email es requerido")
         String email,
-        @Schema(description = "Código TOTP de 6 dígitos", example = "123456", minimum = "000000", maximum = "999999")
-        int code
+ 
+        @Schema(example = "123456")
+        @NotBlank(message = "El código es requerido")
+        String code
 ) {
 }

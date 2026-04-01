@@ -7,6 +7,6 @@ public record TotpLoginRequest(
         @Schema(description = "Correo electrónico del usuario", example = "ana@example.com")
         String email,
         @Schema(description = "Código TOTP de 6 dígitos", example = "654321")
-        int totpCode
+        String totpCode
 ) {
 }
