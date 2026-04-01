@@ -8,9 +8,8 @@ import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.model.user.UserInfo;
 import co.turismo.model.user.gateways.UserRepository;
+import co.turismo.model.user.gateways.UserVerificationGateway;
 import co.turismo.model.security.gateways.PasswordHasher;
-import co.turismo.usecase.authenticate.AccountRecoveryUseCase;
-import com.sun.jdi.request.DuplicateRequestException;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -20,23 +19,23 @@ import reactor.core.publisher.Mono;
 public class UserUseCase {
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
-    private final AccountRecoveryUseCase accountRecoveryUseCase;
-
+    private final UserVerificationGateway userVerificationGateway;
+ 
     public Mono<User> createUser(User user) {
         return userRepository.save(user)
-                .onErrorMap(DuplicateRequestException.class,
+                .onErrorMap(e -> e.getMessage().contains("duplicate key") || e instanceof DuplicateKeyException,
                         e -> new ConflictException("Ya existe un usuario con ese email"));
     }
-
+ 
     public Mono<User> register(RegisterUserCommand cmd) {
         return userRepository.save(cmd.toUser())
                 .onErrorMap(DuplicateKeyException.class, e ->
                         new ConflictException("Ya existe un usuario con el email: " + cmd.getEmail()))
                 .flatMap(saved -> updatePasswordIfPresent(saved.getEmail(), cmd.getPassword())
-                        .then(accountRecoveryUseCase.sendVerificationEmail(saved.getEmail()))
+                        .then(userVerificationGateway.sendVerificationEmail(saved.getEmail()))
                         .thenReturn(saved));
     }
-
+ 
     private Mono<Void> updatePasswordIfPresent(String email, String password) {
         String hash = passwordHasher.hash(password);
         return userRepository.updatePasswordHash(email, hash);

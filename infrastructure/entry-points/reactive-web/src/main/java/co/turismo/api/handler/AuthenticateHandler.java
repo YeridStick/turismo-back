@@ -9,6 +9,7 @@ import co.turismo.api.error.RequestValidator;
 import co.turismo.model.common.AppUrlConfig;
 import co.turismo.model.notification.EmailMessage;
 import co.turismo.model.notification.gateways.EmailGateway;
+import co.turismo.model.user.EmailVerificationResult;
 import co.turismo.usecase.authenticate.AccountRecoveryUseCase;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
@@ -111,7 +112,7 @@ public class AuthenticateHandler {
                 .flatMap(req -> accountRecoveryUseCase.requestEmailVerification(normalize(req.email())))
                 .flatMap(result -> {
                     String status = result.status().name().toLowerCase();
-                    String message = result.status() == AccountRecoveryUseCase.VerificationStatus.ALREADY_VERIFIED
+                    String message = result.status() == EmailVerificationResult.VerificationStatus.ALREADY_VERIFIED
                             ? "Correo ya estaba verificado"
                             : "Correo de verificacion enviado";
                     return ServerResponse.ok()
