@@ -7,8 +7,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record UserInfoResponse(
         User user,
         @Schema(example = "true")
-        boolean emailVerified,
-        @Schema(example = "false")
-        boolean passwordEnabled
+        boolean emailVerified
 ) {
 }

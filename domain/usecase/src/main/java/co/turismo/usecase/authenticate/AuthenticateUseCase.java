@@ -42,13 +42,7 @@ public class AuthenticateUseCase {
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
-                .then(userRepository.isPasswordEnabled(email))
-                .flatMap(enabled -> {
-                    if (Boolean.FALSE.equals(enabled)) {
-                        return Mono.error(new RuntimeException("Password no habilitado"));
-                    }
-                    return userRepository.getPasswordHash(email);
-                })
+                .then(userRepository.getPasswordHash(email))
                 .switchIfEmpty(Mono.error(new RuntimeException("Password no configurado")))
                 .flatMap(hash -> {
                     if (!passwordHasher.matches(password, hash)) {
@@ -151,13 +145,7 @@ public class AuthenticateUseCase {
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("Usuario inexistente o bloqueado")))
-                .then(userRepository.isPasswordEnabled(email))
-                .flatMap(enabled -> {
-                    if (Boolean.FALSE.equals(enabled)) {
-                        return Mono.error(new RuntimeException("Password no habilitado"));
-                    }
-                    return userRepository.getPasswordHash(email);
-                })
+                .then(userRepository.getPasswordHash(email))
                 .switchIfEmpty(Mono.error(new RuntimeException("Password no configurado")))
                 .flatMap(hash -> {
                     if (!passwordHasher.matches(password, hash)) {

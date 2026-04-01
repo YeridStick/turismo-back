@@ -41,5 +41,4 @@ public interface UserRepository {
     // Contraseña
     Mono<String> getPasswordHash(String email);
     Mono<Void> updatePasswordHash(String email, String passwordHash);
-    Mono<Boolean> isPasswordEnabled(String email);
 }

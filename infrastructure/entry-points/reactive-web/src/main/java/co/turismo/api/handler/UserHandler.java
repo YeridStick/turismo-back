@@ -44,8 +44,7 @@ public class UserHandler {
                 .flatMap(info -> ServerResponse.ok()
                         .bodyValue(new UserInfoResponse(
                                 info.user(),
-                                info.emailVerified(),
-                                info.passwordEnabled()
+                                info.emailVerified()
                         )));
     }
 
@@ -64,15 +63,9 @@ public class UserHandler {
                 .map(Authentication::getName)
                 .zipWith(req.bodyToMono(PasswordUpdateRequest.class))
                 .flatMap(t -> userUseCase.setPassword(t.getT1(), t.getT2().password()))
-                .flatMap(result -> {
-                    String status = result.name().toLowerCase();
-                    String message = result == UserUseCase.PasswordUpdateResult.CREATED
-                            ? "Contrasena configurada"
-                            : "Contrasena actualizada";
-                    return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new PasswordUpdateResponse(status, message));
-                })
+                .flatMap(result -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(new PasswordUpdateResponse("success", "Contrasena procesada correctamente")))
                 .onErrorResume(IllegalArgumentException.class,
                         e -> HttpResponses.badRequest(e.getMessage()));
     }

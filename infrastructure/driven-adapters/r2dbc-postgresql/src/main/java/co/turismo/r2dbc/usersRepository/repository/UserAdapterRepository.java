@@ -177,17 +177,9 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
 
     @Query("""
         UPDATE users
-           SET password_hash = :passwordHash,
-               password_enabled = TRUE
+           SET password_hash = :passwordHash
          WHERE lower(email)=lower(:email)
     """)
     Mono<Void> updatePasswordHash(@Param("email") String email,
                                   @Param("passwordHash") String passwordHash);
-
-    @Query("""
-        SELECT COALESCE(password_enabled, FALSE)
-          FROM users
-         WHERE lower(email)=lower(:email)
-    """)
-    Mono<Boolean> isPasswordEnabled(@Param("email") String email);
 }

@@ -34,9 +34,8 @@ public class UserUseCase {
     public Mono<UserInfo> getUserInfo(String email) {
         Mono<User> userMono = userRepository.findByEmail(email);
         Mono<Boolean> verifiedMono = userRepository.isEmailVerified(email).defaultIfEmpty(false);
-        Mono<Boolean> passwordEnabledMono = userRepository.isPasswordEnabled(email).defaultIfEmpty(false);
-        return Mono.zip(userMono, verifiedMono, passwordEnabledMono)
-                .map(t -> new UserInfo(t.getT1(), t.getT2(), t.getT3()));
+        return Mono.zip(userMono, verifiedMono)
+                .map(t -> new UserInfo(t.getT1(), t.getT2()));
     }
 
     public Flux<User> getAllUsers() {
@@ -44,27 +43,19 @@ public class UserUseCase {
                 .switchIfEmpty(Flux.error(new Exception("No se encontraron usuarios")));
     }
 
-    public Mono<PasswordUpdateResult> setPassword(String email, String newPassword) {
+    public Mono<Boolean> setPassword(String email, String newPassword) {
         if (newPassword == null || newPassword.isBlank()) {
             return Mono.error(new IllegalArgumentException("La contrasena es requerida"));
         }
         if (newPassword.length() < 8) {
             return Mono.error(new IllegalArgumentException("La contrasena debe tener al menos 8 caracteres"));
         }
-        return userRepository.findByEmail(email)
-                .then(userRepository.isPasswordEnabled(email).defaultIfEmpty(false))
-                .flatMap(enabled -> {
-                    String hash = passwordHasher.hash(newPassword);
-                    return userRepository.updatePasswordHash(email, hash)
-                            .thenReturn(enabled ? PasswordUpdateResult.UPDATED : PasswordUpdateResult.CREATED);
-                });
+        String hash = passwordHasher.hash(newPassword);
+        return userRepository.updatePasswordHash(email, hash)
+                .thenReturn(true);
     }
 
-    public record UserInfo(User user, boolean emailVerified, boolean passwordEnabled) {
+    public record UserInfo(User user, boolean emailVerified) {
     }
 
-    public enum PasswordUpdateResult {
-        CREATED,
-        UPDATED
-    }
 }

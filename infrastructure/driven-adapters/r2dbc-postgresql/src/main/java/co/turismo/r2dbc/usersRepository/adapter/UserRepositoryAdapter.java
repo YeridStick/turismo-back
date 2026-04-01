@@ -191,10 +191,7 @@ public class UserRepositoryAdapter
         return repository.updatePasswordHash(email, passwordHash);
     }
 
-    @Override
-    public Mono<Boolean> isPasswordEnabled(String email) {
-        return repository.isPasswordEnabled(email);
-    }
+
 
     private RecoveryStatus toRecoveryStatus(RecoveryStatusRow row) {
         return new RecoveryStatus(
