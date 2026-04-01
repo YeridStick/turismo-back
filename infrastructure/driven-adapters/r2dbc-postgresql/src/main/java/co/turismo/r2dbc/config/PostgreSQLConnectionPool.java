@@ -46,7 +46,6 @@ public class PostgreSQLConnectionPool {
                 .host(host)
                 .port(port)
                 .database(database)
-                .schema(schema)
                 .username(username)
                 .password(password)
                 .build();
