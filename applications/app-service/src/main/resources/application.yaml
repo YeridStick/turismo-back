@@ -16,7 +16,7 @@ spring:
       database: "${DB_NAME:postgres}"
       schema: "${DB_SCHEMA:public}"
       username: "${DB_USER:postgres}"
-      password: "${DB_PASSWORD:}"
+      password: "${DB_PASSWORD:turismo-db@2006.}"
     pool:
       initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
       max-size: "${CONN_POOL_MAX_SIZE:15}"
@@ -103,8 +103,8 @@ logging:
 
 brevo:
   base-url: "${BREVO_BASE_URL:https://api.brevo.com/v3}"
-  api-key: "${BREVO_API_KEY}"
-  mcp-api-key: "${BREVO_MCP_API_KEY}"
+  api-key: "${BREVO_API_KEY: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}"
+  mcp-api-key: "${BREVO_MCP_API_KEY:eyJhcGlfa2V5IjoieGtleXNpYi0wMzI0ZmRkMDljYmNlMTkxNTkzZDI3MWEyYzk1Yzc4ZmZkNjYzN2YyMGE4NTA1YTUzODFkMTliMWMxNTRhZjkzLXhhM1c0VW9IM0JBRmxRdTgifQ==}"
   sender:
     email: "${BREVO_SENDER_EMAIL:yeridstick3000@gmail.com}"
     name: "${BREVO_SENDER_NAME:Turismo_App_Dev}"
