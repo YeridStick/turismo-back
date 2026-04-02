@@ -58,8 +58,8 @@ public class UserVerificationAdapter implements UserVerificationGateway {
                     return userRepository.saveEmailVerificationToken(email, tokenHash, expiresAt)
                             .then(emailGateway.sendEmail(new EmailMessage(
                                     email,
-                                    "Verifica tu correo",
-                                    buildVerificationHtml(link)
+                                    "Verifica tu correo - Turismo App",
+                                    buildVerificationHtml(link, token)
                             )))
                             .thenReturn(new EmailVerificationResult(EmailVerificationResult.VerificationStatus.SENT));
                 });
@@ -80,13 +80,55 @@ public class UserVerificationAdapter implements UserVerificationGateway {
         return normalized + "/api/auth/email/verify?token=" + token;
     }
  
-    private String buildVerificationHtml(String link) {
+    private String buildVerificationHtml(String link, String token) {
         return """
-                <p>Hola,</p>
-                <p>Para verificar tu correo, abre este enlace:</p>
-                <p><a href="%s">%s</a></p>
-                <p>Si no solicitaste esto, ignora el mensaje.</p>
-                """.formatted(link, link);
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; margin: 0; padding: 0; color: #1a1a1a; -webkit-font-smoothing: antialiased; }
+                    .container { max-width: 600px; margin: 40px auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #0d47a1, #6a1b9a, #c2185b); height: 6px; border-radius: 3px; margin-bottom: 40px; }
+                    .brand { font-size: 20px; font-weight: 800; color: #6a1b9a; margin-bottom: 10px; letter-spacing: -0.5px; }
+                    .content { text-align: left; }
+                    .content h2 { font-size: 28px; font-weight: 700; color: #1a1a1a; margin-bottom: 20px; }
+                    .content p { font-size: 16px; line-height: 1.6; color: #4a4a4a; margin-bottom: 30px; }
+                    .cta-button { display: inline-block; padding: 16px 36px; background-color: #6a1b9a; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin-bottom: 40px; }
+                    .divider { height: 1px; background-color: #f0f0f0; margin: 40px 0; }
+                    .token-section { background-color: #fafafa; border: 1px solid #eee; border-radius: 12px; padding: 30px; text-align: center; }
+                    .token-label { font-size: 13px; font-weight: 600; color: #999; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px; }
+                    .token-wrapper { display: inline-block; padding: 10px 20px; background: #ffffff; border: 1px solid #e1bee7; border-radius: 6px; }
+                    .token-value { font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; font-size: 24px; font-weight: 700; color: #c2185b; user-select: all; -webkit-user-select: all; }
+                    .copy-hint { font-size: 12px; color: #666; margin-top: 15px; }
+                    .footer { text-align: left; font-size: 13px; color: #999; margin-top: 40px; line-height: 1.5; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header"></div>
+                    <div class="brand">Turismo App</div>
+                    <div class="content">
+                        <h2>Verifica tu cuenta</h2>
+                        <p>Haz clic en el botón inferior para completar tu registro en la plataforma web.</p>
+                        <a href="%s" class="cta-button">Confirmar correo electrónico</a>
+                        
+                        <div class="token-section">
+                            <div class="token-label">Código de verificación manual</div>
+                            <div class="token-wrapper">
+                                <div class="token-value">%s</div>
+                            </div>
+                            <div class="copy-hint">Toca o haz doble clic sobre el código para copiarlo.</div>
+                        </div>
+                    </div>
+                    <div class="footer">
+                        Este código es válido por 24 horas.<br>
+                        Si no has solicitado este correo, por favor ignóralo o contáctanos si crees que es un error.
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(link, token);
     }
  
     private String generateToken() {

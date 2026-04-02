@@ -14,6 +14,7 @@ import co.turismo.usecase.authenticate.AccountRecoveryUseCase;
 import co.turismo.usecase.authenticate.AuthenticateUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -120,21 +121,35 @@ public class AuthenticateHandler {
                             .bodyValue(ApiResponse.ok(new EmailVerificationResponse(status, message)));
                 });
     }
- 
-    // ---------- EMAIL VERIFY: GET /api/auth/email/verify?token= ----------
+
     public Mono<ServerResponse> verifyEmail(ServerRequest request) {
-        String token = request.queryParam("token").orElse(null);
+        String token = request.queryParam("token").orElse("");
+        boolean prefersJson = request.headers().accept().contains(MediaType.APPLICATION_JSON);
+
         return accountRecoveryUseCase.verifyEmailToken(token)
-                .then(redirectToFrontend(token, "ok", null))
+                .then(Mono.defer(() -> buildResponse(token, "ok", "Correo verificado exitosamente", prefersJson, HttpStatus.OK)))
                 .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error verificando correo" : e.getMessage();
-                    return redirectToFrontend(token, "error", msg)
-                            .switchIfEmpty(ServerResponse.badRequest()
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .bodyValue(new SimpleMessageResponse(msg)));
+                    String msg = (e.getMessage() != null) ? e.getMessage() : "Error verificando correo";
+                    return buildResponse(token, "error", msg, prefersJson, HttpStatus.BAD_REQUEST);
                 });
     }
- 
+
+    private Mono<ServerResponse> buildResponse(String token, String status, String message, boolean prefersJson, HttpStatus httpStatus) {
+        if (prefersJson) {
+            return ServerResponse.status(httpStatus)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(httpStatus.is2xxSuccessful()
+                            ? ApiResponse.ok(new SimpleMessageResponse(message))
+                            : new SimpleMessageResponse(message));
+        }
+
+        return redirectToFrontend(token, status, message)
+                .switchIfEmpty(ServerResponse.status(httpStatus)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(new SimpleMessageResponse(message)));
+    }
+
+
     // ---------- RECOVERY: POST /api/auth/recovery/request ----------
     public Mono<ServerResponse> requestRecovery(ServerRequest request) {
         return request.bodyToMono(RecoveryRequest.class)
