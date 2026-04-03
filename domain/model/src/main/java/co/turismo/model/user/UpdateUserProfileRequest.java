@@ -1,10 +1,14 @@
 package co.turismo.model.user;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Value
+@Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class UpdateUserProfileRequest {
     String fullName;
     String urlAvatar;
