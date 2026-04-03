@@ -16,4 +16,5 @@ public class UpdatePlaceRequest {
     private String website;
     private String[] imageUrls;
     private String[] model3dUrls;
+    private String[] services;
 }

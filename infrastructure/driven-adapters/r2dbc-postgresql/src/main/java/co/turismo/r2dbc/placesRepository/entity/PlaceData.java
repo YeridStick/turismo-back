@@ -39,6 +39,9 @@ public class PlaceData {
     @Column("model_3d_urls")
     private String[] model3dUrls;
 
+    @Column("services")
+    private String[] services;
+
     @Column("is_verified")
     private Boolean isVerified;
 

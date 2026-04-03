@@ -10,12 +10,10 @@ import co.turismo.r2dbc.placesRepository.entity.PlaceData;
 import co.turismo.r2dbc.placesRepository.repository.PlaceAdapterRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivecommons.utils.ObjectMapper;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.Arrays;
 
 @Repository
 @Slf4j
@@ -53,7 +51,8 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
                             request.getPhone(),
                             request.getWebsite(),
                             request.getImageUrls() == null ? new String[0] : request.getImageUrls(),
-                            request.getModel3dUrls() == null ? new String[0] : request.getModel3dUrls()
+                            request.getModel3dUrls() == null ? new String[0] : request.getModel3dUrls(),
+                            request.getServices() == null ? new String[0] : request.getServices()
                     );
                 })
                 .map(this::toEntity);
@@ -96,7 +95,8 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
                         req.getPhone(),
                         req.getWebsite(),
                         req.getImageUrls(),
-                        req.getModel3dUrls()
+                        req.getModel3dUrls(),
+                        req.getServices()
                 )
                 .switchIfEmpty(Mono.error(new IllegalStateException("Lugar no encontrado")))
                 .map(this::toEntity);

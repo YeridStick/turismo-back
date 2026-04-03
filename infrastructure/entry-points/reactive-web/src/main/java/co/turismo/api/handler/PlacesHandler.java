@@ -55,6 +55,7 @@ public class PlacesHandler {
                             .website(dto.website())
                             .imageUrls(dto.imageUrls())
                             .model3dUrls(dto.model3dUrls())
+                            .services(dto.services())
                             .build();
 
                     return placeUseCase.createPlace(cmd);
@@ -227,7 +228,9 @@ public class PlacesHandler {
             @Schema(description = "Listado de URLs de imágenes")
             String[] imageUrls,
             @Schema(description = "Listado de URLs de modelos 3D")
-            String[] model3dUrls
+            String[] model3dUrls,
+            @Schema(description = "Listado de servicios (WiFi, Parqueadero, etc.)", example = "[\"WiFi\", \"Piscina\"]")
+            String[] services
     ) {
     }
 
@@ -252,7 +255,9 @@ public class PlacesHandler {
             @Schema(description = "Listado de URLs de imágenes")
             List<String> imageUrls,
             @Schema(description = "Listado de URLs de modelos 3D")
-            List<String> model3dUrls
+            List<String> model3dUrls,
+            @Schema(description = "Listado de servicios (WiFi, Parqueadero, etc.)")
+            List<String> services
     ) {
         public co.turismo.model.place.UpdatePlaceRequest toDomain() {
             return co.turismo.model.place.UpdatePlaceRequest.builder()
@@ -266,6 +271,7 @@ public class PlacesHandler {
                     .website(website)
                     .imageUrls(imageUrls == null ? null : imageUrls.toArray(String[]::new))
                     .model3dUrls(model3dUrls == null ? null : model3dUrls.toArray(String[]::new))
+                    .services(services == null ? null : services.toArray(String[]::new))
                     .build();
         }
     }

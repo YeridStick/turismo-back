@@ -35,5 +35,6 @@ public class Place {
     private Boolean isActive;
     private OffsetDateTime createdAt;
 
+    private String[] services;
     private Double distanceMeters;
 }

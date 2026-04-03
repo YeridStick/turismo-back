@@ -15,7 +15,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
   @Query("""
           INSERT INTO places(
               owner_user_id, name, description, category_id, geom, address, phone, website, image_urls, model_3d_urls,
-              is_verified, is_active, created_at
+              services, is_verified, is_active, created_at
           )
           VALUES (
               :ownerId, :name, :description, :categoryId,
@@ -23,6 +23,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               :address, :phone, :website,
               COALESCE(:imageUrls::text[], '{}'::text[]),
               COALESCE(:model3dUrls::text[], '{}'::text[]),
+              COALESCE(:services::text[], '{}'::text[]),
               FALSE, TRUE, NOW()
           )
           RETURNING
@@ -35,6 +36,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               address, phone, website,
               image_urls,
               model_3d_urls,
+              services,
               is_verified,
               is_active,
               created_at
@@ -50,14 +52,15 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
       @Param("phone") String phone,
       @Param("website") String website,
       @Param("imageUrls") String[] imageUrls,
-      @Param("model3dUrls") String[] model3dUrls);
+      @Param("model3dUrls") String[] model3dUrls,
+      @Param("services") String[] services);
 
   // NEARBY
   @Query("""
         SELECT 
             p.id, p.owner_user_id, p.name, p.description, p.category_id, 
             p.address, p.phone, p.website, p.image_urls, p.model_3d_urls, 
-            p.is_verified, p.is_active, p.created_at,
+            p.services, p.is_verified, p.is_active, p.created_at,
             ST_Y(p.geom) AS lat, 
             ST_X(p.geom) AS lng,
             ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)) AS distance_meters
@@ -92,6 +95,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               p.address, p.phone, p.website,
               p.image_urls,
               p.model_3d_urls,
+              p.services,
               p.is_verified,
               p.is_active,
               p.created_at
@@ -117,7 +121,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
           SELECT
             p.id, p.owner_user_id, p.name, p.description, p.category_id,
             ST_Y(p.geom) AS lat, ST_X(p.geom) AS lng,
-            p.address, p.phone, p.website, p.image_urls, p.model_3d_urls, p.is_verified, p.is_active, p.created_at,
+            p.address, p.phone, p.website, p.image_urls, p.model_3d_urls, p.services, p.is_verified, p.is_active, p.created_at,
             CASE
               WHEN CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL
               THEN ST_DistanceSphere(p.geom, ST_SetSRID(ST_MakePoint(CAST(:lng AS FLOAT8), CAST(:lat AS FLOAT8)), 4326))
@@ -186,6 +190,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               website     = COALESCE(:website,     website),
               image_urls  = COALESCE(:imageUrls::text[], image_urls),
               model_3d_urls = COALESCE(:model3dUrls::text[], model_3d_urls),
+              services    = COALESCE(:services::text[], services),
               geom        = CASE
                              WHEN CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL
                              THEN ST_SetSRID(ST_MakePoint(CAST(:lng AS FLOAT8), CAST(:lat AS FLOAT8)), 4326)
@@ -202,6 +207,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               address, phone, website,
               image_urls,
               model_3d_urls,
+              services,
               is_verified,
               is_active,
               created_at
@@ -217,7 +223,8 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
       @Param("phone") String phone,
       @Param("website") String website,
       @Param("imageUrls") String[] imageUrls,
-      @Param("model3dUrls") String[] model3dUrls);
+      @Param("model3dUrls") String[] model3dUrls,
+      @Param("services") String[] services);
 
   // (Compat) Mis lugares por email – ya sin co-owners
   @Query("""
@@ -231,6 +238,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               p.address, p.phone, p.website,
               p.image_urls,
               p.model_3d_urls,
+              p.services,
               p.is_verified,
               p.is_active,
               p.created_at
@@ -264,6 +272,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               address, phone, website,
               image_urls,
               model_3d_urls,
+              services,
               is_verified,
               is_active,
               created_at
@@ -278,7 +287,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
   @Query("""
           UPDATE places
              SET is_active = :active
-           WHERE id = :id
+            WHERE id = :id
           RETURNING
               id,
               owner_user_id,
@@ -289,6 +298,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               address, phone, website,
               image_urls,
               model_3d_urls,
+              services,
               is_verified,
               is_active,
               created_at
@@ -309,6 +319,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               p.address, p.phone, p.website,
               p.image_urls,
               p.model_3d_urls,
+              p.services,
               p.is_verified,
               p.is_active,
               p.created_at
@@ -332,6 +343,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               p.address, p.phone, p.website,
               p.image_urls,
               p.model_3d_urls,
+              p.services,
               p.is_verified,
               p.is_active,
               p.created_at
@@ -351,6 +363,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               p.id,
               p.owner_user_id,
               p.name,
+              p.services,
               ST_Y(p.geom) AS lat,
               ST_X(p.geom) AS lng,
               p.created_at
@@ -369,8 +382,8 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
   @Query("""
           UPDATE places
              SET is_active = :active
-           WHERE id = :placeId
-             AND owner_user_id = :ownerId
+            WHERE id = :placeId
+              AND owner_user_id = :ownerId
           RETURNING
               id,
               owner_user_id,
@@ -381,6 +394,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               address, phone, website,
               image_urls,
               model_3d_urls,
+              services,
               is_verified,
               is_active,
               created_at
@@ -400,6 +414,7 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               p.address, p.phone, p.website,
               p.image_urls,
               p.model_3d_urls,
+              p.services,
               p.is_verified,
               p.is_active,
               p.created_at
