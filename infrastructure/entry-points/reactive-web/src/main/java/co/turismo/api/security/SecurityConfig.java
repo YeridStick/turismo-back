@@ -220,13 +220,17 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.PATCH, "/api/categories/*").hasRole("ADMIN")
 
                         // ---- Protegido: Packages / Agency ----
-                        .pathMatchers(HttpMethod.POST, "/api/packages").hasRole("AGENCY")
+                        .pathMatchers(HttpMethod.POST,   "/api/packages").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.PATCH,  "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.DELETE, "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
 
                         // ---- Protegido: Agencies ----
-                        .pathMatchers(HttpMethod.POST, "/api/agencies").hasAnyRole("ADMIN", "AGENCY")
-                        .pathMatchers(HttpMethod.POST, "/api/agencies/users").hasAnyRole("ADMIN", "AGENCY")
-                        .pathMatchers(HttpMethod.GET, "/api/agencies/by-user").hasAnyRole("ADMIN", "AGENCY")
-                        .pathMatchers(HttpMethod.GET, "/api/agencies/dashboard").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.POST,   "/api/agencies").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.POST,   "/api/agencies/users").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.GET,    "/api/agencies/by-user").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.GET,    "/api/agencies/dashboard").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.PATCH,  "/api/agencies/*").hasAnyRole("ADMIN", "AGENCY")
+                        .pathMatchers(HttpMethod.DELETE, "/api/agencies/*").hasAnyRole("ADMIN", "AGENCY")
 
                         // ---- Resto autenticado ----
                         .anyExchange().authenticated()

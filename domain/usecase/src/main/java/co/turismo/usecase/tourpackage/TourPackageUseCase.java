@@ -70,46 +70,30 @@ public class TourPackageUseCase {
                 .flatMap(tourPackage -> attachPlaces(tourPackage, 100, 0));
     }
 
-    public Mono<TourPackage> update(String userEmail, Long packageId, co.turismo.model.tourpackage.UpdateTourPackageRequest request) {
-        if (request == null) {
-            return Mono.error(new IllegalArgumentException("Body requerido"));
-        }
-        return tourPackageRepository.findById(packageId)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Paquete no encontrado")))
-                .flatMap(tourPackage -> agencyRepository.findByUserEmail(userEmail)
-                        .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
-                        .flatMap(agency -> {
-                            if (!agency.getId().equals(tourPackage.getAgencyId())) {
-                                return Mono.error(new IllegalStateException("No tienes permisos para editar este paquete"));
-                            }
-                            
-                            Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
-                            if (request.getPlaceIds() != null && placeIds.length == 0) {
-                                return Mono.error(new IllegalArgumentException("placeIds no puede estar vacío si se envía"));
-                            }
-                            
-                            Mono<Void> validationMono = Mono.empty();
-                            if (request.getPlaceIds() != null) {
-                                validationMono = validatePlaces(placeIds, 100, 0);
-                            }
-                            
-                            return validationMono
-                                    .then(tourPackageRepository.update(packageId, request.toBuilder().placeIds(request.getPlaceIds() != null ? placeIds : null).build()))
-                                    .flatMap(updated -> attachPlaces(updated, 100, 0));
-                        }));
+    /**
+     * Actualiza un paquete turístico.
+     * Pre-condición: el Handler ya validó que el solicitante tiene permisos sobre este paquete.
+     */
+    public Mono<TourPackage> update(Long packageId, co.turismo.model.tourpackage.UpdateTourPackageRequest request) {
+        Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
+        Mono<Void> placesValidation = (request.getPlaceIds() != null)
+                ? validatePlaces(placeIds, 100, 0)
+                : Mono.empty();
+
+        return placesValidation
+                .then(tourPackageRepository.update(packageId,
+                        request.toBuilder()
+                                .placeIds(request.getPlaceIds() != null ? placeIds : null)
+                                .build()))
+                .flatMap(updated -> attachPlaces(updated, 100, 0));
     }
 
-    public Mono<Void> delete(String userEmail, Long packageId) {
-        return tourPackageRepository.findById(packageId)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Paquete no encontrado")))
-                .flatMap(tourPackage -> agencyRepository.findByUserEmail(userEmail)
-                        .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
-                        .flatMap(agency -> {
-                            if (!agency.getId().equals(tourPackage.getAgencyId())) {
-                                return Mono.error(new IllegalStateException("No tienes permisos para eliminar este paquete"));
-                            }
-                            return tourPackageRepository.delete(packageId);
-                        }));
+    /**
+     * Elimina un paquete turístico.
+     * Pre-condición: el Handler ya validó que el solicitante tiene permisos sobre este paquete.
+     */
+    public Mono<Void> delete(Long packageId) {
+        return tourPackageRepository.delete(packageId);
     }
 
     private Mono<Void> validatePlaces(Long[] placeIds, Integer limit, Integer offset) {

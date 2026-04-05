@@ -63,34 +63,22 @@ public class AgencyUseCase {
                 .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")));
     }
 
-    public Mono<Agency> update(String requesterEmail, Long agencyId, co.turismo.model.agency.UpdateAgencyRequest request) {
-        if (request == null) {
-            return Mono.error(new IllegalArgumentException("Body requerido"));
-        }
-        return agencyRepository.findByUserEmail(requesterEmail)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
-                .flatMap(agency -> {
-                    if (!agency.getId().equals(agencyId)) {
-                        return Mono.error(new IllegalStateException("No tienes permisos para editar esta agencia"));
-                    }
-                    return agencyRepository.update(agencyId, request);
-                });
+    /**
+     * Actualiza los datos de una agencia.
+     * Pre-condición: el Handler ya validó que el solicitante tiene permisos.
+     */
+    public Mono<Agency> update(Long agencyId, co.turismo.model.agency.UpdateAgencyRequest request) {
+        return agencyRepository.update(agencyId, request);
     }
 
-    public Mono<Void> delete(String requesterEmail, Long agencyId) {
-        return agencyRepository.findByUserEmail(requesterEmail)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
-                .flatMap(agency -> {
-                    if (!agency.getId().equals(agencyId)) {
-                        return Mono.error(new IllegalStateException("No tienes permisos para eliminar esta agencia"));
-                    }
-                    
-                    // Recuperar cada paquete turístico de la agencia y eliminarlo para asegurar 
-                    // que las tablas dependientes se mantengan íntegras.
-                    return tourPackageRepository.findByAgencyId(agencyId)
-                            .flatMap(pkg -> tourPackageRepository.delete(pkg.getId()))
-                            .then(agencyRepository.delete(agencyId));
-                });
+    /**
+     * Elimina una agencia y en cascada todos sus paquetes turísticos.
+     * Pre-condición: el Handler ya validó que el solicitante tiene permisos.
+     */
+    public Mono<Void> delete(Long agencyId) {
+        return tourPackageRepository.findByAgencyId(agencyId)
+                .flatMap(pkg -> tourPackageRepository.delete(pkg.getId()))
+                .then(agencyRepository.delete(agencyId));
     }
 
     public Mono<AgencyDashboard> dashboard(String userEmail, LocalDate from, LocalDate to, int limit) {

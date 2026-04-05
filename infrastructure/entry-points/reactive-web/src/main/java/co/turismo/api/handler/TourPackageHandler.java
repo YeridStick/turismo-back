@@ -4,6 +4,7 @@ import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.model.place.Place;
 import co.turismo.model.tourpackage.CreateTourPackageRequest;
 import co.turismo.model.tourpackage.TourPackage;
+import co.turismo.usecase.agency.AgencyUseCase;
 import co.turismo.usecase.tourpackage.TourPackageUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -26,6 +27,7 @@ import java.util.Objects;
 public class TourPackageHandler {
 
     private final TourPackageUseCase tourPackageUseCase;
+    private final AgencyUseCase agencyUseCase;
 
     public Mono<ServerResponse> create(ServerRequest req) {
         return req.principal()
@@ -95,47 +97,80 @@ public class TourPackageHandler {
     }
 
     public Mono<ServerResponse> update(ServerRequest req) {
-        long id = Long.parseLong(req.pathVariable("id"));
+        long packageId = Long.parseLong(req.pathVariable("id"));
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName)
-                .zipWith(req.bodyToMono(UpdatePackageBody.class))
-                .flatMap(tuple -> {
-                    String email = tuple.getT1();
-                    UpdatePackageBody body = tuple.getT2();
+                .flatMap(auth -> req.bodyToMono(UpdatePackageBody.class)
+                        .flatMap(body -> {
+                            var cmd = co.turismo.model.tourpackage.UpdateTourPackageRequest.builder()
+                                    .title(body.title())
+                                    .city(body.city())
+                                    .description(body.description())
+                                    .days(body.days())
+                                    .nights(body.nights())
+                                    .people(body.people())
+                                    .rating(body.rating())
+                                    .reviews(body.reviews())
+                                    .price(body.price())
+                                    .originalPrice(body.originalPrice())
+                                    .discount(body.discount())
+                                    .tag(body.tag())
+                                    .includes(body.includes() == null ? null : body.includes().toArray(String[]::new))
+                                    .image(body.image())
+                                    .placeIds(body.placeIds() == null ? null : body.placeIds().toArray(Long[]::new))
+                                    .build();
 
-                    var cmd = co.turismo.model.tourpackage.UpdateTourPackageRequest.builder()
-                            .title(body.title())
-                            .city(body.city())
-                            .description(body.description())
-                            .days(body.days())
-                            .nights(body.nights())
-                            .people(body.people())
-                            .rating(body.rating())
-                            .reviews(body.reviews())
-                            .price(body.price())
-                            .originalPrice(body.originalPrice())
-                            .discount(body.discount())
-                            .tag(body.tag())
-                            .includes(body.includes() == null ? null : body.includes().toArray(String[]::new))
-                            .image(body.image())
-                            .placeIds(body.placeIds() == null ? null : body.placeIds().toArray(Long[]::new))
-                            .build();
-
-                    return tourPackageUseCase.update(email, id, cmd);
-                })
+                            boolean isAdmin = hasRole(auth, "ADMIN");
+                            if (isAdmin) {
+                                // ADMIN: actualiza directamente sin verificar agencia
+                                return tourPackageUseCase.update(packageId, cmd);
+                            }
+                            // AGENCY: verificar que el paquete le pertenece (via agencia)
+                            return tourPackageUseCase.findById(packageId, 0, 0)
+                                    .flatMap(pkg -> agencyUseCase.findByUserEmail(auth.getName())
+                                            .flatMap(agency -> {
+                                                if (!agency.getId().equals(pkg.getAgencyId())) {
+                                                    return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                                            org.springframework.http.HttpStatus.FORBIDDEN,
+                                                            "No tienes permisos para editar este paquete"));
+                                                }
+                                                return tourPackageUseCase.update(packageId, cmd);
+                                            }));
+                        }))
                 .flatMap(pkg -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(toResponse(pkg))));
     }
 
     public Mono<ServerResponse> delete(ServerRequest req) {
-        long id = Long.parseLong(req.pathVariable("id"));
+        long packageId = Long.parseLong(req.pathVariable("id"));
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName)
-                .flatMap(email -> tourPackageUseCase.delete(email, id))
+                .flatMap(auth -> {
+                    boolean isAdmin = hasRole(auth, "ADMIN");
+                    if (isAdmin) {
+                        // ADMIN: elimina directamente sin verificar agencia
+                        return tourPackageUseCase.delete(packageId);
+                    }
+                    // AGENCY: verificar que el paquete le pertenece (via agencia)
+                    return tourPackageUseCase.findById(packageId, 0, 0)
+                            .flatMap(pkg -> agencyUseCase.findByUserEmail(auth.getName())
+                                    .flatMap(agency -> {
+                                        if (!agency.getId().equals(pkg.getAgencyId())) {
+                                            return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                                    org.springframework.http.HttpStatus.FORBIDDEN,
+                                                    "No tienes permisos para eliminar este paquete"));
+                                        }
+                                        return tourPackageUseCase.delete(packageId);
+                                    }));
+                })
                 .then(ServerResponse.noContent().build());
+    }
+
+    private static boolean hasRole(Authentication auth, String role) {
+        String expected = "ROLE_" + role.toUpperCase();
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> expected.equalsIgnoreCase(a.getAuthority()));
     }
 
     private TourPackageResponse toResponse(TourPackage pkg) {

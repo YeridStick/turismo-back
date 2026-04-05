@@ -106,37 +106,65 @@ public class AgencyHandler {
     }
 
     public Mono<ServerResponse> update(ServerRequest req) {
-        Long id = Long.parseLong(req.pathVariable("id"));
+        Long agencyId = Long.parseLong(req.pathVariable("id"));
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName)
-                .zipWith(req.bodyToMono(UpdateAgencyBody.class))
-                .flatMap(tuple -> {
-                    String email = tuple.getT1();
-                    UpdateAgencyBody body = tuple.getT2();
-                    var cmd = co.turismo.model.agency.UpdateAgencyRequest.builder()
-                            .name(body.name())
-                            .description(body.description())
-                            .phone(body.phone())
-                            .email(body.email())
-                            .website(body.website())
-                            .logoUrl(body.logoUrl())
-                            .build();
-                    return agencyUseCase.update(email, id, cmd);
-                })
+                .flatMap(auth -> req.bodyToMono(UpdateAgencyBody.class)
+                        .flatMap(body -> {
+                            var cmd = co.turismo.model.agency.UpdateAgencyRequest.builder()
+                                    .name(body.name())
+                                    .description(body.description())
+                                    .phone(body.phone())
+                                    .email(body.email())
+                                    .website(body.website())
+                                    .logoUrl(body.logoUrl())
+                                    .build();
+
+                            boolean isAdmin = hasRole(auth, "ADMIN");
+                            if (isAdmin) {
+                                // ADMIN: acceso directo, sin verificar propiedad
+                                return agencyUseCase.update(agencyId, cmd);
+                            }
+                            // AGENCY: verificar que la agencia le pertenece al usuario
+                            return agencyUseCase.findByUserEmail(auth.getName())
+                                    .flatMap(agency -> {
+                                        if (!agency.getId().equals(agencyId)) {
+                                            return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                                    org.springframework.http.HttpStatus.FORBIDDEN,
+                                                    "No tienes permisos para editar esta agencia"));
+                                        }
+                                        return agencyUseCase.update(agencyId, cmd);
+                                    });
+                        }))
                 .flatMap(agency -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(agency)));
     }
 
     public Mono<ServerResponse> delete(ServerRequest req) {
-        Long id = Long.parseLong(req.pathVariable("id"));
+        Long agencyId = Long.parseLong(req.pathVariable("id"));
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName)
-                .flatMap(email -> agencyUseCase.delete(email, id))
+                .flatMap(auth -> {
+                    boolean isAdmin = hasRole(auth, "ADMIN");
+                    if (isAdmin) {
+                        // ADMIN: borrado directo sin verificar propiedad
+                        return agencyUseCase.delete(agencyId);
+                    }
+                    // AGENCY: verificar que la agencia le pertenece al usuario
+                    return agencyUseCase.findByUserEmail(auth.getName())
+                            .flatMap(agency -> {
+                                if (!agency.getId().equals(agencyId)) {
+                                    return Mono.error(new org.springframework.web.server.ResponseStatusException(
+                                            org.springframework.http.HttpStatus.FORBIDDEN,
+                                            "No tienes permisos para eliminar esta agencia"));
+                                }
+                                return agencyUseCase.delete(agencyId);
+                            });
+                })
                 .then(ServerResponse.noContent().build());
     }
+
 
     private AgencyDashboardResponse toDashboardResponse(AgencyDashboard dashboard) {
         List<AgencyTourPackageResponse> packages = dashboard.getPackages() == null ? List.of()
