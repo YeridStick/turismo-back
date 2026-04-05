@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -100,11 +101,14 @@ public class TourPackageHandler {
         return req.principal()
                 .cast(Authentication.class)
                 .flatMap(auth -> {
+                    String email = auth.getName();
+                    String[] roles = extraerRoles(auth);
+
                     if (hasRole(auth, "ADMIN")) {
-                        return tourPackageUseCase.delete(packageId);
+                        return tourPackageUseCase.delete(packageId, email, roles);
                     }
-                    return verifyOwnership(auth.getName(), packageId)
-                            .then(tourPackageUseCase.delete(packageId));
+                    return verifyOwnership(email, packageId)
+                            .then(tourPackageUseCase.delete(packageId, email, roles));
                 })
                 .then(ServerResponse.noContent().build());
     }
@@ -125,6 +129,13 @@ public class TourPackageHandler {
             }
             return Mono.empty();
         });
+    }
+
+    private String[] extraerRoles(Authentication auth) {
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .map(r -> r.replace("ROLE_", ""))
+                .toArray(String[]::new);
     }
 
     private static CreateTourPackageRequest toCreateCommand(CreatePackageRequest body) {

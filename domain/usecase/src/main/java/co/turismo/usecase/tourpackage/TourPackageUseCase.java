@@ -1,6 +1,8 @@
 package co.turismo.usecase.tourpackage;
 
 import co.turismo.model.agency.gateways.AgencyRepository;
+import co.turismo.model.auditLog.AuditLog;
+import co.turismo.model.auditLog.gateways.AuditLogRepository;
 import co.turismo.model.error.ConflictException;
 import co.turismo.model.error.NotFoundException;
 import co.turismo.model.place.gateways.PlaceRepository;
@@ -22,6 +24,7 @@ public class TourPackageUseCase {
     private final TourPackageRepository tourPackageRepository;
     private final AgencyRepository agencyRepository;
     private final PlaceRepository placeRepository;
+    private final AuditLogRepository auditLogRepository;
 
     private static final int DEFAULT_PLACE_LIMIT = 100;
     private static final int DEFAULT_PLACE_OFFSET = 0;
@@ -71,6 +74,22 @@ public class TourPackageUseCase {
 
     public Mono<Void> delete(Long packageId) {
         return tourPackageRepository.delete(packageId);
+    }
+
+    public Mono<Void> delete(Long packageId, String usuarioEmail, String[] roles) {
+        return tourPackageRepository.findById(packageId)
+                .flatMap(pkg -> tourPackageRepository.delete(pkg.getId())
+                        .then(auditLogRepository.registrar(
+                                AuditLog.builder()
+                                        .tabla("tour_packages")
+                                        .registroId(packageId)
+                                        .usuarioEmail(usuarioEmail)
+                                        .roles(roles)
+                                        .datos(pkg)
+                                        .build()
+                                )
+
+                        ));
     }
 
     private Mono<Void> validatePlacesExist(Long[] placeIds) {

@@ -9,6 +9,7 @@ import co.turismo.model.place.Place;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.model.tourpackage.TopPackage;
 import co.turismo.model.tourpackage.TourPackageSalesSummary;
+import co.turismo.model.user.User;
 import co.turismo.usecase.agency.AgencyUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -143,26 +147,36 @@ public class AgencyHandler {
 
     public Mono<ServerResponse> delete(ServerRequest req) {
         Long agencyId = Long.parseLong(req.pathVariable("id"));
+
         return req.principal()
                 .cast(Authentication.class)
                 .flatMap(auth -> {
+                    String email = auth.getName();          // el sub del JWT
+                    String[] roles = extraerRoles(auth);
                     boolean isAdmin = hasRole(auth, "ADMIN");
+
                     if (isAdmin) {
-                        // ADMIN: borrado directo sin verificar propiedad
-                        return agencyUseCase.delete(agencyId);
+                        return agencyUseCase.delete(agencyId, email, roles);
                     }
-                    // AGENCY: verificar que la agencia le pertenece al usuario
-                    return agencyUseCase.findByUserEmail(auth.getName())
+
+                    return agencyUseCase.findByUserEmail(email)
                             .flatMap(agency -> {
                                 if (!agency.getId().equals(agencyId)) {
-                                    return Mono.error(new org.springframework.web.server.ResponseStatusException(
-                                            org.springframework.http.HttpStatus.FORBIDDEN,
+                                    return Mono.error(new ResponseStatusException(
+                                            HttpStatus.FORBIDDEN,
                                             "No tienes permisos para eliminar esta agencia"));
                                 }
-                                return agencyUseCase.delete(agencyId);
+                                return agencyUseCase.delete(agencyId, email, roles);
                             });
                 })
                 .then(ServerResponse.noContent().build());
+    }
+
+    private String[] extraerRoles(Authentication auth) {
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .map(r -> r.replace("ROLE_", ""))
+                .toArray(String[]::new);
     }
 
 

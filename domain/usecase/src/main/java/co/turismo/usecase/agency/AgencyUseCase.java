@@ -4,6 +4,8 @@ import co.turismo.model.agency.Agency;
 import co.turismo.model.agency.AgencyDashboard;
 import co.turismo.model.agency.CreateAgencyRequest;
 import co.turismo.model.agency.gateways.AgencyRepository;
+import co.turismo.model.auditLog.AuditLog;
+import co.turismo.model.auditLog.gateways.AuditLogRepository;
 import co.turismo.model.tourpackage.TourPackageSalesSummary;
 import co.turismo.model.tourpackage.gateways.TourPackageRepository;
 import co.turismo.model.user.gateways.UserRepository;
@@ -21,6 +23,7 @@ public class AgencyUseCase {
     private final UserRepository userRepository;
     private final TourPackageRepository tourPackageRepository;
     private final VisitGateway visitGateway;
+    private final AuditLogRepository auditLogRepository;
 
     public Mono<Agency> create(String creatorEmail, CreateAgencyRequest request) {
         if (request == null) {
@@ -75,10 +78,32 @@ public class AgencyUseCase {
      * Elimina una agencia y en cascada todos sus paquetes turísticos.
      * Pre-condición: el Handler ya validó que el solicitante tiene permisos.
      */
-    public Mono<Void> delete(Long agencyId) {
+    public Mono<Void> delete(Long agencyId, String usuarioEmail, String[] roles) {
         return tourPackageRepository.findByAgencyId(agencyId)
-                .flatMap(pkg -> tourPackageRepository.delete(pkg.getId()))
-                .then(agencyRepository.delete(agencyId));
+                .flatMap(pkg -> tourPackageRepository.delete(pkg.getId())  // ← pkg.getId(), no agencyId
+                        .then(auditLogRepository.registrar(
+                                AuditLog.builder()
+                                        .tabla("tour_packages")
+                                        .registroId(pkg.getId())
+                                        .usuarioEmail(usuarioEmail)
+                                        .roles(roles)
+                                        .datos(pkg)
+                                        .build()
+                        ))
+                )
+                .then(agencyRepository.findById(agencyId)
+                        .flatMap(agency -> agencyRepository.delete(agencyId)
+                                .then(auditLogRepository.registrar(
+                                        AuditLog.builder()
+                                                .tabla("agencies")
+                                                .registroId(agencyId)
+                                                .usuarioEmail(usuarioEmail)
+                                                .roles(roles)
+                                                .datos(agency)
+                                                .build()
+                                ))
+                        )
+                );
     }
 
     public Mono<AgencyDashboard> dashboard(String userEmail, LocalDate from, LocalDate to, int limit) {
