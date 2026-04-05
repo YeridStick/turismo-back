@@ -238,4 +238,50 @@ public interface TourPackageAdapterRepository extends ReactiveCrudRepository<Tou
     Mono<TourPackageSalesSummaryRow> salesSummaryByAgency(@Param("agencyId") Long agencyId,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    @Query("""
+        UPDATE tour_packages
+        SET title = COALESCE(:title, title),
+            city = COALESCE(:city, city),
+            description = COALESCE(:description, description),
+            days = COALESCE(:days, days),
+            nights = COALESCE(:nights, nights),
+            people = COALESCE(:people, people),
+            rating = COALESCE(:rating, rating),
+            reviews = COALESCE(:reviews, reviews),
+            price = COALESCE(:price, price),
+            original_price = COALESCE(:originalPrice, original_price),
+            discount = COALESCE(:discount, discount),
+            tag = COALESCE(:tag, tag),
+            includes = COALESCE(:includes::text[], includes),
+            image = COALESCE(:image, image)
+        WHERE id = :id
+        RETURNING *
+    """)
+    Mono<TourPackageData> updatePackage(
+            @Param("id") Long id,
+            @Param("title") String title,
+            @Param("city") String city,
+            @Param("description") String description,
+            @Param("days") Integer days,
+            @Param("nights") Integer nights,
+            @Param("people") String people,
+            @Param("rating") Double rating,
+            @Param("reviews") Long reviews,
+            @Param("price") Long price,
+            @Param("originalPrice") Long originalPrice,
+            @Param("discount") String discount,
+            @Param("tag") String tag,
+            @Param("includes") String[] includes,
+            @Param("image") String image
+    );
+
+    @Query("DELETE FROM tour_package_places WHERE package_id = :packageId")
+    Mono<Void> deletePackagePlaces(@Param("packageId") Long packageId);
+
+    @Query("INSERT INTO tour_package_places (package_id, place_id) VALUES (:packageId, :placeId)")
+    Mono<Void> addPlaceToPackage(@Param("packageId") Long packageId, @Param("placeId") Long placeId);
+
+    @Query("DELETE FROM tour_packages WHERE id = :id")
+    Mono<Void> deletePackage(@Param("id") Long id);
 }

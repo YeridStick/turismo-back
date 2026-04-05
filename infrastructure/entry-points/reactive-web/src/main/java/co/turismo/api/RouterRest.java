@@ -406,6 +406,26 @@ public class RouterRest {
                                 .response(apiErrorResponse("404", "No encontrado"))
                 )
 
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_BASE_PATH + "/{id}",
+                        agencyHandler::update,
+                        ops -> ops.operationId("agencyUpdate")
+                                .summary("Actualizar agencia")
+                                .tag("Agencies")
+                                .parameter(pathParam("id", "Identificador interno de la agencia", Long.class))
+                                .requestBody(jsonBody(AgencyHandler.UpdateAgencyBody.class, true))
+                                .response(jsonResponse("200", "Agencia actualizada", ApiAgencyResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                )
+
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_BASE_PATH + "/{id}",
+                        agencyHandler::delete,
+                        ops -> ops.operationId("agencyDelete")
+                                .summary("Eliminar agencia")
+                                .tag("Agencies")
+                                .parameter(pathParam("id", "Identificador interno de la agencia", Long.class))
+                                .response(jsonResponse("204", "Eliminado", null))
+                )
+
                 // =========================
                 // Tour Packages
                 // =========================
@@ -437,6 +457,25 @@ public class RouterRest {
                                 .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
                                 .response(jsonResponse("200", "Paquete encontrado", ApiTourPackageResponse.class))
                                 .response(apiErrorResponse("404", "No encontrado"))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PACKAGES_ID_PATH,
+                        tourPackageHandler::update,
+                        ops -> ops.operationId("packageUpdate")
+                                .summary("Actualizar paquete turístico")
+                                .tag("Packages")
+                                .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
+                                .requestBody(jsonBody(TourPackageHandler.UpdatePackageBody.class, true))
+                                .response(jsonResponse("200", "Paquete actualizado", ApiTourPackageResponse.class))
+                )
+
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PACKAGES_ID_PATH,
+                        tourPackageHandler::delete,
+                        ops -> ops.operationId("packageDelete")
+                                .summary("Eliminar paquete turístico")
+                                .tag("Packages")
+                                .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
+                                .response(jsonResponse("204", "Eliminado", null))
                 )
 
                 // =========================

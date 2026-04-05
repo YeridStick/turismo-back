@@ -77,4 +77,30 @@ public interface AgencyAdapterRepository extends ReactiveCrudRepository<AgencyDa
         ORDER BY created_at DESC
     """)
     reactor.core.publisher.Flux<AgencyData> findAllProjected();
+
+    @Query("""
+        UPDATE agencies
+        SET name = COALESCE(:name, name),
+            description = COALESCE(:description, description),
+            phone = COALESCE(:phone, phone),
+            email = COALESCE(:email, email),
+            website = COALESCE(:website, website),
+            logo_url = COALESCE(:logoUrl, logo_url)
+        WHERE id = :id
+        RETURNING id, name, description, phone, email, website, logo_url, created_at
+    """)
+    Mono<AgencyData> updateAgency(
+            @Param("id") Long id,
+            @Param("name") String name,
+            @Param("description") String description,
+            @Param("phone") String phone,
+            @Param("email") String email,
+            @Param("website") String website,
+            @Param("logoUrl") String logoUrl
+    );
+
+    @Query("""
+        DELETE FROM agencies WHERE id = :id
+    """)
+    Mono<Void> deleteAgency(@Param("id") Long id);
 }

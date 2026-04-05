@@ -4,6 +4,7 @@ import co.turismo.model.tourpackage.CreateTourPackageRequest;
 import co.turismo.model.tourpackage.TopPackage;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.model.tourpackage.TourPackageSalesSummary;
+import co.turismo.model.tourpackage.UpdateTourPackageRequest;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -21,4 +22,8 @@ public interface TourPackageRepository {
     Flux<TopPackage> topSoldByAgency(Long agencyId, LocalDate from, LocalDate to, int limit);
 
     Mono<TourPackageSalesSummary> salesSummaryByAgency(Long agencyId, LocalDate from, LocalDate to);
+
+    Mono<TourPackage> update(Long id, UpdateTourPackageRequest request);
+
+    Mono<Void> delete(Long id);
 }

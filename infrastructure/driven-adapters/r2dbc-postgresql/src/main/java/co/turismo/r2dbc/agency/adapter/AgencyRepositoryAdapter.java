@@ -48,4 +48,23 @@ public class AgencyRepositoryAdapter extends ReactiveAdapterOperations<Agency, A
         return repository.findAllProjected()
                 .map(this::toEntity);
     }
+
+    @Override
+    public Mono<Agency> update(Long id, co.turismo.model.agency.UpdateAgencyRequest request) {
+        return repository.updateAgency(
+                        id,
+                        request.getName(),
+                        request.getDescription(),
+                        request.getPhone(),
+                        request.getEmail(),
+                        request.getWebsite(),
+                        request.getLogoUrl()
+                )
+                .map(this::toEntity);
+    }
+
+    @Override
+    public Mono<Void> delete(Long id) {
+        return repository.deleteAgency(id);
+    }
 }

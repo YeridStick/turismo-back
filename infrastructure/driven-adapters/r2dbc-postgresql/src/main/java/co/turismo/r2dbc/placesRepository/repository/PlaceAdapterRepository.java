@@ -363,14 +363,23 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               p.id,
               p.owner_user_id,
               p.name,
-              p.services,
+              p.description,
+              p.category_id,
               ST_Y(p.geom) AS lat,
               ST_X(p.geom) AS lng,
+              p.address,
+              p.phone,
+              p.website,
+              p.image_urls,
+              p.model_3d_urls,
+              p.services,
+              p.is_verified,
+              p.is_active,
               p.created_at
           FROM places p
           WHERE p.id = ANY(:ids)
-          ORDER BY p.created_at DESC  -- ¡Crucial para que la paginación sea consistente!
-          LIMIT :limit                -- Cantidad de registros por página
+          ORDER BY p.created_at DESC
+          LIMIT :limit
           OFFSET :offset;
       """)
   Flux<PlaceData> findByIds(

@@ -105,6 +105,39 @@ public class AgencyHandler {
                 });
     }
 
+    public Mono<ServerResponse> update(ServerRequest req) {
+        Long id = Long.parseLong(req.pathVariable("id"));
+        return req.principal()
+                .cast(Authentication.class)
+                .map(Authentication::getName)
+                .zipWith(req.bodyToMono(UpdateAgencyBody.class))
+                .flatMap(tuple -> {
+                    String email = tuple.getT1();
+                    UpdateAgencyBody body = tuple.getT2();
+                    var cmd = co.turismo.model.agency.UpdateAgencyRequest.builder()
+                            .name(body.name())
+                            .description(body.description())
+                            .phone(body.phone())
+                            .email(body.email())
+                            .website(body.website())
+                            .logoUrl(body.logoUrl())
+                            .build();
+                    return agencyUseCase.update(email, id, cmd);
+                })
+                .flatMap(agency -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(agency)));
+    }
+
+    public Mono<ServerResponse> delete(ServerRequest req) {
+        Long id = Long.parseLong(req.pathVariable("id"));
+        return req.principal()
+                .cast(Authentication.class)
+                .map(Authentication::getName)
+                .flatMap(email -> agencyUseCase.delete(email, id))
+                .then(ServerResponse.noContent().build());
+    }
+
     private AgencyDashboardResponse toDashboardResponse(AgencyDashboard dashboard) {
         List<AgencyTourPackageResponse> packages = dashboard.getPackages() == null ? List.of()
                 : dashboard.getPackages().stream().map(this::toPackageResponse).toList();
@@ -230,6 +263,22 @@ public class AgencyHandler {
             @NotBlank String email
     ) {
     }
+
+    @Schema(name = "UpdateAgencyRequest", description = "Cuerpo para actualizar una agencia")
+    public record UpdateAgencyBody(
+            @Schema(description = "Nombre de la agencia", example = "Turismo Huila")
+            String name,
+            @Schema(description = "Descripción corta")
+            String description,
+            @Schema(description = "Teléfono de contacto")
+            String phone,
+            @Schema(description = "Email de la agencia")
+            String email,
+            @Schema(description = "Sitio web")
+            String website,
+            @Schema(description = "Logo URL")
+            String logoUrl
+    ) {}
 
     @Schema(name = "AgencyDashboard", description = "Resumen de métricas de la agencia")
     public record AgencyDashboardResponse(

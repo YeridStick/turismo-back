@@ -78,6 +78,43 @@ public class TourPackageRepositoryAdapter
                 .map(TourPackageRepositoryAdapter::toSalesSummary);
     }
 
+    @Override
+    public Mono<TourPackage> update(Long id, co.turismo.model.tourpackage.UpdateTourPackageRequest request) {
+        return repository.updatePackage(
+                        id,
+                        request.getTitle(),
+                        request.getCity(),
+                        request.getDescription(),
+                        request.getDays(),
+                        request.getNights(),
+                        request.getPeople(),
+                        request.getRating(),
+                        request.getReviews(),
+                        request.getPrice(),
+                        request.getOriginalPrice(),
+                        request.getDiscount(),
+                        request.getTag(),
+                        request.getIncludes(),
+                        request.getImage()
+                )
+                .flatMap(updatedPackage -> {
+                    if (request.getPlaceIds() != null) {
+                        return repository.deletePackagePlaces(id)
+                                .then(Flux.fromArray(request.getPlaceIds())
+                                        .flatMap(placeId -> repository.addPlaceToPackage(id, placeId))
+                                        .then())
+                                .thenReturn(updatedPackage);
+                    }
+                    return Mono.just(updatedPackage);
+                })
+                .map(this::toEntity);
+    }
+
+    @Override
+    public Mono<Void> delete(Long id) {
+        return repository.deletePackage(id);
+    }
+
     private static TopPackage toTopPackage(TopPackageRowDto row) {
         return TopPackage.builder()
                 .packageId(row.getPackageId())

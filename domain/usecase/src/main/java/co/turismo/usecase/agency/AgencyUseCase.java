@@ -63,6 +63,36 @@ public class AgencyUseCase {
                 .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")));
     }
 
+    public Mono<Agency> update(String requesterEmail, Long agencyId, co.turismo.model.agency.UpdateAgencyRequest request) {
+        if (request == null) {
+            return Mono.error(new IllegalArgumentException("Body requerido"));
+        }
+        return agencyRepository.findByUserEmail(requesterEmail)
+                .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
+                .flatMap(agency -> {
+                    if (!agency.getId().equals(agencyId)) {
+                        return Mono.error(new IllegalStateException("No tienes permisos para editar esta agencia"));
+                    }
+                    return agencyRepository.update(agencyId, request);
+                });
+    }
+
+    public Mono<Void> delete(String requesterEmail, Long agencyId) {
+        return agencyRepository.findByUserEmail(requesterEmail)
+                .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
+                .flatMap(agency -> {
+                    if (!agency.getId().equals(agencyId)) {
+                        return Mono.error(new IllegalStateException("No tienes permisos para eliminar esta agencia"));
+                    }
+                    
+                    // Recuperar cada paquete turístico de la agencia y eliminarlo para asegurar 
+                    // que las tablas dependientes se mantengan íntegras.
+                    return tourPackageRepository.findByAgencyId(agencyId)
+                            .flatMap(pkg -> tourPackageRepository.delete(pkg.getId()))
+                            .then(agencyRepository.delete(agencyId));
+                });
+    }
+
     public Mono<AgencyDashboard> dashboard(String userEmail, LocalDate from, LocalDate to, int limit) {
         if (userEmail == null || userEmail.isBlank()) {
             return Mono.error(new IllegalArgumentException("email es obligatorio"));
