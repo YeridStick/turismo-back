@@ -137,13 +137,15 @@ public class PlaceRepositoryAdapter extends ReactiveAdapterOperations<Place, Pla
 
     @Override
     public Flux<Place> findByIds(Long[] ids, Integer limit, Integer offset) {
-        return Mono.just(ids)
-                .filter(array -> array.length > 0 )
-                .flatMapMany(array -> repository.findByIds(
+        // Proteger contra null o array vacío — evita NullPointerException en Mono.just()
+        if (ids == null || ids.length == 0) {
+            return Flux.empty();
+        }
+        return repository.findByIds(
                         ids,
                         limit != null ? limit : 10,
                         offset != null ? offset : 0
-                ))
+                )
                 .map(this::toEntity);
     }
 

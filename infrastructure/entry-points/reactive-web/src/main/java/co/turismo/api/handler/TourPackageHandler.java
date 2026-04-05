@@ -1,20 +1,22 @@
 package co.turismo.api.handler;
 
 import co.turismo.api.dto.response.ApiResponse;
+import co.turismo.api.error.RequestValidator;
 import co.turismo.model.place.Place;
 import co.turismo.model.tourpackage.CreateTourPackageRequest;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.usecase.agency.AgencyUseCase;
 import co.turismo.usecase.tourpackage.TourPackageUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
@@ -28,49 +30,23 @@ public class TourPackageHandler {
 
     private final TourPackageUseCase tourPackageUseCase;
     private final AgencyUseCase agencyUseCase;
+    private final RequestValidator requestValidator;
 
     public Mono<ServerResponse> create(ServerRequest req) {
         return req.principal()
                 .cast(Authentication.class)
                 .map(Authentication::getName)
-                .zipWith(req.bodyToMono(CreatePackageRequest.class))
-                .flatMap(tuple -> {
-                    String email = tuple.getT1();
-                    CreatePackageRequest body = tuple.getT2();
-
-                    var cmd = CreateTourPackageRequest.builder()
-                            .title(body.title())
-                            .city(body.city())
-                            .description(body.description())
-                            .days(body.days())
-                            .nights(body.nights())
-                            .people(body.people())
-                            .rating(body.rating())
-                            .reviews(body.reviews())
-                            .price(body.price())
-                            .originalPrice(body.originalPrice())
-                            .discount(body.discount())
-                            .tag(body.tag())
-                            .includes(body.includes() == null ? new String[0] : body.includes().toArray(String[]::new))
-                            .image(body.image())
-                            .placeIds(body.placeIds() == null ? new Long[0] : body.placeIds().toArray(Long[]::new))
-                            .build();
-
-                    return tourPackageUseCase.create(email, cmd);
-                })
+                .zipWith(req.bodyToMono(CreatePackageRequest.class)
+                        .flatMap(requestValidator::validate))
+                .flatMap(tuple -> tourPackageUseCase.create(tuple.getT1(), toCreateCommand(tuple.getT2())))
                 .flatMap(pkg -> ServerResponse.status(201)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.created(toResponse(pkg))));
     }
 
     public Mono<ServerResponse> list(ServerRequest req) {
-        int limit = req.queryParam("limit")
-                .map(Integer::parseInt)
-                .orElse(10);
-
-        int offset = req.queryParam("offset")
-                .map(Integer::parseInt)
-                .orElse(0);
+        int limit  = parseQueryParam(req, "limit",  10);
+        int offset = parseQueryParam(req, "offset", 0);
 
         return tourPackageUseCase.findAll(limit, offset)
                 .map(this::toResponse)
@@ -81,14 +57,10 @@ public class TourPackageHandler {
     }
 
     public Mono<ServerResponse> findById(ServerRequest req) {
-        long id = Long.parseLong(req.pathVariable("id"));
-        int limit = req.queryParam("limit")
-                .map(Integer::parseInt)
-                .orElse(10);
+        long id    = Long.parseLong(req.pathVariable("id"));
+        int limit  = parseQueryParam(req, "limit",  10);
+        int offset = parseQueryParam(req, "offset", 0);
 
-        int offset = req.queryParam("offset")
-                .map(Integer::parseInt)
-                .orElse(0);
         return tourPackageUseCase.findById(id, limit, offset)
                 .map(this::toResponse)
                 .flatMap(pkg -> ServerResponse.ok()
@@ -96,88 +68,106 @@ public class TourPackageHandler {
                         .bodyValue(ApiResponse.ok(pkg)));
     }
 
+    // ── UPDATE ────────────────────────────────────────────────────────────────
+
     public Mono<ServerResponse> update(ServerRequest req) {
         long packageId = Long.parseLong(req.pathVariable("id"));
+
         return req.principal()
                 .cast(Authentication.class)
-                .flatMap(auth -> req.bodyToMono(UpdatePackageBody.class)
-                        .flatMap(body -> {
-                            var cmd = co.turismo.model.tourpackage.UpdateTourPackageRequest.builder()
-                                    .title(body.title())
-                                    .city(body.city())
-                                    .description(body.description())
-                                    .days(body.days())
-                                    .nights(body.nights())
-                                    .people(body.people())
-                                    .rating(body.rating())
-                                    .reviews(body.reviews())
-                                    .price(body.price())
-                                    .originalPrice(body.originalPrice())
-                                    .discount(body.discount())
-                                    .tag(body.tag())
-                                    .includes(body.includes() == null ? null : body.includes().toArray(String[]::new))
-                                    .image(body.image())
-                                    .placeIds(body.placeIds() == null ? null : body.placeIds().toArray(Long[]::new))
-                                    .build();
+                .zipWith(req.bodyToMono(UpdatePackageBody.class)
+                        .flatMap(requestValidator::validate))
+                .flatMap(tuple -> {
+                    Authentication auth = tuple.getT1();
+                    var cmd = toUpdateCommand(tuple.getT2());
 
-                            boolean isAdmin = hasRole(auth, "ADMIN");
-                            if (isAdmin) {
-                                // ADMIN: actualiza directamente sin verificar agencia
-                                return tourPackageUseCase.update(packageId, cmd);
-                            }
-                            // AGENCY: verificar que el paquete le pertenece (via agencia)
-                            return tourPackageUseCase.findById(packageId, 0, 0)
-                                    .flatMap(pkg -> agencyUseCase.findByUserEmail(auth.getName())
-                                            .flatMap(agency -> {
-                                                if (!agency.getId().equals(pkg.getAgencyId())) {
-                                                    return Mono.error(new org.springframework.web.server.ResponseStatusException(
-                                                            org.springframework.http.HttpStatus.FORBIDDEN,
-                                                            "No tienes permisos para editar este paquete"));
-                                                }
-                                                return tourPackageUseCase.update(packageId, cmd);
-                                            }));
-                        }))
+                    if (hasRole(auth, "ADMIN")) {
+                        return tourPackageUseCase.update(packageId, cmd);
+                    }
+                    return verifyOwnership(auth.getName(), packageId)
+                            .then(tourPackageUseCase.update(packageId, cmd));
+                })
                 .flatMap(pkg -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(toResponse(pkg))));
     }
 
+    // ── DELETE ────────────────────────────────────────────────────────────────
+
     public Mono<ServerResponse> delete(ServerRequest req) {
         long packageId = Long.parseLong(req.pathVariable("id"));
+
         return req.principal()
                 .cast(Authentication.class)
                 .flatMap(auth -> {
-                    boolean isAdmin = hasRole(auth, "ADMIN");
-                    if (isAdmin) {
-                        // ADMIN: elimina directamente sin verificar agencia
+                    if (hasRole(auth, "ADMIN")) {
                         return tourPackageUseCase.delete(packageId);
                     }
-                    // AGENCY: verificar que el paquete le pertenece (via agencia)
-                    return tourPackageUseCase.findById(packageId, 0, 0)
-                            .flatMap(pkg -> agencyUseCase.findByUserEmail(auth.getName())
-                                    .flatMap(agency -> {
-                                        if (!agency.getId().equals(pkg.getAgencyId())) {
-                                            return Mono.error(new org.springframework.web.server.ResponseStatusException(
-                                                    org.springframework.http.HttpStatus.FORBIDDEN,
-                                                    "No tienes permisos para eliminar este paquete"));
-                                        }
-                                        return tourPackageUseCase.delete(packageId);
-                                    }));
+                    return verifyOwnership(auth.getName(), packageId)
+                            .then(tourPackageUseCase.delete(packageId));
                 })
                 .then(ServerResponse.noContent().build());
     }
 
-    private static boolean hasRole(Authentication auth, String role) {
-        String expected = "ROLE_" + role.toUpperCase();
-        return auth.getAuthorities().stream()
-                .anyMatch(a -> expected.equalsIgnoreCase(a.getAuthority()));
+    // ── PRIVADOS ──────────────────────────────────────────────────────────────
+
+    /** Verifica que el paquete pertenece a la agencia del usuario autenticado. */
+    private Mono<Void> verifyOwnership(String userEmail, long packageId) {
+        return Mono.zip(
+                tourPackageUseCase.findById(packageId, 0, 0),
+                agencyUseCase.findByUserEmail(userEmail)
+        ).flatMap(tuple -> {
+            TourPackage pkg    = tuple.getT1();
+            var         agency = tuple.getT2();
+            if (!agency.getId().equals(pkg.getAgencyId())) {
+                return Mono.error(new ResponseStatusException(
+                        HttpStatus.FORBIDDEN, "No tienes permisos para operar este paquete"));
+            }
+            return Mono.empty();
+        });
+    }
+
+    private static CreateTourPackageRequest toCreateCommand(CreatePackageRequest body) {
+        return CreateTourPackageRequest.builder()
+                .title(body.title())
+                .city(body.city())
+                .description(body.description())
+                .days(body.days())
+                .nights(body.nights())
+                .people(body.people())
+                .rating(body.rating())
+                .reviews(body.reviews())
+                .price(body.price())
+                .originalPrice(body.originalPrice())
+                .discount(body.discount())
+                .tag(body.tag())
+                .includes(body.includes() == null ? new String[0] : body.includes().toArray(String[]::new))
+                .image(body.image())
+                .placeIds(body.placeIds().toArray(Long[]::new))
+                .build();
+    }
+
+    private static co.turismo.model.tourpackage.UpdateTourPackageRequest toUpdateCommand(UpdatePackageBody body) {
+        return co.turismo.model.tourpackage.UpdateTourPackageRequest.builder()
+                .title(body.title())
+                .city(body.city())
+                .description(body.description())
+                .days(body.days())
+                .nights(body.nights())
+                .people(body.people())
+                .rating(body.rating())
+                .reviews(body.reviews())
+                .price(body.price())
+                .originalPrice(body.originalPrice())
+                .discount(body.discount())
+                .tag(body.tag())
+                .includes(body.includes() == null ? null : body.includes().toArray(String[]::new))
+                .image(body.image())
+                .placeIds(body.placeIds() == null ? null : body.placeIds().toArray(Long[]::new))
+                .build();
     }
 
     private TourPackageResponse toResponse(TourPackage pkg) {
-        List<String> includes = pkg.getIncludes() == null ? List.of() : Arrays.asList(pkg.getIncludes());
-        List<Long> placeIds = List.of(normalizePlaceIds(pkg.getPlaceIds()));
-        List<Place> places = pkg.getPlaces() == null ? List.of() : pkg.getPlaces();
-
         return new TourPackageResponse(
                 pkg.getId() == null ? null : String.valueOf(pkg.getId()),
                 pkg.getTitle(),
@@ -192,138 +182,123 @@ public class TourPackageHandler {
                 pkg.getOriginalPrice(),
                 pkg.getDiscount(),
                 pkg.getTag(),
-                includes,
+                pkg.getIncludes() == null ? List.of() : Arrays.asList(pkg.getIncludes()),
                 pkg.getImage(),
-                placeIds,
+                List.of(normalizePlaceIds(pkg.getPlaceIds())),
                 pkg.getAgencyId(),
                 pkg.getAgencyName(),
-                places
+                pkg.getPlaces() == null ? List.of() : pkg.getPlaces()
         );
     }
 
+    private static boolean hasRole(Authentication auth, String role) {
+        String expected = "ROLE_" + role.toUpperCase();
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> expected.equalsIgnoreCase(a.getAuthority()));
+    }
+
+    private static int parseQueryParam(ServerRequest req, String name, int defaultValue) {
+        return req.queryParam(name).map(Integer::parseInt).orElse(defaultValue);
+    }
+
     private static Long[] normalizePlaceIds(Long[] placeIds) {
-        if (placeIds == null || placeIds.length == 0) {
-            return new Long[0];
-        }
+        if (placeIds == null || placeIds.length == 0) return new Long[0];
         var set = new LinkedHashSet<Long>();
         for (Long id : placeIds) {
-            if (id != null && id > 0) {
-                set.add(id);
-            }
+            if (id != null && id > 0) set.add(id);
         }
         return set.stream().filter(Objects::nonNull).toArray(Long[]::new);
     }
 
-    @Schema(name = "TourPackageCreateRequest", description = "Cuerpo para crear un paquete turístico")
+    // ── DTOs ──────────────────────────────────────────────────────────────────
+
+    @Schema(name = "TourPackageCreateRequest")
     public record CreatePackageRequest(
-            @Schema(description = "Título visible del paquete", example = "Aventura Completa Huila")
-            @NotBlank String title,
-            @Schema(description = "Ciudad o zona principal", example = "Tatacoa / San Agustín")
-            String city,
-            @Schema(description = "Descripción corta para el carrusel")
-            @NotBlank String description,
-            @Schema(description = "Número de días", example = "5")
-            Integer days,
-            @Schema(description = "Número de noches", example = "4")
-            Integer nights,
-            @Schema(description = "Texto libre sobre capacidad", example = "Hasta 8 personas")
-            String people,
-            @Schema(description = "Rating promedio", example = "4.9")
-            Double rating,
-            @Schema(description = "Cantidad de reseñas", example = "342")
-            Long reviews,
-            @Schema(description = "Precio actual", example = "1890000")
-            @NotNull Long price,
-            @Schema(description = "Precio original antes de descuento", example = "2500000")
-            Long originalPrice,
-            @Schema(description = "Texto de descuento", example = "-24%")
-            String discount,
-            @Schema(description = "Etiqueta del paquete", example = "Destacado")
-            String tag,
-            @Schema(description = "Incluye (lista de strings)")
-            List<String> includes,
-            @Schema(description = "URL de imagen principal")
-            String image,
-            @Schema(description = "IDs de lugares asociados", example = "[101, 102]")
-            @NotNull List<Long> placeIds
-    ) {
-    }
-
-    @Schema(name = "UpdatePackageBody", description = "Cuerpo para actualizar un paquete turístico")
-    public record UpdatePackageBody(
-            @Schema(description = "Título visible del paquete", example = "Aventura Completa Huila")
+            @NotBlank(message = "title es obligatorio")
+            @Schema(example = "Aventura Completa Huila")
             String title,
-            @Schema(description = "Ciudad o zona principal", example = "Tatacoa / San Agustín")
+
+            @Schema(example = "Tatacoa / San Agustín")
             String city,
-            @Schema(description = "Descripción corta para el carrusel")
+
+            @NotBlank(message = "description es obligatorio")
             String description,
-            @Schema(description = "Número de días", example = "5")
+
+            @Positive(message = "days debe ser mayor a 0")
             Integer days,
-            @Schema(description = "Número de noches", example = "4")
+
+            @PositiveOrZero(message = "nights debe ser mayor o igual a 0")
             Integer nights,
-            @Schema(description = "Texto libre sobre capacidad", example = "Hasta 8 personas")
+
             String people,
-            @Schema(description = "Rating promedio", example = "4.9")
+
+            @DecimalMin(value = "0.0", message = "rating debe ser >= 0")
+            @DecimalMax(value = "5.0", message = "rating debe ser <= 5")
             Double rating,
-            @Schema(description = "Cantidad de reseñas", example = "342")
+
+            @PositiveOrZero(message = "reviews debe ser >= 0")
             Long reviews,
-            @Schema(description = "Precio actual", example = "1890000")
+
+            @NotNull(message = "price es obligatorio")
+            @Positive(message = "price debe ser mayor a 0")
             Long price,
-            @Schema(description = "Precio original antes de descuento", example = "2500000")
+
+            @Positive(message = "originalPrice debe ser mayor a 0")
             Long originalPrice,
-            @Schema(description = "Texto de descuento", example = "-24%")
+
             String discount,
-            @Schema(description = "Etiqueta del paquete", example = "Destacado")
             String tag,
-            @Schema(description = "Incluye (lista de strings)")
             List<String> includes,
-            @Schema(description = "URL de imagen principal")
             String image,
-            @Schema(description = "IDs de lugares asociados", example = "[101, 102]")
+
+            @NotNull(message = "placeIds es obligatorio")
+            @Size(min = 1, message = "Debe incluir al menos un lugar")
             List<Long> placeIds
-    ) {
-    }
+    ) {}
 
-    @Schema(name = "TourPackageResponse", description = "Respuesta pública de un paquete turístico")
-    public record TourPackageResponse(
-            @Schema(description = "Identificador del paquete", example = "1")
-            String id,
-            @Schema(description = "Título visible del paquete")
+    @Schema(name = "UpdatePackageBody")
+    public record UpdatePackageBody(
+            @Size(min = 1, message = "title no puede ser vacío si se envía")
             String title,
-            @Schema(description = "Ciudad o zona principal")
+
             String city,
-            @Schema(description = "Descripción corta del paquete")
+
+            @Size(min = 1, message = "description no puede ser vacía si se envía")
             String description,
-            @Schema(description = "Número de días")
+
+            @Positive(message = "days debe ser mayor a 0")
             Integer days,
-            @Schema(description = "Número de noches")
+
+            @PositiveOrZero(message = "nights debe ser mayor o igual a 0")
             Integer nights,
-            @Schema(description = "Texto de capacidad")
+
             String people,
-            @Schema(description = "Rating promedio")
+
+            @DecimalMin(value = "0.0") @DecimalMax(value = "5.0")
             Double rating,
-            @Schema(description = "Cantidad de reseñas")
-            Long reviews,
-            @Schema(description = "Precio actual")
+
+            @PositiveOrZero Long reviews,
+
+            @Positive(message = "price debe ser mayor a 0")
             Long price,
-            @Schema(description = "Precio original antes de descuento")
-            Long originalPrice,
-            @Schema(description = "Texto de descuento")
+
+            @Positive Long originalPrice,
+
             String discount,
-            @Schema(description = "Etiqueta del paquete")
             String tag,
-            @Schema(description = "Incluye (lista de strings)")
             List<String> includes,
-            @Schema(description = "URL de imagen principal")
             String image,
-            @Schema(description = "IDs de lugares asociados")
-            List<Long> placeIds,
-            @Schema(description = "ID de la agencia responsable")
-            Long agencyId,
-            @Schema(description = "Nombre de la agencia responsable")
-            String agencyName,
-            @Schema(description = "Listado de lugares asociados")
-            List<Place> places
-    ) {
-    }
+
+            @Size(min = 1, message = "placeIds no puede estar vacío si se envía")
+            List<Long> placeIds
+    ) {}
+
+    @Schema(name = "TourPackageResponse")
+    public record TourPackageResponse(
+            String id, String title, String city, String description,
+            Integer days, Integer nights, String people,
+            Double rating, Long reviews, Long price, Long originalPrice,
+            String discount, String tag, List<String> includes, String image,
+            List<Long> placeIds, Long agencyId, String agencyName, List<Place> places
+    ) {}
 }
