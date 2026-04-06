@@ -82,6 +82,19 @@ public interface AgencyAdapterRepository extends ReactiveCrudRepository<AgencyDa
     Mono<Void> addUserToAgency(@Param("agencyId") Long agencyId, @Param("userId") Long userId);
 
     @Query("""
+        UPDATE agency_users
+           SET user_id = :newUserId
+         WHERE agency_id = :agencyId AND user_id = :oldUserId
+    """)
+    Mono<Void> updateAgencyUser(@Param("agencyId") Long agencyId, @Param("oldUserId") Long oldUserId, @Param("newUserId") Long newUserId);
+
+    @Query("""
+        DELETE FROM agency_users
+         WHERE agency_id = :agencyId AND user_id = :userId
+    """)
+    Mono<Void> deleteUserFromAgency(@Param("agencyId") Long agencyId, @Param("userId") Long userId);
+
+    @Query("""
         SELECT id,
                name,
                description,

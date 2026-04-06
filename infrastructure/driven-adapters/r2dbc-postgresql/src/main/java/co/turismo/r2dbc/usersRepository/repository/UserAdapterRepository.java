@@ -17,6 +17,14 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     Mono<UserData> findByEmail(@Param("email") String email);
 
     @Query("""
+        SELECT u.*
+          FROM users u
+          JOIN agency_users au ON au.user_id = u.id
+         WHERE au.agency_id = :agencyId
+    """)
+    Flux<UserData> findByAgencyId(@Param("agencyId") Long agencyId);
+
+    @Query("""
         SELECT r.role_name
           FROM users u
           JOIN user_roles ur ON ur.user_id = u.id
@@ -44,7 +52,6 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
             @Param("identificationNumber") String identificationNumber
     );
 
-    // Para confirmar cambio de correo tras OTP verificado (opcional)
     @Query("""
         UPDATE users
            SET email = :newEmail
@@ -55,7 +62,6 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     """)
     Mono<UserData> updateEmailById(@Param("userId") Long userId, @Param("newEmail") String newEmail);
 
-    // ======= (tus métodos OTP existentes) =======
     @Query("""
         UPDATE users
            SET otp_attempts = otp_attempts + 1,
@@ -87,7 +93,6 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     """)
     Mono<Void> resetLockIfExpired(@Param("email") String email);
 
-    // ======= Email verification =======
     @Query("""
         SELECT COALESCE(email_verified, FALSE)
           FROM users
@@ -117,7 +122,6 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     """)
     Mono<Long> verifyEmailByToken(@Param("tokenHash") String tokenHash);
 
-    // ======= Recovery codes =======
     @Query("""
         UPDATE users
            SET recovery_code_hash = :codeHash,
@@ -134,8 +138,8 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
                recovery_expires_at AS recoveryExpiresAt,
                recovery_attempts AS recoveryAttempts,
                recovery_max_attempts AS recoveryMaxAttempts
-          FROM users
-         WHERE lower(trim(email))=lower(trim(:email))
+           FROM users
+          WHERE lower(trim(email))=lower(trim(:email))
     """)
     Mono<RecoveryStatusRow> getRecoveryStatus(@Param("email") String email);
 
@@ -167,7 +171,6 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     """)
     Mono<Void> clearRecoveryCode(@Param("email") String email);
 
-    // ======= Password =======
     @Query("""
         SELECT password_hash
           FROM users

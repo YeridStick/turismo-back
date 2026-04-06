@@ -24,7 +24,7 @@ import co.turismo.api.handler.PlacesHandler.UpdateRequest;
 import co.turismo.api.handler.PlacesHandler.VerifyRequest;
 import co.turismo.model.feedback.Feedback;
 import co.turismo.model.place.Place;
-import co.turismo.model.place.strategy.PlaceSearchCriteria;
+
 import co.turismo.model.place.strategy.PlaceSearchMode;
 import co.turismo.model.reviews.Review;
 import co.turismo.model.user.UpdateUserProfileRequest;
@@ -445,6 +445,39 @@ public class RouterRest {
                                 .parameter(pathParam("id", "Identificador interno de la agencia", Long.class))
                                 .response(jsonResponse("200", "Listado de paquetes", ApiTourPackageListResponse.class))
                                 .response(apiErrorResponse("404", "Agencia no encontrada"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_USERS_LIST_PATH,
+                        agencyHandler::usersByAgency,
+                        ops -> ops.operationId("agencyUsersList")
+                                .summary("Usuarios vinculados a una agencia")
+                                .description("Devuelve la lista de correos de los usuarios vinculados. Endpoint público.")
+                                .tag("Agencies")
+                                .parameter(pathParam("id", "ID de la agencia", Long.class))
+                                .response(jsonResponse("200", "Listado de correos", String[].class))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_USERS_MANAGE_PATH,
+                        agencyHandler::updateAgencyUser,
+                        ops -> ops.operationId("agencyUserUpdate")
+                                .summary("Corregir usuario vinculado")
+                                .description("Permite cambiar el usuario vinculado por uno nuevo mediante su correo. Solo Dueño/Admin.")
+                                .tag("Agencies")
+                                .parameter(pathParam("id", "ID de la agencia", Long.class))
+                                .parameter(pathParam("userId", "ID del usuario actual", Long.class))
+                                .requestBody(jsonBody(AgencyHandler.UpdateAgencyUserEmailBody.class, true))
+                                .response(jsonResponse("200", "Usuario actualizado", String.class))
+                )
+
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_USERS_MANAGE_PATH,
+                        agencyHandler::removeAgencyUser,
+                        ops -> ops.operationId("agencyUserRemove")
+                                .summary("Desvincular usuario")
+                                .description("Elimina la vinculación del usuario con la agencia. Solo Dueño/Admin.")
+                                .tag("Agencies")
+                                .parameter(pathParam("id", "ID de la agencia", Long.class))
+                                .parameter(pathParam("userId", "ID del usuario a desvincular", Long.class))
+                                .response(jsonResponse("204", "Usuario desvinculado", Void.class))
                 )
 
                 // =========================

@@ -50,6 +50,16 @@ public class AgencyRepositoryAdapter extends ReactiveAdapterOperations<Agency, A
     }
 
     @Override
+    public Mono<Void> updateAgencyUser(Long agencyId, Long oldUserId, Long newUserId) {
+        return repository.updateAgencyUser(agencyId, oldUserId, newUserId);
+    }
+
+    @Override
+    public Mono<Void> removeUserFromAgency(Long agencyId, Long userId) {
+        return repository.deleteUserFromAgency(agencyId, userId);
+    }
+
+    @Override
     public Flux<Agency> findAll() {
         return repository.findAllProjected()
                 .map(this::toEntity);

@@ -67,6 +67,10 @@ public class UserUseCase {
                 .map(t -> new UserInfo(t.getT1(), t.getT2()));
     }
  
+    public Flux<User> findUsersByAgencyId(Long agencyId) {
+        return userRepository.findByAgencyId(agencyId);
+    }
+
     public Flux<User> getAllUsers() {
         return userRepository.findAllUser()
                 .switchIfEmpty(Flux.error(new Exception("No se encontraron usuarios")));

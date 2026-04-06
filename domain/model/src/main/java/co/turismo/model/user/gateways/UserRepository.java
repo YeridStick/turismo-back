@@ -13,6 +13,7 @@ public interface UserRepository {
     Mono<Boolean> isActiveByEmail(String email);
     Flux<String> findRoleNameByEmail(String email);
     Mono<User> save(User user);
+    Flux<User> findByAgencyId(Long agencyId);
 
     // existentes
     Mono<Void> registerOtpFail(String email);

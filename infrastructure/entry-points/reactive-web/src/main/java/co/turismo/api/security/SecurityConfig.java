@@ -181,6 +181,7 @@ public class SecurityConfig {
                         // ---- Público: agencias ----
                         .pathMatchers(HttpMethod.GET, "/api/agencies").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/agencies/{id}/packages").permitAll() // paquetes por agencia (público)
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/{id}/users").permitAll()    // lista de usuarios (público)
 
                         // ---- Público: categorías ----
                         .pathMatchers(HttpMethod.GET, "/api/categories").permitAll()

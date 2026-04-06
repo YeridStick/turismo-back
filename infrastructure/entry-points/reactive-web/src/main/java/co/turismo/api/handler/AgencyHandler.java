@@ -12,6 +12,7 @@ import co.turismo.model.tourpackage.TourPackageSalesSummary;
 import co.turismo.model.user.User;
 import co.turismo.usecase.agency.AgencyUseCase;
 import co.turismo.usecase.tourpackage.TourPackageUseCase;
+import co.turismo.usecase.user.UserUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class AgencyHandler {
 
     private final AgencyUseCase agencyUseCase;
     private final TourPackageUseCase tourPackageUseCase;
+    private final UserUseCase userUseCase;
 
     public Mono<ServerResponse> create(ServerRequest req) {
         return req.principal()
@@ -119,6 +121,46 @@ public class AgencyHandler {
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(list)));
+    }
+
+    /**
+     * Servicio público: Lista los correos de los usuarios vinculados a una agencia.
+     */
+    public Mono<ServerResponse> usersByAgency(ServerRequest req) {
+        Long agencyId = Long.parseLong(req.pathVariable("id"));
+        return userUseCase.findUsersByAgencyId(agencyId)
+                .map(User::getEmail) // El usuario pidió que solo aparezca el correo
+                .collectList()
+                .flatMap(emails -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(emails)));
+    }
+
+    /**
+     * Corrige la vinculación de un usuario cambiando su correo.
+     */
+    public Mono<ServerResponse> updateAgencyUser(ServerRequest req) {
+        Long agencyId = Long.parseLong(req.pathVariable("id"));
+        Long userId = Long.parseLong(req.pathVariable("userId"));
+        return req.principal()
+                .cast(Authentication.class)
+                .flatMap(auth -> req.bodyToMono(UpdateAgencyUserEmailBody.class)
+                        .flatMap(body -> agencyUseCase.updateAgencyUser(auth.getName(), agencyId, userId, body.email())))
+                .then(ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok("Usuario actualizado en la agencia")));
+    }
+
+    /**
+     * Elimina la vinculación de un usuario con una agencia.
+     */
+    public Mono<ServerResponse> removeAgencyUser(ServerRequest req) {
+        Long agencyId = Long.parseLong(req.pathVariable("id"));
+        Long userId = Long.parseLong(req.pathVariable("userId"));
+        return req.principal()
+                .cast(Authentication.class)
+                .flatMap(auth -> agencyUseCase.removeUserFromAgency(auth.getName(), agencyId, userId))
+                .then(ServerResponse.noContent().build());
     }
 
     public Mono<ServerResponse> dashboard(ServerRequest req) {
@@ -332,6 +374,13 @@ public class AgencyHandler {
     @Schema(name = "AddAgencyUserRequest", description = "Asociar usuario a la agencia del solicitante")
     public record AddAgencyUserBody(
             @Schema(description = "Email del usuario a asociar", example = "nuevo@correo.com")
+            @NotBlank String email
+    ) {
+    }
+
+    @Schema(name = "UpdateAgencyUserEmailRequest", description = "Corregir el correo de un usuario vinculado")
+    public record UpdateAgencyUserEmailBody(
+            @Schema(description = "Nuevo email", example = "corregido@correo.com")
             @NotBlank String email
     ) {
     }

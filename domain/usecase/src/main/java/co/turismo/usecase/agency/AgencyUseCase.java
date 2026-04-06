@@ -142,8 +142,35 @@ public class AgencyUseCase {
                                 .agency(agency)
                                 .packages(tuple.getT1())
                                 .topPackages(tuple.getT2())
-                                .salesSummary(tuple.getT3())
-                                .topPlaces(tuple.getT4())
-                                .build()));
+                                 .salesSummary(tuple.getT3())
+                                 .topPlaces(tuple.getT4())
+                                 .build()));
+    }
+
+    public Mono<Void> updateAgencyUser(String requesterEmail, Long agencyId, Long oldUserId, String newEmail) {
+        return checkAgencyOwnership(requesterEmail, agencyId)
+                .then(userRepository.findByEmail(newEmail)
+                        .switchIfEmpty(Mono.error(new NotFoundException("El nuevo usuario no existe: " + newEmail))))
+                .flatMap(newUser -> agencyRepository.updateAgencyUser(agencyId, oldUserId, newUser.getId()));
+    }
+
+    public Mono<Void> removeUserFromAgency(String requesterEmail, Long agencyId, Long userId) {
+        return checkAgencyOwnership(requesterEmail, agencyId)
+                .then(agencyRepository.removeUserFromAgency(agencyId, userId));
+    }
+
+    private Mono<Agency> checkAgencyOwnership(String requesterEmail, Long agencyId) {
+        return agencyRepository.findById(agencyId)
+                .switchIfEmpty(Mono.error(new NotFoundException("Agencia no encontrada")))
+                .flatMap(agency -> agencyRepository.findAllByUserEmail(requesterEmail)
+                        .filter(a -> a.getId().equals(agencyId))
+                        .collectList()
+                        .flatMap(list -> {
+                            if (list.isEmpty()) {
+                                return Mono.error(new IllegalStateException("No tienes permisos para esta agencia"));
+                            }
+                            return Mono.just(agency);
+                        })
+                );
     }
 }

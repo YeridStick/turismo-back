@@ -16,5 +16,7 @@ public interface AgencyRepository {
     Mono<Agency> update(Long id, UpdateAgencyRequest request);
     Mono<Void> delete(Long id);
     Mono<Void> addUserToAgency(Long agencyId, Long userId);
+    Mono<Void> updateAgencyUser(Long agencyId, Long oldUserId, Long newUserId);
+    Mono<Void> removeUserFromAgency(Long agencyId, Long userId);
     Flux<Agency> findAll();
 }

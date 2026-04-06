@@ -49,6 +49,8 @@ public class ConstantsEntryPoint {
     public static final String AGENCIES_MY_PATH = "/agencies/my";          // Agencias del usuario autenticado
     public static final String AGENCIES_DASHBOARD_PATH = "/agencies/dashboard";
     public static final String AGENCIES_PACKAGES_PATH = "/agencies/{id}/packages"; // Paquetes de una agencia
+    public static final String AGENCIES_USERS_LIST_PATH = "/agencies/{id}/users";    // Listado de correos (Público)
+    public static final String AGENCIES_USERS_MANAGE_PATH = "/agencies/{id}/users/{userId}"; // Editar/Eliminar (Protegido)
 
     // gecode
     public static final String GETCOORDINATES = "/tools/geocode";

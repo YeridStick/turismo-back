@@ -80,9 +80,13 @@ public class UserRepositoryAdapter
 
     @Override
     public Mono<User> save(User user) {
-        return Mono.just(user)
-                .map(this::toData)
-                .flatMap(repository::save)
+        return repository.save(toData(user))
+                .map(this::toEntity);
+    }
+
+    @Override
+    public Flux<User> findByAgencyId(Long agencyId) {
+        return repository.findByAgencyId(agencyId)
                 .map(this::toEntity);
     }
 
