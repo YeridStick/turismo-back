@@ -248,6 +248,21 @@ CREATE TABLE IF NOT EXISTS place_visits (
     meta JSONB 
 );
 
+
+
+CREATE TABLE IF NOT EXISTS audit_log (
+     id             BIGSERIAL PRIMARY KEY,
+     tabla          TEXT NOT NULL,
+     registro_id    BIGINT NOT NULL,
+     usuario_email  TEXT,
+     roles          TEXT[],
+     fecha          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+     datos          JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_fecha  ON audit_log (fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_tabla  ON audit_log (tabla, fecha DESC);
+
 -- Asegurar columnas si ya existe la tabla
 DO $$ 
 BEGIN 
