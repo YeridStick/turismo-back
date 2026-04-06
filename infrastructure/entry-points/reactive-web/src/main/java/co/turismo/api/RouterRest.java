@@ -454,7 +454,7 @@ public class RouterRest {
                                 .description("Devuelve la lista de correos de los usuarios vinculados. Endpoint público.")
                                 .tag("Agencies")
                                 .parameter(pathParam("id", "ID de la agencia", Long.class))
-                                .response(jsonResponse("200", "Listado de correos", String[].class))
+                                .response(jsonResponse("200", "Listado de usuarios vinculados", AgencyHandler.AgencyUserResponse[].class))
                 )
 
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_USERS_MANAGE_PATH,

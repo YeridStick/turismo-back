@@ -9,7 +9,7 @@ import co.turismo.model.place.Place;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.model.tourpackage.TopPackage;
 import co.turismo.model.tourpackage.TourPackageSalesSummary;
-import co.turismo.model.user.User;
+
 import co.turismo.usecase.agency.AgencyUseCase;
 import co.turismo.usecase.tourpackage.TourPackageUseCase;
 import co.turismo.usecase.user.UserUseCase;
@@ -129,11 +129,11 @@ public class AgencyHandler {
     public Mono<ServerResponse> usersByAgency(ServerRequest req) {
         Long agencyId = Long.parseLong(req.pathVariable("id"));
         return userUseCase.findUsersByAgencyId(agencyId)
-                .map(User::getEmail) // El usuario pidió que solo aparezca el correo
+                .map(user -> new AgencyUserResponse(user.getId(), user.getEmail()))
                 .collectList()
-                .flatMap(emails -> ServerResponse.ok()
+                .flatMap(users -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(emails)));
+                        .bodyValue(ApiResponse.ok(users)));
     }
 
     /**
@@ -382,6 +382,15 @@ public class AgencyHandler {
     public record UpdateAgencyUserEmailBody(
             @Schema(description = "Nuevo email", example = "corregido@correo.com")
             @NotBlank String email
+    ) {
+    }
+
+    @Schema(name = "AgencyUserResponse", description = "Información básica de un usuario vinculado")
+    public record AgencyUserResponse(
+            @Schema(description = "ID del usuario", example = "5")
+            Long id,
+            @Schema(description = "Email del usuario", example = "usuario@correo.com")
+            String email
     ) {
     }
 
