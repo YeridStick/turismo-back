@@ -5,6 +5,7 @@ import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.query.ReactiveQueryByExampleExecutor;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface AgencyAdapterRepository extends ReactiveCrudRepository<AgencyData, Long>,
@@ -23,9 +24,19 @@ public interface AgencyAdapterRepository extends ReactiveCrudRepository<AgencyDa
         JOIN agency_users au ON au.agency_id = a.id
         JOIN users u ON u.id = au.user_id
         WHERE lower(u.email) = lower(:email)
-        LIMIT 1
     """)
-    Mono<AgencyData> findByUserEmail(@Param("email") String email);
+    Flux<AgencyData> findByUserEmail(@Param("email") String email);
+
+    @Query("""
+        SELECT a.*
+        FROM agencies a
+        WHERE a.email = lower(:email)
+        limit 1
+    """)
+    Mono<AgencyData> findByEmail(@Param("email") String email);
+
+
+
 
     @Query("""
         SELECT a.id,

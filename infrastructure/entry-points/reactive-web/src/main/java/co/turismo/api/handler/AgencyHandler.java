@@ -5,6 +5,7 @@ import co.turismo.api.dto.visit.TopPlaceDTO;
 import co.turismo.model.agency.Agency;
 import co.turismo.model.agency.AgencyDashboard;
 import co.turismo.model.agency.CreateAgencyRequest;
+import co.turismo.model.agency.UpdateAgencyRequest;
 import co.turismo.model.place.Place;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.model.tourpackage.TopPackage;
@@ -64,14 +65,11 @@ public class AgencyHandler {
     }
 
     public Mono<ServerResponse> addUser(ServerRequest req) {
-        return req.principal()
-                .cast(Authentication.class)
-                .map(Authentication::getName)
-                .zipWith(req.bodyToMono(AddAgencyUserBody.class))
-                .flatMap(tuple -> agencyUseCase.addUserToMyAgency(tuple.getT1(), tuple.getT2().email()))
-                .flatMap(agency -> ServerResponse.ok()
+        return req.bodyToMono(AddAgencyUserBody.class)
+                .flatMap(body -> agencyUseCase.addUserToMyAgency(body.emailAgencia, body.email))
+                .flatMap(egency -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(agency)));
+                        .bodyValue(ApiResponse.created(egency)));
     }
 
     public Mono<ServerResponse> list(ServerRequest req) {
@@ -83,16 +81,12 @@ public class AgencyHandler {
     }
 
     public Mono<ServerResponse> findByUser(ServerRequest req) {
-        return req.principal()
-                .cast(Authentication.class)
-                .flatMap(auth -> {
-                    String email = req.queryParam("email").orElse(auth.getName());
-                    return ensureAllowedEmail(auth, email)
-                            .then(agencyUseCase.findByUserEmail(email))
-                            .flatMap(agency -> ServerResponse.ok()
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .bodyValue(ApiResponse.ok(agency)));
-                });
+        String email = req.queryParam("email").orElse("");
+        return agencyUseCase.findByUserEmail(email)
+                .collectList()
+                .flatMap(agencies -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(agencies)));
     }
 
     /**
@@ -173,8 +167,9 @@ public class AgencyHandler {
                     int limit = parseLimit(req.queryParam("limit").orElse(null), 10);
 
                     return ensureAllowedEmail(auth, email)
-                            .then(agencyUseCase.dashboard(email, from, to, limit))
+                            .thenMany(agencyUseCase.dashboard(email, from, to, limit))
                             .map(this::toDashboardResponse)
+                            .collectList()
                             .flatMap(resp -> ServerResponse.ok()
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .bodyValue(ApiResponse.ok(resp)));
@@ -183,35 +178,35 @@ public class AgencyHandler {
 
     public Mono<ServerResponse> update(ServerRequest req) {
         Long agencyId = Long.parseLong(req.pathVariable("id"));
+
+        Mono<UpdateAgencyRequest> cmd = req.bodyToMono(UpdateAgencyBody.class)
+                .map(body -> UpdateAgencyRequest.builder()
+                        .name(body.name())
+                        .description(body.description())
+                        .phone(body.phone())
+                        .email(body.email())
+                        .website(body.website())
+                        .logoUrl(body.logoUrl())
+                        .build());
+
         return req.principal()
                 .cast(Authentication.class)
-                .flatMap(auth -> req.bodyToMono(UpdateAgencyBody.class)
-                        .flatMap(body -> {
-                            var cmd = co.turismo.model.agency.UpdateAgencyRequest.builder()
-                                    .name(body.name())
-                                    .description(body.description())
-                                    .phone(body.phone())
-                                    .email(body.email())
-                                    .website(body.website())
-                                    .logoUrl(body.logoUrl())
-                                    .build();
+                .zipWith(cmd)
+                .flatMap(tuple -> {
+                    Authentication auth = tuple.getT1();
+                    UpdateAgencyRequest body = tuple.getT2();
 
-                            boolean isAdmin = hasRole(auth, "ADMIN");
-                            if (isAdmin) {
-                                // ADMIN: acceso directo, sin verificar propiedad
-                                return agencyUseCase.update(agencyId, cmd);
-                            }
-                            // AGENCY: verificar que la agencia le pertenece al usuario
-                            return agencyUseCase.findByUserEmail(auth.getName())
-                                    .flatMap(agency -> {
-                                        if (!agency.getId().equals(agencyId)) {
-                                            return Mono.error(new org.springframework.web.server.ResponseStatusException(
-                                                    org.springframework.http.HttpStatus.FORBIDDEN,
-                                                    "No tienes permisos para editar esta agencia"));
-                                        }
-                                        return agencyUseCase.update(agencyId, cmd);
-                                    });
-                        }))
+                    if (hasRole(auth, "ADMIN")) {
+                        return agencyUseCase.update(agencyId, body);
+                    }
+
+                    return agencyUseCase.findByUserEmail(auth.getName())
+                            .filter(agency -> agency.getId().equals(agencyId))
+                            .next()
+                            .switchIfEmpty(Mono.error(new ResponseStatusException(
+                                    HttpStatus.FORBIDDEN, "No tienes permisos para editar esta agencia")))
+                            .flatMap(ignored -> agencyUseCase.update(agencyId, body));
+                })
                 .flatMap(agency -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(agency)));
@@ -223,23 +218,19 @@ public class AgencyHandler {
         return req.principal()
                 .cast(Authentication.class)
                 .flatMap(auth -> {
-                    String email = auth.getName();          // el sub del JWT
+                    String email = auth.getName();
                     String[] roles = extraerRoles(auth);
-                    boolean isAdmin = hasRole(auth, "ADMIN");
 
-                    if (isAdmin) {
+                    if (hasRole(auth, "ADMIN")) {
                         return agencyUseCase.delete(agencyId, email, roles);
                     }
 
                     return agencyUseCase.findByUserEmail(email)
-                            .flatMap(agency -> {
-                                if (!agency.getId().equals(agencyId)) {
-                                    return Mono.error(new ResponseStatusException(
-                                            HttpStatus.FORBIDDEN,
-                                            "No tienes permisos para eliminar esta agencia"));
-                                }
-                                return agencyUseCase.delete(agencyId, email, roles);
-                            });
+                            .filter(agency -> agency.getId().equals(agencyId))
+                            .next()
+                            .switchIfEmpty(Mono.error(new ResponseStatusException(
+                                    HttpStatus.FORBIDDEN, "No tienes permisos para eliminar esta agencia")))
+                            .flatMap(ignored -> agencyUseCase.delete(agencyId, email, roles));
                 })
                 .then(ServerResponse.noContent().build());
     }
@@ -373,6 +364,8 @@ public class AgencyHandler {
 
     @Schema(name = "AddAgencyUserRequest", description = "Asociar usuario a la agencia del solicitante")
     public record AddAgencyUserBody(
+            @Schema(description = "Email de la agencia", example = "nuevo@correo.com")
+            @NotBlank String emailAgencia,
             @Schema(description = "Email del usuario a asociar", example = "nuevo@correo.com")
             @NotBlank String email
     ) {

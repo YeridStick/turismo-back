@@ -8,7 +8,8 @@ import reactor.core.publisher.Flux;
 
 public interface AgencyRepository {
     /** Retorna la primera agencia vinculada al email (tabla agency_users). */
-    Mono<Agency> findByUserEmail(String email);
+    Flux<Agency> findByUserEmail(String email);
+    Mono<Agency> findByEmail(String email);
     /** Retorna TODAS las agencias vinculadas al email (tabla agency_users). */
     Flux<Agency> findAllByUserEmail(String email);
     Mono<Agency> findById(Long id);

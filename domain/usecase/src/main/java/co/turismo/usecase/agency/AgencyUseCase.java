@@ -27,16 +27,9 @@ public class AgencyUseCase {
     private final AuditLogRepository auditLogRepository;
 
     public Mono<Agency> create(String creatorEmail, CreateAgencyRequest request) {
-        if (request == null) {
-            return Mono.error(new IllegalArgumentException("Body requerido"));
-        }
-        if (request.getName() == null || request.getName().isBlank()) {
-            return Mono.error(new IllegalArgumentException("name es obligatorio"));
-        }
-
         return userRepository.findByEmail(creatorEmail)
                 .switchIfEmpty(Mono.error(new IllegalStateException("Usuario no encontrado")))
-                .flatMap(user -> agencyRepository.findByUserEmail(creatorEmail)
+                .flatMap(user -> agencyRepository.findByEmail(creatorEmail)
                         .flatMap(ignored -> Mono.error(new IllegalStateException("El usuario ya tiene una agencia registrada")))
                         .then(agencyRepository.create(request)
                                 .flatMap(agency -> agencyRepository.addUserToAgency(agency.getId(), user.getId())
@@ -44,11 +37,8 @@ public class AgencyUseCase {
     }
 
     public Mono<Agency> addUserToMyAgency(String requesterEmail, String userEmail) {
-        if (userEmail == null || userEmail.isBlank()) {
-            return Mono.error(new IllegalStateException("email es obligatorio"));
-        }
-        return agencyRepository.findByUserEmail(requesterEmail)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
+        return agencyRepository.findByEmail(requesterEmail)
+                .switchIfEmpty(Mono.error(new IllegalStateException("Email de la Agencia no encontrada")))
                 .zipWith(userRepository.findByEmail(userEmail)
                         .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado"))))
                 .flatMap(tuple -> agencyRepository.addUserToAgency(tuple.getT1().getId(), tuple.getT2().getId())
@@ -59,12 +49,14 @@ public class AgencyUseCase {
         return agencyRepository.findAll();
     }
 
-    public Mono<Agency> findByUserEmail(String email) {
-        if (email == null || email.isBlank()) {
-            return Mono.error(new IllegalArgumentException("email es obligatorio"));
-        }
+    public Flux<Agency> findByUserEmail(String email) {
         return agencyRepository.findByUserEmail(email)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")));
+                .switchIfEmpty(Flux.error(new IllegalStateException("Agencia no encontrada para el usuario")));
+    }
+
+    public Mono<Agency> findByEmail(String email) {
+        return agencyRepository.findByEmail(email)
+                .switchIfEmpty(Mono.error(new NotFoundException("Agencia no encontrada para el usuario")));
     }
 
     /**
@@ -115,19 +107,9 @@ public class AgencyUseCase {
                 );
     }
 
-    public Mono<AgencyDashboard> dashboard(String userEmail, LocalDate from, LocalDate to, int limit) {
-        if (userEmail == null || userEmail.isBlank()) {
-            return Mono.error(new IllegalArgumentException("email es obligatorio"));
-        }
-        if (from == null || to == null) {
-            return Mono.error(new IllegalArgumentException("from y to son obligatorios"));
-        }
-        if (limit <= 0) {
-            return Mono.error(new IllegalArgumentException("limit debe ser mayor a 0"));
-        }
-
+    public Flux<AgencyDashboard> dashboard(String userEmail, LocalDate from, LocalDate to, int limit) {
         return agencyRepository.findByUserEmail(userEmail)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
+                .switchIfEmpty(Flux.error(new IllegalStateException("Agencia no encontrada para el usuario")))
                 .flatMap(agency -> Mono.zip(
                                 tourPackageRepository.findByAgencyId(agency.getId()).collectList(),
                                 tourPackageRepository.topSoldByAgency(agency.getId(), from, to, limit).collectList(),
@@ -142,9 +124,9 @@ public class AgencyUseCase {
                                 .agency(agency)
                                 .packages(tuple.getT1())
                                 .topPackages(tuple.getT2())
-                                 .salesSummary(tuple.getT3())
-                                 .topPlaces(tuple.getT4())
-                                 .build()));
+                                .salesSummary(tuple.getT3())
+                                .topPlaces(tuple.getT4())
+                                .build()));
     }
 
     public Mono<Void> updateAgencyUser(String requesterEmail, Long agencyId, Long oldUserId, String newEmail) {

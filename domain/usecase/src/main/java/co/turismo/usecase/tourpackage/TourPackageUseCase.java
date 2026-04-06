@@ -32,8 +32,8 @@ public class TourPackageUseCase {
     public Mono<TourPackage> create(String userEmail, CreateTourPackageRequest request) {
         Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
 
-        return agencyRepository.findByUserEmail(userEmail)
-                .switchIfEmpty(Mono.error(new NotFoundException("Agencia no encontrada para el usuario")))
+        return agencyRepository.findByEmail(userEmail)
+                .switchIfEmpty(Mono.error(new NotFoundException("Agencia no encontrada para el email")))
                 .flatMap(agency ->
                         validatePlacesExist(placeIds)
                                 .then(tourPackageRepository.create(

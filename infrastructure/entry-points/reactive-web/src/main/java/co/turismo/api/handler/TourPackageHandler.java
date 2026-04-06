@@ -119,7 +119,7 @@ public class TourPackageHandler {
     private Mono<Void> verifyOwnership(String userEmail, long packageId) {
         return Mono.zip(
                 tourPackageUseCase.findById(packageId, 0, 0),
-                agencyUseCase.findByUserEmail(userEmail)
+                agencyUseCase.findByEmail(userEmail)
         ).flatMap(tuple -> {
             TourPackage pkg    = tuple.getT1();
             var         agency = tuple.getT2();

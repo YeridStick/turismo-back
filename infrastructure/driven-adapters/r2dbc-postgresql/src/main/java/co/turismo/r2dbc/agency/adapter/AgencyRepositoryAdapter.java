@@ -20,8 +20,14 @@ public class AgencyRepositoryAdapter extends ReactiveAdapterOperations<Agency, A
     }
 
     @Override
-    public Mono<Agency> findByUserEmail(String email) {
+    public Flux<Agency> findByUserEmail(String email) {
         return repository.findByUserEmail(email)
+                .map(this::toEntity);
+    }
+
+    @Override
+    public Mono<Agency> findByEmail(String email) {
+        return repository.findByEmail(email)
                 .map(this::toEntity);
     }
 
