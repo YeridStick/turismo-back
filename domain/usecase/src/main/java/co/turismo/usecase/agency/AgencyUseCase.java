@@ -6,6 +6,7 @@ import co.turismo.model.agency.CreateAgencyRequest;
 import co.turismo.model.agency.gateways.AgencyRepository;
 import co.turismo.model.auditLog.AuditLog;
 import co.turismo.model.auditLog.gateways.AuditLogRepository;
+import co.turismo.model.error.NotFoundException;
 import co.turismo.model.tourpackage.TourPackageSalesSummary;
 import co.turismo.model.tourpackage.gateways.TourPackageRepository;
 import co.turismo.model.user.gateways.UserRepository;
@@ -44,12 +45,12 @@ public class AgencyUseCase {
 
     public Mono<Agency> addUserToMyAgency(String requesterEmail, String userEmail) {
         if (userEmail == null || userEmail.isBlank()) {
-            return Mono.error(new IllegalArgumentException("email es obligatorio"));
+            return Mono.error(new IllegalStateException("email es obligatorio"));
         }
         return agencyRepository.findByUserEmail(requesterEmail)
                 .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")))
                 .zipWith(userRepository.findByEmail(userEmail)
-                        .switchIfEmpty(Mono.error(new IllegalStateException("Usuario no encontrado"))))
+                        .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado"))))
                 .flatMap(tuple -> agencyRepository.addUserToAgency(tuple.getT1().getId(), tuple.getT2().getId())
                         .thenReturn(tuple.getT1()));
     }
@@ -64,6 +65,14 @@ public class AgencyUseCase {
         }
         return agencyRepository.findByUserEmail(email)
                 .switchIfEmpty(Mono.error(new IllegalStateException("Agencia no encontrada para el usuario")));
+    }
+
+    /**
+     * Devuelve TODAS las agencias a las que pertenece el usuario autenticado.
+     * El email se extrae del JWT en el Handler — el UseCase solo opera datos.
+     */
+    public Flux<Agency> findAllByUserEmail(String email) {
+        return agencyRepository.findAllByUserEmail(email);
     }
 
     /**

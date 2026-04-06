@@ -11,6 +11,7 @@ import co.turismo.model.tourpackage.TopPackage;
 import co.turismo.model.tourpackage.TourPackageSalesSummary;
 import co.turismo.model.user.User;
 import co.turismo.usecase.agency.AgencyUseCase;
+import co.turismo.usecase.tourpackage.TourPackageUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import java.util.List;
 public class AgencyHandler {
 
     private final AgencyUseCase agencyUseCase;
+    private final TourPackageUseCase tourPackageUseCase;
 
     public Mono<ServerResponse> create(ServerRequest req) {
         return req.principal()
@@ -89,6 +91,34 @@ public class AgencyHandler {
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .bodyValue(ApiResponse.ok(agency)));
                 });
+    }
+
+    /**
+     * Servicio 2: Devuelve TODAS las agencias a las que pertenece el usuario autenticado.
+     * Extrae el email del JWT — no requiere ningún rol específico, sólo token válido.
+     */
+    public Mono<ServerResponse> myAgencies(ServerRequest req) {
+        return req.principal()
+                .cast(Authentication.class)
+                .map(Authentication::getName)
+                .flatMapMany(email -> agencyUseCase.findAllByUserEmail(email))
+                .collectList()
+                .flatMap(list -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(list)));
+    }
+
+    /**
+     * Servicio 1: Devuelve todos los paquetes turísticos de una agencia específica.
+     * Es un endpoint público (no requiere token).
+     */
+    public Mono<ServerResponse> packagesByAgency(ServerRequest req) {
+        Long agencyId = Long.parseLong(req.pathVariable("id"));
+        return tourPackageUseCase.findByAgencyId(agencyId)
+                .collectList()
+                .flatMap(list -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(list)));
     }
 
     public Mono<ServerResponse> dashboard(ServerRequest req) {

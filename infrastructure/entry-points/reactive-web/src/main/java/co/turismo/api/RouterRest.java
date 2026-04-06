@@ -426,6 +426,27 @@ public class RouterRest {
                                 .response(jsonResponse("204", "Eliminado", null))
                 )
 
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_MY_PATH,
+                        agencyHandler::myAgencies,
+                        ops -> ops.operationId("agencyMyList")
+                                .summary("Mis agencias (usuario autenticado)")
+                                .description("Devuelve todas las agencias vinculadas al usuario autenticado, extraido del JWT. No requiere rol específico.")
+                                .tag("Agencies")
+                                .response(jsonResponse("200", "Listado de agencias del usuario", ApiAgencyResponse.class))
+                                .response(apiErrorResponse("401", "Token inválido o ausente"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_PACKAGES_PATH,
+                        agencyHandler::packagesByAgency,
+                        ops -> ops.operationId("agencyPackages")
+                                .summary("Paquetes turísticos de una agencia")
+                                .description("Devuelve todos los paquetes turísticos de una agencia en específico. Endpoint público.")
+                                .tag("Agencies")
+                                .parameter(pathParam("id", "Identificador interno de la agencia", Long.class))
+                                .response(jsonResponse("200", "Listado de paquetes", ApiTourPackageListResponse.class))
+                                .response(apiErrorResponse("404", "Agencia no encontrada"))
+                )
+
                 // =========================
                 // Tour Packages
                 // =========================

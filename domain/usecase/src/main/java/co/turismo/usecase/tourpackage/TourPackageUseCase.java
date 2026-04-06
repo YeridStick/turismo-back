@@ -51,6 +51,14 @@ public class TourPackageUseCase {
                 .concatMap(this::attachPlaces);
     }
 
+    /**
+     * Lista todos los paquetes turísticos de una agencia específica, incluyendo sus lugares.
+     */
+    public Flux<TourPackage> findByAgencyId(Long agencyId) {
+        return tourPackageRepository.findByAgencyId(agencyId)
+                .concatMap(this::attachPlaces);
+    }
+
     public Mono<TourPackage> findById(long id, Integer limit, Integer offset) {
         return tourPackageRepository.findById(id)
                 .switchIfEmpty(Mono.error(new NotFoundException("Paquete no encontrado")))

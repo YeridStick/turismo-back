@@ -28,6 +28,23 @@ public interface AgencyAdapterRepository extends ReactiveCrudRepository<AgencyDa
     Mono<AgencyData> findByUserEmail(@Param("email") String email);
 
     @Query("""
+        SELECT a.id,
+               a.name,
+               a.description,
+               a.phone,
+               a.email,
+               a.website,
+               a.logo_url,
+               a.created_at
+        FROM agencies a
+        JOIN agency_users au ON au.agency_id = a.id
+        JOIN users u ON u.id = au.user_id
+        WHERE lower(u.email) = lower(:email)
+        ORDER BY a.created_at DESC
+    """)
+    reactor.core.publisher.Flux<AgencyData> findAllByUserEmail(@Param("email") String email);
+
+    @Query("""
         INSERT INTO agencies (
             name,
             description,

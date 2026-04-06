@@ -26,6 +26,12 @@ public class AgencyRepositoryAdapter extends ReactiveAdapterOperations<Agency, A
     }
 
     @Override
+    public Flux<Agency> findAllByUserEmail(String email) {
+        return repository.findAllByUserEmail(email)
+                .map(this::toEntity);
+    }
+
+    @Override
     public Mono<Agency> create(CreateAgencyRequest request) {
         return repository.insertAgency(
                         request.getName(),

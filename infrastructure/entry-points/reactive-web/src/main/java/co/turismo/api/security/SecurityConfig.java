@@ -5,8 +5,6 @@ import co.turismo.api.security.jwt.JwtReactiveAuthenticationManager;
 import co.turismo.api.security.jwt.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -48,7 +46,6 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Parse de los orígenes permitidos desde el YAML (separados por comas)
         List<String> origins = new ArrayList<>();
         if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
             String[] originArray = allowedOrigins.split(",");
@@ -56,7 +53,6 @@ public class SecurityConfig {
                 origins.add(origin.trim());
             }
         } else {
-            // Fallback si no está configurado
             origins = Arrays.asList(
                     "http://localhost:3000",
                     "http://localhost:8080",
@@ -65,13 +61,9 @@ public class SecurityConfig {
         }
 
         configuration.setAllowedOrigins(origins);
-
-        // Métodos HTTP permitidos
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
         ));
-
-        // Headers permitidos
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -80,23 +72,16 @@ public class SecurityConfig {
                 "X-CSRF-Token",
                 "Cache-Control"
         ));
-
-        // Headers que puede exponer el navegador
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
                 "X-Total-Count"
         ));
-
-        // Permitir credenciales (cookies, auth headers)
         configuration.setAllowCredentials(true);
-
-        // Máximo tiempo de cache de la preflight request (en segundos)
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
-
         return source;
     }
 
@@ -144,7 +129,6 @@ public class SecurityConfig {
         var tokenProvider = new JwtTokenProvider(jwtSecret);
         var authManager   = new JwtReactiveAuthenticationManager(tokenProvider);
 
-        // Convertidor que solo intenta autenticar si hay un Bearer token presente
         var bearerConverter = new ServerBearerTokenAuthenticationConverter();
         bearerConverter.setAllowUriQueryParameter(false);
 
@@ -152,9 +136,7 @@ public class SecurityConfig {
         jwtFilter.setServerAuthenticationConverter(bearerConverter);
         jwtFilter.setSecurityContextRepository(NoOpServerSecurityContextRepository.getInstance());
 
-        // IMPORTANTE: Configurar el filtro para que NO requiera autenticación en caso de fallo
         jwtFilter.setRequiresAuthenticationMatcher(exchange -> {
-            // Solo intentar autenticar si hay un header Authorization
             String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 return ServerWebExchangeMatcher.MatchResult.match();
@@ -174,7 +156,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(jsonAccessDeniedHandler)
                 )
                 .authorizeExchange(ex -> ex
-                        // ---- Público: documentación (IMPORTANTE: antes que todo) ----
+                        // ---- Público: documentación ----
                         .pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                         .pathMatchers("/scalar", "/docs").permitAll()
 
@@ -182,11 +164,11 @@ public class SecurityConfig {
                         .pathMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .pathMatchers("/favicon.ico", "/").permitAll()
 
-                        // ---- Público: endpoints de autenticación ----
+                        // ---- Público: autenticación ----
                         .pathMatchers("/api/auth/**").permitAll()
                         .pathMatchers("/admin/auth/**").permitAll()
 
-                        // ---- Público: endpoints de places ----
+                        // ---- Público: places ----
                         .pathMatchers(HttpMethod.GET, "/api/places/nearby").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/places/all").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/places/search").permitAll()
@@ -195,7 +177,10 @@ public class SecurityConfig {
                         // ---- Público: paquetes turísticos ----
                         .pathMatchers(HttpMethod.GET, "/api/packages").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/packages/{id}").permitAll()
+
+                        // ---- Público: agencias ----
                         .pathMatchers(HttpMethod.GET, "/api/agencies").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/{id}/packages").permitAll() // paquetes por agencia (público)
 
                         // ---- Público: categorías ----
                         .pathMatchers(HttpMethod.GET, "/api/categories").permitAll()
@@ -216,10 +201,10 @@ public class SecurityConfig {
                         .pathMatchers("/admin/**").hasRole("ADMIN")
 
                         // ---- Protegido: Categories ----
-                        .pathMatchers(HttpMethod.POST, "/api/categories").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.POST,  "/api/categories").hasRole("ADMIN")
                         .pathMatchers(HttpMethod.PATCH, "/api/categories/*").hasRole("ADMIN")
 
-                        // ---- Protegido: Packages / Agency ----
+                        // ---- Protegido: Packages (AGENCY o ADMIN) ----
                         .pathMatchers(HttpMethod.POST,   "/api/packages").hasAnyRole("AGENCY", "ADMIN")
                         .pathMatchers(HttpMethod.PATCH,  "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
                         .pathMatchers(HttpMethod.DELETE, "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
@@ -231,6 +216,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET,    "/api/agencies/dashboard").hasAnyRole("ADMIN", "AGENCY")
                         .pathMatchers(HttpMethod.PATCH,  "/api/agencies/*").hasAnyRole("ADMIN", "AGENCY")
                         .pathMatchers(HttpMethod.DELETE, "/api/agencies/*").hasAnyRole("ADMIN", "AGENCY")
+                        // /api/agencies/my — cualquier usuario autenticado (sin importar rol)
+                        .pathMatchers(HttpMethod.GET,    "/api/agencies/my").authenticated()
 
                         // ---- Resto autenticado ----
                         .anyExchange().authenticated()
