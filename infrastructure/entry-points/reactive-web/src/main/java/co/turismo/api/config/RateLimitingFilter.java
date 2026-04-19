@@ -1,9 +1,7 @@
 package co.turismo.api.config;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.ConsumptionProbe;
+import co.turismo.api.http.ClientIp;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
@@ -18,164 +16,124 @@ import reactor.core.publisher.Mono;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
-import co.turismo.api.http.ClientIp;
-
+@Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RateLimitingFilter implements WebFilter {
 
     private final RateLimiterProperties props;
-    private final Cache<String, Bucket> cache;
+    private final RateLimitStore rateLimitStore;
     private final AntPathMatcher matcher = new AntPathMatcher();
 
-    public RateLimitingFilter(RateLimiterProperties props) {
+    public RateLimitingFilter(RateLimiterProperties props, RateLimitStore rateLimitStore) {
         this.props = props;
-        this.cache = Caffeine.newBuilder()
-                .maximumSize(100_000)
-                .expireAfterAccess(30, TimeUnit.MINUTES)
-                .build();
+        this.rateLimitStore = rateLimitStore;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        // Si rate limiting está deshabilitado, continuar
         if (!props.isEnabled()) {
             return chain.filter(exchange);
         }
 
-        // Permitir OPTIONS y HEAD sin rate limiting
         HttpMethod method = exchange.getRequest().getMethod();
         if (method == HttpMethod.OPTIONS || method == HttpMethod.HEAD) {
             return chain.filter(exchange);
         }
 
-        // Verificar si la ruta debe ser omitida
-        final String path = exchange.getRequest().getPath().value();
+        String path = exchange.getRequest().getPath().value();
         if (mustSkip(path)) {
             return chain.filter(exchange);
         }
 
-        // Aplicar rate limiting
-        final String clientIp = ClientIp.resolve(exchange.getRequest());
-        final PathConfig cfg = resolvePathConfig(path);
-        final String key = cfg.keyPrefix + clientIp;
+        String clientIp = ClientIp.resolve(exchange.getRequest());
+        PathConfig config = resolvePathConfig(path);
+        String key = config.keyPrefix() + ":" + clientIp;
 
-        Bucket bucket = cache.get(key, k -> newBucket(cfg));
-        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-
-        if (probe.isConsumed()) {
-            // Request permitido, agregar headers informativos
-            var headers = exchange.getResponse().getHeaders();
-            headers.add("X-Rate-Limit-Limit", String.valueOf(cfg.capacity));
-            headers.add("X-Rate-Limit-Remaining", String.valueOf(probe.getRemainingTokens()));
-            long resetSec = Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).getSeconds());
-            headers.add("X-Rate-Limit-Reset", String.valueOf(resetSec));
-            return chain.filter(exchange);
-        } else {
-            // Rate limit excedido
-            long secondsToWait = Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).getSeconds());
-            var resp = exchange.getResponse();
-            resp.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
-            resp.getHeaders().set("Retry-After", String.valueOf(secondsToWait));
-            resp.getHeaders().set("X-Rate-Limit-Limit", String.valueOf(cfg.capacity));
-            resp.getHeaders().set("X-Rate-Limit-Remaining", "0");
-            resp.getHeaders().set("X-Rate-Limit-Reset", String.valueOf(secondsToWait));
-            resp.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-
-            String body = """
-                {"status":429,"message":"Demasiadas solicitudes. Intenta de nuevo en %d s.","data":null}
-                """.formatted(secondsToWait);
-            var buffer = resp.bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
-            return resp.writeWith(Mono.just(buffer));
-        }
+        return rateLimitStore.consume(key, config)
+                .flatMap(decision -> {
+                    if (decision.allowed()) {
+                        addRateHeaders(exchange, decision);
+                        return chain.filter(exchange);
+                    }
+                    return respondTooManyRequests(exchange, decision);
+                })
+                .onErrorResume(error -> {
+                    log.warn("Rate limiter backend error. Request allowed by fallback. path={}, ip={}", path, clientIp, error);
+                    return chain.filter(exchange);
+                });
     }
 
-    /**
-     * Verifica si la ruta debe ser omitida del rate limiting
-     */
+    private void addRateHeaders(ServerWebExchange exchange, RateLimitDecision decision) {
+        var headers = exchange.getResponse().getHeaders();
+        headers.add("X-Rate-Limit-Limit", String.valueOf(decision.limit()));
+        headers.add("X-Rate-Limit-Remaining", String.valueOf(decision.remaining()));
+        headers.add("X-Rate-Limit-Reset", String.valueOf(decision.resetSeconds()));
+    }
+
+    private Mono<Void> respondTooManyRequests(ServerWebExchange exchange, RateLimitDecision decision) {
+        var response = exchange.getResponse();
+        response.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
+        response.getHeaders().set("Retry-After", String.valueOf(decision.resetSeconds()));
+        response.getHeaders().set("X-Rate-Limit-Limit", String.valueOf(decision.limit()));
+        response.getHeaders().set("X-Rate-Limit-Remaining", "0");
+        response.getHeaders().set("X-Rate-Limit-Reset", String.valueOf(decision.resetSeconds()));
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+
+        String body = """
+                {"status":429,"message":"Demasiadas solicitudes. Intenta de nuevo en %d s.","data":null}
+                """.formatted(decision.resetSeconds());
+        var buffer = response.bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
+        return response.writeWith(Mono.just(buffer));
+    }
+
     private boolean mustSkip(String path) {
         if (props.getSkipPaths() == null || props.getSkipPaths().isEmpty()) {
             return false;
         }
-
-        for (String skipPattern : props.getSkipPaths()) {
-            if (matcher.match(skipPattern, path)) {
+        for (String pattern : props.getSkipPaths()) {
+            if (matcher.match(pattern, path)) {
                 return true;
             }
         }
-
         return false;
     }
 
-    /**
-     * Configuración de rate limit por path
-     */
-    private static class PathConfig {
-        final long capacity;
-        final Duration window;
-        final long refill;
-        final String keyPrefix;
-        final String path;
-
-        PathConfig(long capacity, long windowSeconds, long refill, String keyPrefix, String path) {
-            this.capacity = capacity;
-            this.window = Duration.ofSeconds(windowSeconds);
-            this.refill = refill > 0 ? refill : capacity;
-            this.keyPrefix = keyPrefix;
-            this.path = path;
-        }
-    }
-
-    /**
-     * Resuelve la configuración de rate limit específica para un path
-     */
     private PathConfig resolvePathConfig(String path) {
         Map<String, RateLimiterProperties.PathLimit> map = props.getPerPath();
-
         if (map != null && !map.isEmpty()) {
-            // Buscar configuración específica por path
             for (var entry : map.entrySet()) {
                 String pathPrefix = entry.getKey();
                 if (path.startsWith(pathPrefix)) {
-                    var pathLimit = entry.getValue();
-                    long refill = pathLimit.refillPerWindow > 0
-                            ? pathLimit.refillPerWindow
-                            : pathLimit.capacity;
-
+                    var limit = entry.getValue();
+                    long refill = limit.refillPerWindow > 0 ? limit.refillPerWindow : limit.capacity;
                     return new PathConfig(
-                            pathLimit.capacity,
-                            pathLimit.windowSeconds,
+                            limit.capacity,
+                            Duration.ofSeconds(limit.windowSeconds),
                             refill,
-                            "rl:" + pathPrefix + ":",
+                            "rl:" + pathPrefix,
                             pathPrefix
                     );
                 }
             }
         }
 
-        // Configuración por defecto
-        long refill = props.getRefillPerWindow() > 0
-                ? props.getRefillPerWindow()
-                : props.getCapacity();
-
+        long refill = props.getRefillPerWindow() > 0 ? props.getRefillPerWindow() : props.getCapacity();
         return new PathConfig(
                 props.getCapacity(),
-                props.getWindowSeconds(),
+                Duration.ofSeconds(props.getWindowSeconds()),
                 refill,
-                "rl:default:",
+                "rl:default",
                 "default"
         );
     }
 
-    /**
-     * Crea un nuevo bucket con la configuración especificada
-     */
-    private Bucket newBucket(PathConfig cfg) {
-        return Bucket.builder()
-                .addLimit(limit -> limit
-                        .capacity(cfg.capacity)
-                        .refillGreedy(cfg.refill, cfg.window))
-                .build();
+    public record PathConfig(
+            long capacity,
+            Duration window,
+            long refill,
+            String keyPrefix,
+            String path
+    ) {
     }
 }

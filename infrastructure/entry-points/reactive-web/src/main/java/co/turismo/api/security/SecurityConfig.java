@@ -3,12 +3,16 @@ package co.turismo.api.security;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.security.jwt.JwtReactiveAuthenticationManager;
 import co.turismo.api.security.jwt.JwtTokenProvider;
+import co.turismo.model.authenticationsession.gateways.AuthenticationSessionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.server.resource.web.server.authentication.ServerBearerTokenAuthenticationConverter;
@@ -91,12 +95,15 @@ public class SecurityConfig {
             var resp = exchange.getResponse();
             resp.setRawStatusCode(401);
             resp.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-            var body = ApiResponse.error(401, "No autenticado");
+            String message = resolveAuthMessage(ex);
+            var body = ApiResponse.error(401, message);
             byte[] bytes;
             try {
                 bytes = mapper.writeValueAsBytes(body);
             } catch (Exception e) {
-                bytes = "{\"status\":401,\"message\":\"No autenticado\",\"data\":null}".getBytes();
+                bytes = """
+                        {"status":401,"message":"%s","data":null}
+                        """.formatted(message).getBytes();
             }
             return resp.writeWith(Mono.just(resp.bufferFactory().wrap(bytes)));
         };
@@ -124,10 +131,11 @@ public class SecurityConfig {
             ServerHttpSecurity http,
             ServerAuthenticationEntryPoint jsonAuthEntryPoint,
             ServerAccessDeniedHandler jsonAccessDeniedHandler,
-            CorsConfigurationSource corsConfigurationSource
+            CorsConfigurationSource corsConfigurationSource,
+            AuthenticationSessionRepository authenticationSessionRepository
     ) {
         var tokenProvider = new JwtTokenProvider(jwtSecret);
-        var authManager   = new JwtReactiveAuthenticationManager(tokenProvider);
+        var authManager   = new JwtReactiveAuthenticationManager(tokenProvider, authenticationSessionRepository);
 
         var bearerConverter = new ServerBearerTokenAuthenticationConverter();
         bearerConverter.setAllowUriQueryParameter(false);
@@ -225,5 +233,43 @@ public class SecurityConfig {
                 )
                 .addFilterAt(jwtFilter, AUTHENTICATION)
                 .build();
+    }
+
+    private String resolveAuthMessage(Throwable ex) {
+        if (containsCause(ex, ExpiredJwtException.class)) {
+            return "Token expirado";
+        }
+        if (containsCause(ex, JwtException.class)) {
+            return "Token invalido";
+        }
+
+        String message = ex == null ? null : ex.getMessage();
+        if (message != null && !message.isBlank()) {
+            String normalized = message.toLowerCase();
+            if (normalized.contains("expirado")) {
+                return "Token expirado";
+            }
+            if (normalized.contains("invalido") || normalized.contains("inválido")) {
+                return "Token invalido";
+            }
+            if (normalized.contains("revocado") || normalized.contains("sesion invalida") || normalized.contains("sesión inválida")) {
+                return "Token revocado o sesion invalida";
+            }
+            if (ex instanceof AuthenticationException) {
+                return message;
+            }
+        }
+        return "No autenticado";
+    }
+
+    private boolean containsCause(Throwable ex, Class<? extends Throwable> type) {
+        Throwable current = ex;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

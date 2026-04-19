@@ -230,6 +230,28 @@ public class AuthenticateHandler {
                             .bodyValue(new SimpleMessageResponse(msg));
                 });
     }
+
+    public Mono<ServerResponse> logout(ServerRequest request) {
+        String bearer = request.headers().firstHeader("Authorization");
+        String tokenFromHeader = extractBearer(bearer);
+
+        Mono<String> tokenMono = tokenFromHeader != null
+                ? Mono.just(tokenFromHeader)
+                : request.bodyToMono(RefreshTokenRequest.class)
+                .map(RefreshTokenRequest::token)
+                .onErrorResume(e -> Mono.empty());
+
+        return tokenMono
+                .filter(token -> token != null && !token.isBlank())
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Token requerido (Authorization Bearer o body)")))
+                .flatMap(authenticateUseCase::logoutSession)
+                .then(ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Sesion cerrada correctamente"))))
+                .onErrorResume(IllegalArgumentException.class, e -> ServerResponse.badRequest()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(new SimpleMessageResponse(e.getMessage())));
+    }
  
     private static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase();

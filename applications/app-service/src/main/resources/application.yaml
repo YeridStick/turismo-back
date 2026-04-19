@@ -8,15 +8,24 @@ spring:
     log-startup-info: false
   application:
     name: "${APP_NAME:turismo}"
+  data:
+    redis:
+      host: "${REDIS_HOST:}"
+      port: "${REDIS_PORT:6379}"
+      password: "${REDIS_PASSWORD:}"
+      database: "${REDIS_DB:0}"
+      timeout: "${REDIS_TIMEOUT:3s}"
+      ssl:
+        enabled: ${REDIS_SSL:}
 
   r2dbc:
     postgresql:
-      host: "${DB_HOST:aws-0-us-west-2.pooler.supabase.com}"
-      port: "${DB_PORT:5432}"
-      database: "${DB_NAME:postgres}"
-      schema: "${DB_SCHEMA:public}"
-      username: "${DB_USER:postgres.egfossuqhgxgpnxovdpt}"
-      password: "${DB_PASSWORD:turismo-db@2006.}"
+      host: "${DB_HOST}"
+      port: "${DB_PORT}"
+      database: "${DB_NAME}"
+      schema: "${DB_SCHEMA}"
+      username: "${DB_USER}"
+      password: "${DB_PASSWORD}"
     pool:
       initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
       max-size: "${CONN_POOL_MAX_SIZE:15}"
@@ -52,17 +61,22 @@ cors:
 
 security:
   jwt:
-    secret: "${JWT_SECRET:cambia-esto-por-una-clave-de-32+caracteres-para-HS256}"
+    secret: "${JWT_SECRET}"
   session:
+    bind-ip: ${SEC_BIND_IP:false}
     refresh-grace-minutes: ${SEC_REFRESH_GRACE_MINUTES:15}
+    redis:
+      key-prefix: "${SEC_REDIS_KEY_PREFIX}"
 
 turismo:
   rate-limiter:
     enabled: ${RATE_LIMIT_ENABLED:true}
-    backend: ${RATE_LIMIT_BACKEND:local}
+    backend: ${RATE_LIMIT_BACKEND:redis}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
     capacity: ${RATE_LIMIT_CAPACITY:600}
     refill-per-window: ${RATE_LIMIT_REFILL:600}
+    redis:
+      key-prefix: "${RATE_LIMIT_REDIS_KEY_PREFIX}"
     per-path:
       "/api/auth":
         capacity: ${RATE_LIMIT_AUTH_CAPACITY:30}
@@ -83,7 +97,7 @@ turismo:
       - /docs
 
 locationiq:
-  key: "${LOCATIONIQ_KEY:pk.568c37ab0f335201297f305792b7fe13}"
+  key: "${LOCATIONIQ_KEY}"
   base-url: https://us1.locationiq.com/v1
   timeout-ms: 5000
 
@@ -103,8 +117,8 @@ logging:
 
 brevo:
   base-url: "${BREVO_BASE_URL:https://api.brevo.com/v3}"
-  api-key: "${BREVO_API_KEY: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}"
-  mcp-api-key: "${BREVO_MCP_API_KEY:eyJhcGlfa2V5IjoieGtleXNpYi0wMzI0ZmRkMDljYmNlMTkxNTkzZDI3MWEyYzk1Yzc4ZmZkNjYzN2YyMGE4NTA1YTUzODFkMTliMWMxNTRhZjkzLXhhM1c0VW9IM0JBRmxRdTgifQ==}"
+  api-key: "${BREVO_API_KEY}"
+  mcp-api-key: "${BREVO_MCP_API_KEY}"
   sender:
-    email: "${BREVO_SENDER_EMAIL:yeridstick3000@gmail.com}"
-    name: "${BREVO_SENDER_NAME:Turismo_App_Dev}"
+    email: "${BREVO_SENDER_EMAIL}"
+    name: "${BREVO_SENDER_NAME}"

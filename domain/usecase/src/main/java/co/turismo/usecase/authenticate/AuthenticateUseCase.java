@@ -161,6 +161,10 @@ public class AuthenticateUseCase {
     public Mono<String> refreshSession(String oldToken, String ip) {
         return authenticationRepository.refreshToken(oldToken, ip);
     }
+
+    public Mono<Void> logoutSession(String token) {
+        return authenticationRepository.revokeToken(token);
+    }
  
     // -------------------- VALIDACIÓN DE SESIÓN --------------------
     public Mono<Boolean> validateSession(String token, String ip) {

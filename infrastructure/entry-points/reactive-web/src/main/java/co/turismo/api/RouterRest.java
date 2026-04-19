@@ -175,6 +175,18 @@ public class RouterRest {
                                 .response(messageResponse("401", "No autorizado o fuera de la ventana de gracia"))
                 )
 
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AUTH_LOGOUT_PATH,
+                        authenticateHandler::logout,
+                        ops -> ops.operationId("authLogout")
+                                .summary("Cerrar sesion")
+                                .description("Revoca el token actual para invalidarlo en todas las instancias.")
+                                .tag("Auth")
+                                .parameter(headerParam("Authorization", false, "Bearer token a revocar", "Bearer eyJhbGciOiJIUzI1NiJ9..."))
+                                .requestBody(jsonBody(RefreshTokenRequest.class, false))
+                                .response(jsonResponse("200", "Sesion cerrada", ApiMessageResponse.class))
+                                .response(messageResponse("400", "Token requerido"))
+                )
+
                 // =========================
                 // Users (protegido)
                 // =========================

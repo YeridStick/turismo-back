@@ -12,9 +12,11 @@ import java.util.Map;
 @Setter
 public class RateLimiterProperties {
     private boolean enabled = true;
+    private String backend = "local";
     private long windowSeconds = 60;
     private long capacity = 50;
     private long refillPerWindow = 50;
+    private Redis redis = new Redis();
 
     // límites por prefijo de ruta (ej: "/api/auth")
     private Map<String, PathLimit> perPath;
@@ -25,5 +27,11 @@ public class RateLimiterProperties {
         public long capacity = 60;
         public long windowSeconds = 60;
         public long refillPerWindow = capacity; // por defecto, full refill
+    }
+
+    @Getter
+    @Setter
+    public static class Redis {
+        private String keyPrefix = "turismo:rl";
     }
 }
