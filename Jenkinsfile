@@ -14,6 +14,9 @@ pipeline {
 
     environment {
         GRADLE_ARGS = '--no-daemon --stacktrace'
+        // Variables de configuración de AWS (No secretas)
+        AWS_REGION    = 'us-east-1'
+        ECR_REPO_NAME = 'turismo-back'
     }
 
     stages {
@@ -60,6 +63,40 @@ pipeline {
                 archiveArtifacts artifacts: 'applications/app-service/build/libs/*.jar', fingerprint: true
             }
         }
+
+        stage('Diagnostico') {
+            steps {
+                sh 'docker --version'
+                sh 'aws --version'
+                sh 'aws sts get-caller-identity' // Confirma que AWS Auth funciona
+            }
+        }
+
+        // --- NUEVO STAGE PARA DOCKER Y ECR ---
+        stage('Docker Build & Push') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCOUNT_ID', variable: 'ACCOUNT_ID'),
+                    // Solo si Jenkins NO corre en EC2 con IAM Role:
+                    // string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    // string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    script {
+                        def ecrUrl = "${ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+                        def fullImage = "${ecrUrl}/${env.ECR_REPO_NAME}:latest"
+
+                        echo "Autenticando en ECR..."
+                        sh "aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
+
+                        echo "Construyendo imagen Docker..."
+                        sh "docker build -t ${fullImage} -f deployment/Dockerfile ."
+
+                        echo "Subiendo imagen a ECR..."
+                        sh "docker push ${fullImage}"
+                    }
+                }
+            }
+        }
     }
 
     post {
@@ -67,11 +104,10 @@ pipeline {
             deleteDir()
         }
         success {
-            echo 'Pipeline finalizado correctamente.'
+            echo 'Pipeline finalizado y desplegado en ECR correctamente.'
         }
         failure {
-            echo 'Pipeline fallo. Revisa el stage y logs.'
+            echo 'Pipeline falló. Revisa el stage y logs.'
         }
     }
 }
-

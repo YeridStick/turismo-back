@@ -46,19 +46,6 @@ public class UserUseCase {
                 .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado: " + email)));
     }
  
-    /** Para cuando YA hayas verificado OTP en tu flujo de autenticación. */
-    public Mono<User> confirmEmailChange(Long userId, String newEmail) {
-        return userRepository.updateEmailById(userId, newEmail)
-                .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado con id: " + userId)))
-                .onErrorMap(DuplicateKeyException.class, e ->
-                        new ConflictException("Ya existe un usuario con ese email: " + newEmail));
-    }
- 
-    public Mono<User> getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado: " + email)));
-    }
- 
     public Mono<UserInfo> getUserInfo(String email) {
         Mono<User> userMono = userRepository.findByEmail(email)
                 .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado: " + email)));

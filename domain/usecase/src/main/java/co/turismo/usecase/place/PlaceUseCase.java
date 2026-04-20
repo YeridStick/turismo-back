@@ -56,10 +56,6 @@ public class PlaceUseCase {
         return placeRepository.setActive(placeId, active);
     }
 
-    public Mono<Place> deleteById(long id) {
-        return placeRepository.deletePalce(id);
-    }
-
     public Mono<Place> deleteByOwnerOrAdmin(String email, long placeId) {
         return userIdentityPort.getUserIdForEmail(email)
             .switchIfEmpty(Mono.error(new NotFoundException("Usuario no encontrado")))
