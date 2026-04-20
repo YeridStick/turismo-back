@@ -4,11 +4,12 @@ pipeline {
     options {
         timestamps()
         disableConcurrentBuilds()
+        skipDefaultCheckout(true)
     }
 
     parameters {
         booleanParam(name: 'RUN_TESTS', defaultValue: false, description: 'Ejecutar pruebas unitarias')
-        string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Rama a construir')
+        string(name: 'GIT_BRANCH', defaultValue: 'master', description: 'Rama a construir')
     }
 
     environment {
