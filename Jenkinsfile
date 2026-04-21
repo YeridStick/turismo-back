@@ -15,8 +15,8 @@ pipeline {
     environment {
         GRADLE_ARGS   = '--no-daemon --stacktrace'
         CONTAINER_NAME  = 'api-turismo'
-    
-        AWS_REGION credentials('AWS_REGION')
+
+        AWS_REGION = credentials('AWS_REGION')
         EC2_INSTANCE_ID = credentials('EC2_INSTANCE_ID')
         ECR_REPO_NAME = credentials('ECR_REPO_NAME')
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
