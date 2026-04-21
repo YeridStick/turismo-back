@@ -13,10 +13,12 @@ pipeline {
     }
 
     environment {
-        GRADLE_ARGS = '--no-daemon --stacktrace'
-        // Variables de configuración de AWS (No secretas)
-        AWS_REGION    = 'us-east-1'
-        ECR_REPO_NAME = 'turismo/backend'
+        GRADLE_ARGS   = '--no-daemon --stacktrace'
+        CONTAINER_NAME  = 'api-turismo'
+    
+        AWS_REGION credentials('AWS_REGION')
+        EC2_INSTANCE_ID = credentials('EC2_INSTANCE_ID')
+        ECR_REPO_NAME = credentials('ECR_REPO_NAME')
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
         AWS_ACCOUNT_ID        = credentials('AWS_ACCOUNT_ID')
@@ -35,14 +37,8 @@ pipeline {
 
         stage('Build Jar') {
             steps {
-                script {
-                    if (isUnix()) {
-                        sh 'chmod +x gradlew'
-                        sh "./gradlew ${env.GRADLE_ARGS} :app-service:bootJar -x test -x validateStructure"
-                    } else {
-                        bat ".\\gradlew.bat ${env.GRADLE_ARGS} :app-service:bootJar -x test -x validateStructure"
-                    }
-                }
+                sh 'chmod +x gradlew'
+                sh "./gradlew ${env.GRADLE_ARGS} :app-service:bootJar -x test -x validateStructure"
             }
         }
 
@@ -51,13 +47,7 @@ pipeline {
                 expression { return params.RUN_TESTS }
             }
             steps {
-                script {
-                    if (isUnix()) {
-                        sh "./gradlew ${env.GRADLE_ARGS} test -x validateStructure"
-                    } else {
-                        bat ".\\gradlew.bat ${env.GRADLE_ARGS} test -x validateStructure"
-                    }
-                }
+                sh "./gradlew ${env.GRADLE_ARGS} test -x validateStructure"
             }
         }
 
@@ -71,32 +61,66 @@ pipeline {
             steps {
                 sh 'docker --version'
                 sh 'aws --version'
-                sh 'aws sts get-caller-identity' // Confirma que AWS Auth funciona
+                sh 'aws sts get-caller-identity'
             }
         }
 
-        // --- NUEVO STAGE PARA DOCKER Y ECR ---
         stage('Docker Build & Push') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCOUNT_ID', variable: 'ACCOUNT_ID'),
-                    // Solo si Jenkins NO corre en EC2 con IAM Role:
-                    // string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    // string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
-                ]) {
-                    script {
-                        def ecrUrl = "${ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
-                        def fullImage = "${ecrUrl}/${env.ECR_REPO_NAME}:latest"
+                script {
+                    def ecrUrl = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+                    def fullImage = "${ecrUrl}/${env.ECR_REPO_NAME}:latest"
 
-                        echo "Autenticando en ECR..."
-                        sh "aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
+                    sh "aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
+                    sh "docker build -t ${fullImage} -f deployment/Dockerfile ."
+                    sh "docker push ${fullImage}"
+                }
+            }
+        }
 
-                        echo "Construyendo imagen Docker..."
-                        sh "docker build -t ${fullImage} -f deployment/Dockerfile ."
+        stage('Start EC2') {
+            steps {
+                sh """
+                    aws ec2 start-instances \
+                      --instance-ids ${EC2_INSTANCE_ID} \
+                      --region ${AWS_REGION} || true
+                """
+            }
+        }
 
-                        echo "Subiendo imagen a ECR..."
-                        sh "docker push ${fullImage}"
-                    }
+        stage('Wait EC2 Ready') {
+            steps {
+                sh """
+                    aws ec2 wait instance-running \
+                      --instance-ids ${EC2_INSTANCE_ID} \
+                      --region ${AWS_REGION}
+
+                    aws ec2 wait instance-status-ok \
+                      --instance-ids ${EC2_INSTANCE_ID} \
+                      --region ${AWS_REGION}
+                """
+            }
+        }
+
+        stage('Deploy on EC2 via SSM') {
+            steps {
+                script {
+                    def ecrUrl = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+                    def fullImage = "${ecrUrl}/${env.ECR_REPO_NAME}:latest"
+
+                    sh """
+                        aws ssm send-command \
+                          --region ${AWS_REGION} \
+                          --instance-ids ${EC2_INSTANCE_ID} \
+                          --document-name "AWS-RunShellScript" \
+                          --comment "Deploy turismo backend desde Jenkins" \
+                          --parameters 'commands=[
+                            "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}",
+                            "docker pull ${fullImage}",
+                            "docker rm -f ${CONTAINER_NAME} || true",
+                            "docker run -d --name ${CONTAINER_NAME} --restart unless-stopped -p 7860:7860 ${fullImage}"
+                          ]'
+                    """
                 }
             }
         }
@@ -107,10 +131,10 @@ pipeline {
             deleteDir()
         }
         success {
-            echo 'Pipeline finalizado y desplegado en ECR correctamente.'
+            echo 'Pipeline finalizado: imagen en ECR y despliegue ejecutado en EC2.'
         }
         failure {
-            echo 'Pipeline falló. Revisa el stage y logs.'
+            echo 'Pipeline falló. Revisa logs.'
         }
     }
 }
