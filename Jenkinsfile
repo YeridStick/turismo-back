@@ -118,7 +118,7 @@ pipeline {
                         def envEscaped = envContent
                             .replace("\\", "\\\\")
                             .replace("\"", "\\\"")
-                            .replace("$", "\\$")
+                            .replace('$', '\\$')
                             .replace("\n", "\\n")
 
                         sh """
