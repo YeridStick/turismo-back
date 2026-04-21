@@ -13,15 +13,15 @@ pipeline {
     }
 
     environment {
-        GRADLE_ARGS   = '--no-daemon --stacktrace'
-        CONTAINER_NAME  = 'api-turismo'
+        GRADLE_ARGS = '--no-daemon --stacktrace'
+        CONTAINER_NAME = 'api-turismo'
 
         AWS_REGION = credentials('AWS_REGION')
         EC2_INSTANCE_ID = credentials('EC2_INSTANCE_ID')
         ECR_REPO_NAME = credentials('ECR_REPO_NAME')
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-        AWS_ACCOUNT_ID        = credentials('AWS_ACCOUNT_ID')
+        AWS_ACCOUNT_ID = credentials('AWS_ACCOUNT_ID')
     }
 
     stages {
@@ -78,12 +78,18 @@ pipeline {
             }
         }
 
+        stage('Aprobacion antes de deploy') {
+            steps {
+                input message: '¿Deseas continuar con el despliegue a EC2?', ok: 'Desplegar'
+            }
+        }
+
         stage('Start EC2') {
             steps {
                 sh """
                     aws ec2 start-instances \
-                      --instance-ids ${EC2_INSTANCE_ID} \
-                      --region ${AWS_REGION} || true
+                      --instance-ids ${env.EC2_INSTANCE_ID} \
+                      --region ${env.AWS_REGION} || true
                 """
             }
         }
@@ -92,35 +98,46 @@ pipeline {
             steps {
                 sh """
                     aws ec2 wait instance-running \
-                      --instance-ids ${EC2_INSTANCE_ID} \
-                      --region ${AWS_REGION}
+                      --instance-ids ${env.EC2_INSTANCE_ID} \
+                      --region ${env.AWS_REGION}
 
                     aws ec2 wait instance-status-ok \
-                      --instance-ids ${EC2_INSTANCE_ID} \
-                      --region ${AWS_REGION}
+                      --instance-ids ${env.EC2_INSTANCE_ID} \
+                      --region ${env.AWS_REGION}
                 """
             }
         }
 
         stage('Deploy on EC2 via SSM') {
             steps {
-                script {
-                    def ecrUrl = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
-                    def fullImage = "${ecrUrl}/${env.ECR_REPO_NAME}:latest"
+                withCredentials([file(credentialsId: 'TURISMO_ENV_FILE', variable: 'ENV_FILE')]) {
+                    script {
+                        def ecrUrl = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+                        def fullImage = "${ecrUrl}/${env.ECR_REPO_NAME}:latest"
+                        def envContent = readFile(file: ENV_FILE).trim()
+                        def envEscaped = envContent
+                            .replace("\\", "\\\\")
+                            .replace("\"", "\\\"")
+                            .replace("$", "\\$")
+                            .replace("\n", "\\n")
 
-                    sh """
-                        aws ssm send-command \
-                          --region ${AWS_REGION} \
-                          --instance-ids ${EC2_INSTANCE_ID} \
-                          --document-name "AWS-RunShellScript" \
-                          --comment "Deploy turismo backend desde Jenkins" \
-                          --parameters 'commands=[
-                            "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}",
-                            "docker pull ${fullImage}",
-                            "docker rm -f ${CONTAINER_NAME} || true",
-                            "docker run -d --name ${CONTAINER_NAME} --restart unless-stopped -p 7860:7860 ${fullImage}"
-                          ]'
-                    """
+                        sh """
+                            aws ssm send-command \
+                              --region ${env.AWS_REGION} \
+                              --instance-ids ${env.EC2_INSTANCE_ID} \
+                              --document-name "AWS-RunShellScript" \
+                              --comment "Deploy turismo backend desde Jenkins" \
+                              --parameters commands="[
+                                \\"sudo mkdir -p /opt/turismo\\",
+                                \\"printf \\\\\\"${envEscaped}\\\\\\" | sudo tee /opt/turismo/turismo.env > /dev/null\\",
+                                \\"aws ecr get-login-password --region ${env.AWS_REGION} | sudo docker login --username AWS --password-stdin ${ecrUrl}\\",
+                                \\"sudo docker pull ${fullImage}\\",
+                                \\"sudo docker rm -f ${env.CONTAINER_NAME} || true\\",
+                                \\"sudo docker run -d --name ${env.CONTAINER_NAME} --restart unless-stopped --env-file /opt/turismo/turismo.env -p 7860:7860 ${fullImage}\\",
+                                \\"sudo docker ps -a\\"
+                              ]"
+                        """
+                    }
                 }
             }
         }
