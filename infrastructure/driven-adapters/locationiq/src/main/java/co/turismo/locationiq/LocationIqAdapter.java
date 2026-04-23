@@ -27,11 +27,21 @@ public class LocationIqAdapter implements GeocodingGateway {
     private String token;
 
     private final Cache<String, GeocodeResult> cache =
-            Caffeine.newBuilder().maximumSize(10_000).expireAfterWrite(Duration.ofDays(30)).build();
+            Caffeine.newBuilder().maximumSize(1_000).expireAfterWrite(Duration.ofHours(6)).build();
 
     @Override
     public Mono<List<GeocodeResult>> forward(String rawAddress, int limit) {
         final String q = normalize(rawAddress);
+        final String cacheKey = q + ":" + limit;
+
+        // Verificar caché primero
+        GeocodeResult cached = cache.getIfPresent(cacheKey);
+        if (cached != null) {
+            List<GeocodeResult> cachedList = new java.util.ArrayList<>();
+            cachedList.add(cached);
+            return Mono.just(cachedList);
+        }
+
         return locationIqWebClient.get()
                 .uri(uri -> uri.path("/search")
                         .queryParam("key", token)
@@ -45,13 +55,21 @@ public class LocationIqAdapter implements GeocodingGateway {
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
                 .map(list -> {
-                    if (list == null || list.isEmpty()) return List.of();
-                    return list.stream().map(f -> {
+                    if (list == null || list.isEmpty()) return new java.util.ArrayList<GeocodeResult>();
+                    List<GeocodeResult> results = new java.util.ArrayList<>();
+                    for (Map<String, Object> f : list) {
                         double lat = Double.parseDouble(String.valueOf(f.get("lat")));
                         double lon = Double.parseDouble(String.valueOf(f.get("lon")));
                         String display = String.valueOf(f.getOrDefault("display_name", q));
-                        return new GeocodeResult(lat, lon, "POINT (" + lon + " " + lat + ")", display);
-                    }).toList();
+                        results.add(new GeocodeResult(lat, lon, "POINT (" + lon + " " + lat + ")", display));
+                    }
+                    return results;
+                })
+                .doOnNext((List<GeocodeResult> results) -> {
+                    // Guardar en caché el primer resultado si existe
+                    if (!results.isEmpty()) {
+                        cache.put(cacheKey, results.get(0));
+                    }
                 });
     }
 

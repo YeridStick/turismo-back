@@ -61,8 +61,10 @@ public class TourPackageRepositoryAdapter
     }
 
     @Override
-    public Flux<TourPackage> findByAgencyId(Long agencyId) {
-        return repository.findByAgencyProjected(agencyId)
+    public Flux<TourPackage> findByAgencyId(Long agencyId, Integer limit, Integer offset) {
+        return repository.findByAgencyProjected(agencyId,
+                        limit != null ? limit : 50,
+                        offset != null ? offset : 0)
                 .map(this::toEntity);
     }
 

@@ -27,13 +27,24 @@ public class ResponseEnvelopeFilter implements WebFilter {
     private static final String HEADER_SKIP    = "X-Envelope-Skip";
     private static final String HEADER_DISABLE = "X-Envelope-Disable";
 
-    // Rutas que NO deben tener envelope
+    // Rutas que NO deben tener envelope (incluyen endpoints de listados masivos)
     private static final List<String> EXCLUDED_PATHS = List.of(
             "/actuator",
             "/v3/api-docs",
             "/swagger-ui",
             "/webjars",
-            "/favicon.ico"
+            "/favicon.ico",
+            "/scalar",
+            "/docs",
+            "/api/agencies",
+            "/api/places",
+            "/api/packages",
+            "/api/categories",
+            "/api/pruebas",
+            "/api/reviews",
+            "/api/users",
+            "/api/visits",
+            "/api/admin"
     );
 
     @Override

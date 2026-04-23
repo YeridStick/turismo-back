@@ -1,6 +1,7 @@
 package co.turismo.api.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -12,8 +13,10 @@ import reactor.core.publisher.Mono;
 /**
  * Controlador que sirve la interfaz de Scalar API Reference
  * para visualizar la documentación OpenAPI de forma interactiva.
+ * Se desactiva automáticamente si springdoc.api-docs.enabled=false
  */
 @Controller
+@ConditionalOnProperty(name = "springdoc.api-docs.enabled", havingValue = "true", matchIfMissing = true)
 public class ScalarDocumentationController {
 
     @Value("${scalar.title:Turismo API Documentation}")

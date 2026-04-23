@@ -29,6 +29,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class TourPackageHandler {
 
+    private static final int MAX_LIMIT = 50;
+
     private final TourPackageUseCase tourPackageUseCase;
     private final AgencyUseCase agencyUseCase;
     private final RequestValidator requestValidator;
@@ -209,7 +211,10 @@ public class TourPackageHandler {
     }
 
     private static int parseQueryParam(ServerRequest req, String name, int defaultValue) {
-        return req.queryParam(name).map(Integer::parseInt).orElse(defaultValue);
+        return req.queryParam(name)
+                .map(Integer::parseInt)
+                .map(v -> Math.min(MAX_LIMIT, Math.max(0, v)))
+                .orElse(defaultValue);
     }
 
     private static Long[] normalizePlaceIds(Long[] placeIds) {

@@ -201,7 +201,7 @@ class AgencyUseCaseTest {
         Agency agency  = Agency.builder().id(5L).build();
         String[] roles = {"ROLE_ADMIN"};
 
-        when(tourPackageRepository.findByAgencyId(5L)).thenReturn(Flux.just(pkg));
+        when(tourPackageRepository.findByAgencyId(5L, 100, 0)).thenReturn(Flux.just(pkg));
         when(tourPackageRepository.delete(10L)).thenReturn(Mono.empty());
         when(auditLogRepository.registrar(any())).thenReturn(Mono.empty());
         when(agencyRepository.findById(5L)).thenReturn(Mono.just(agency));
@@ -219,7 +219,7 @@ class AgencyUseCaseTest {
         Agency agency = Agency.builder().id(5L).build();
         String[] roles = {"ROLE_ADMIN"};
 
-        when(tourPackageRepository.findByAgencyId(5L)).thenReturn(Flux.empty());
+        when(tourPackageRepository.findByAgencyId(5L, 100, 0)).thenReturn(Flux.empty());
         when(agencyRepository.findById(5L)).thenReturn(Mono.just(agency));
         when(agencyRepository.delete(5L)).thenReturn(Mono.empty());
         when(auditLogRepository.registrar(any())).thenReturn(Mono.empty());
@@ -243,7 +243,7 @@ class AgencyUseCaseTest {
                 .totalSold(5L).totalRevenue(1000L).build();
 
         when(agencyRepository.findByUserEmail("user@example.com")).thenReturn(Flux.just(agency));
-        when(tourPackageRepository.findByAgencyId(1L)).thenReturn(Flux.empty());
+        when(tourPackageRepository.findByAgencyId(1L, 5, 0)).thenReturn(Flux.empty());
         when(tourPackageRepository.topSoldByAgency(eq(1L), any(), any(), anyInt())).thenReturn(Flux.empty());
         when(tourPackageRepository.salesSummaryByAgency(eq(1L), any(), any())).thenReturn(Mono.just(summary));
         when(visitGateway.topPlacesByAgency(eq(1L), any(), any(), anyInt())).thenReturn(Flux.empty());
@@ -263,7 +263,7 @@ class AgencyUseCaseTest {
         LocalDate to   = LocalDate.now();
 
         when(agencyRepository.findByUserEmail("user@example.com")).thenReturn(Flux.just(agency));
-        when(tourPackageRepository.findByAgencyId(1L)).thenReturn(Flux.empty());
+        when(tourPackageRepository.findByAgencyId(1L, 5, 0)).thenReturn(Flux.empty());
         when(tourPackageRepository.topSoldByAgency(eq(1L), any(), any(), anyInt())).thenReturn(Flux.empty());
         when(tourPackageRepository.salesSummaryByAgency(eq(1L), any(), any())).thenReturn(Mono.empty());
         when(visitGateway.topPlacesByAgency(eq(1L), any(), any(), anyInt())).thenReturn(Flux.empty());

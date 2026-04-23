@@ -15,6 +15,8 @@ import java.time.OffsetDateTime;
 @RequiredArgsConstructor
 public class ReviewRepositoryAdapter implements ReviewModalRepository {
 
+    private static final int MAX_LIMIT = 50;
+
     private final DatabaseClient db;
 
     private Review map(io.r2dbc.spi.Row row) {
@@ -32,13 +34,24 @@ public class ReviewRepositoryAdapter implements ReviewModalRepository {
 
     @Override
     public Flux<Review> findByPlaceId(Long placeId) {
+        return findByPlaceIdPaginated(placeId, 20, 0);
+    }
+
+    @Override
+    public Flux<Review> findByPlaceIdPaginated(Long placeId, int limit, int offset) {
+        int boundedLimit = Math.min(MAX_LIMIT, Math.max(1, limit));
+        int boundedOffset = Math.max(0, offset);
         String sql = """
       SELECT id, place_id, user_id, device_id, rating, comment, created_at, is_verified
       FROM place_reviews
       WHERE place_id = :placeId
       ORDER BY created_at DESC
+      LIMIT :limit OFFSET :offset
     """;
-        return db.sql(sql).bind("placeId", placeId)
+        return db.sql(sql)
+                .bind("placeId", placeId)
+                .bind("limit", boundedLimit)
+                .bind("offset", boundedOffset)
                 .map((r, m) -> map(r)).all();
     }
 

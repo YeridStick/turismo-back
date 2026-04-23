@@ -17,7 +17,7 @@ public interface TourPackageRepository {
 
     Mono<TourPackage> findById(Long id);
 
-    Flux<TourPackage> findByAgencyId(Long agencyId);
+    Flux<TourPackage> findByAgencyId(Long agencyId, Integer limit, Integer offset);
 
     Flux<TopPackage> topSoldByAgency(Long agencyId, LocalDate from, LocalDate to, int limit);
 

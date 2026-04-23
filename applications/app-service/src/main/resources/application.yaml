@@ -1,6 +1,20 @@
 server:
-  port: "${SERVER_PORT:8082}"
+  port: "${SERVER_PORT:7860}"
   forward-headers-strategy: framework
+
+management:
+  endpoints:
+    enabled-by-default: false
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      enabled: true
+      probes:
+        enabled: true
+    prometheus:
+      enabled: ${PROMETHEUS_ENABLED:false}
 
 spring:
   main:
@@ -8,15 +22,17 @@ spring:
     log-startup-info: false
   application:
     name: "${APP_NAME:turismo}"
+  codec:
+    max-in-memory-size: 256KB
   data:
     redis:
-      host: "${REDIS_HOST:}"
+      host: "${REDIS_HOST}"
       port: "${REDIS_PORT:6379}"
-      password: "${REDIS_PASSWORD:}"
+      password: "${REDIS_PASSWORD}"
       database: "${REDIS_DB:0}"
       timeout: "${REDIS_TIMEOUT:3s}"
       ssl:
-        enabled: ${REDIS_SSL:}
+        enabled: ${REDIS_SSL:true}
 
   r2dbc:
     postgresql:
@@ -27,22 +43,22 @@ spring:
       username: "${DB_USER}"
       password: "${DB_PASSWORD}"
     pool:
-      initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
-      max-size: "${CONN_POOL_MAX_SIZE:15}"
-      max-idle-time: "${CONN_POOL_IDLE_TIME:30m}"
+      initial-size: "${CONN_POOL_INITIAL_SIZE:2}"
+      max-size: "${CONN_POOL_MAX_SIZE:6}"
+      max-idle-time: "${CONN_POOL_IDLE_TIME:5m}"
 
   # compat si algún bean lee estas claves viejas
   connection-pool:
-    initial-size: "${CONN_POOL_INITIAL_SIZE:12}"
-    max-size: "${CONN_POOL_MAX_SIZE:15}"
-    max-idle-time: "${CONN_POOL_IDLE_TIME:30}"
+    initial-size: "${CONN_POOL_INITIAL_SIZE:2}"
+    max-size: "${CONN_POOL_MAX_SIZE:6}"
+    max-idle-time: "${CONN_POOL_IDLE_TIME:300}"
 
 
 # OpenAPI / SpringDoc Configuration
 springdoc:
   api-docs:
     path: /v3/api-docs
-    enabled: true
+    enabled: ${SPRINGDOC_ENABLED:true}
   show-actuator: false
 
 # Scalar API Reference Configuration
@@ -106,14 +122,15 @@ geocode:
   cache-ttl-days: 30
 
 app:
-  public-url: "${APP_PUBLIC_URL:http://localhost:8082}"
-  frontend-url: "${APP_FRONTEND_URL:https://turismo-eta-swart.vercel.app}"
+  public-url: "${APP_PUBLIC_URL}"
+  frontend-url: "${APP_FRONTEND_URL}"
 
 logging:
   level:
+    root: INFO
     co.turismo.brevo: INFO
-    co.turismo.usecase.authenticate.AccountRecoveryUseCase: DEBUG
-    co.turismo.r2dbc.usersRepository.adapter.UserRepositoryAdapter: DEBUG
+    co.turismo.usecase.authenticate.AccountRecoveryUseCase: INFO
+    co.turismo.r2dbc.usersRepository.adapter.UserRepositoryAdapter: INFO
 
 brevo:
   base-url: "${BREVO_BASE_URL:https://api.brevo.com/v3}"

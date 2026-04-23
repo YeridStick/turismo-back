@@ -37,6 +37,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AgencyHandler {
 
+    private static final int MAX_LIMIT = 50;
+
     private final AgencyUseCase agencyUseCase;
     private final TourPackageUseCase tourPackageUseCase;
     private final UserUseCase userUseCase;
@@ -105,12 +107,15 @@ public class AgencyHandler {
     }
 
     /**
-     * Servicio 1: Devuelve todos los paquetes turísticos de una agencia específica.
+     * Servicio 1: Devuelve los paquetes turísticos de una agencia específica (paginado).
      * Es un endpoint público (no requiere token).
      */
     public Mono<ServerResponse> packagesByAgency(ServerRequest req) {
         Long agencyId = Long.parseLong(req.pathVariable("id"));
-        return tourPackageUseCase.findByAgencyId(agencyId)
+        int limit = parseLimit(req.queryParam("limit").orElse(null), 20);
+        int offset = parseOffset(req.queryParam("offset").orElse(null), 0);
+
+        return tourPackageUseCase.findByAgencyId(agencyId, limit, offset)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -339,9 +344,20 @@ public class AgencyHandler {
         }
         try {
             int parsed = Integer.parseInt(value);
-            return parsed > 0 ? parsed : fallback;
+            return Math.min(MAX_LIMIT, Math.max(1, parsed));
         } catch (Exception e) {
             throw new IllegalArgumentException("limit inválido");
+        }
+    }
+
+    private static int parseOffset(String value, int fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(value));
+        } catch (Exception e) {
+            throw new IllegalArgumentException("offset inválido");
         }
     }
 

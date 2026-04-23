@@ -17,6 +17,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VisitHandler {
 
+    private static final int MAX_LIMIT = 50;
+
     private final VisitsUseCase visitsUseCase;
 
     // POST /api/places/{placeId}/checkin
@@ -88,7 +90,7 @@ public class VisitHandler {
         double lat = Double.parseDouble(req.queryParam("lat").orElseThrow());
         double lng = Double.parseDouble(req.queryParam("lng").orElseThrow());
         int radius = Integer.parseInt(req.queryParam("radius").orElse("150"));
-        int limit  = Integer.parseInt(req.queryParam("limit").orElse("1"));
+        int limit  = Math.min(MAX_LIMIT, Math.max(1, Integer.parseInt(req.queryParam("limit").orElse("1"))));
 
         return visitsUseCase.nearby(lat, lng, radius, limit)
                 .map(r -> new PlaceNearbyDTO(
@@ -116,7 +118,7 @@ public class VisitHandler {
         LocalDate to = req.queryParam("to")
                 .map(LocalDate::parse)
                 .orElse(LocalDate.now());
-        int limit = Integer.parseInt(req.queryParam("limit").orElse("20"));
+        int limit = Math.min(MAX_LIMIT, Math.max(1, Integer.parseInt(req.queryParam("limit").orElse("20"))));
 
         return visitsUseCase.top(from, to, limit)
                 .map(tp -> new TopPlaceDTO(tp.getPlaceId(), tp.getName(), tp.getVisits()))

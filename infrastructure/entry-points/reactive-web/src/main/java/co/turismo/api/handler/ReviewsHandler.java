@@ -18,6 +18,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ReviewsHandler {
 
+    private static final int MAX_LIMIT = 50;
+
     private final ReviewsUseCase reviews;
 
     @Data
@@ -29,12 +31,21 @@ public class ReviewsHandler {
         private String comment;
     }
 
-    /** GET público: lista reseñas por lugar */
+    /** GET público: lista reseñas por lugar con paginación */
     public Mono<ServerResponse> list(ServerRequest req) {
         Long placeId = Long.valueOf(req.pathVariable("id"));
-        return ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(reviews.list(placeId), Review.class);
+        int limit = req.queryParam("limit")
+                .map(Integer::parseInt)
+                .map(v -> Math.min(MAX_LIMIT, Math.max(1, v)))
+                .orElse(20);
+        int offset = req.queryParam("offset")
+                .map(Integer::parseInt)
+                .orElse(0);
+        return reviews.listPaginated(placeId, limit, offset)
+                .collectList()
+                .flatMap(list -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(list)));
     }
 
     /** GET público: resumen rating de un lugar */

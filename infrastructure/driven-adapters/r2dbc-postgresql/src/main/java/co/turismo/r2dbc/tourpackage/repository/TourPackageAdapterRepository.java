@@ -205,8 +205,11 @@ public interface TourPackageAdapterRepository extends ReactiveCrudRepository<Tou
                 JOIN agencies a ON a.id = p.agency_id
                 WHERE p.agency_id = :agencyId
                 ORDER BY p.created_at DESC
+                LIMIT :limit OFFSET :offset
             """)
-    Flux<TourPackageData> findByAgencyProjected(@Param("agencyId") Long agencyId);
+    Flux<TourPackageData> findByAgencyProjected(@Param("agencyId") Long agencyId,
+                                                @Param("limit") int limit,
+                                                @Param("offset") int offset);
 
     @Query("""
                 SELECT

@@ -26,6 +26,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PlacesHandler {
 
+    private static final int MAX_SIZE = 50;
+
     private final PlaceUseCase placeUseCase;
 
     public Mono<ServerResponse> create(ServerRequest req) {
@@ -95,6 +97,7 @@ public class PlacesHandler {
     }
 
     public static PlaceSearchCriteria mapToCriteria(ServerRequest request) {
+        int size = Math.min(MAX_SIZE, Math.max(1, Integer.parseInt(request.queryParam("size").orElse("10"))));
         return PlaceSearchCriteria.builder()
                 // Mapeo dinámico: si no existe el parámetro, queda en null (gracias a los Wrappers)
                 .mode(request.queryParam("mode").map(PlaceSearchMode::valueOf).orElse(PlaceSearchMode.ALL))
@@ -105,7 +108,7 @@ public class PlacesHandler {
                 .radiusMeters(request.queryParam("radius").map(Double::valueOf).orElse(null))
                 .onlyNearby(Boolean.parseBoolean(request.queryParam("onlyNearby").orElse("false")))
                 .page(Integer.parseInt(request.queryParam("page").orElse("0")))
-                .size(Integer.parseInt(request.queryParam("size").orElse("10")))
+                .size(size)
                 .build();
     }
 
@@ -136,6 +139,7 @@ public class PlacesHandler {
     public Mono<ServerResponse> myPlaces(ServerRequest req) {
         int limit = req.queryParam("limit")
                 .map(Integer::parseInt)
+                .map(v -> Math.min(MAX_SIZE, Math.max(1, v)))
                 .orElse(10);
 
         int offset = req.queryParam("offset")

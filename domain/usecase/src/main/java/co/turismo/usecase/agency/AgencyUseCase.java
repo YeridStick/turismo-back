@@ -80,7 +80,7 @@ public class AgencyUseCase {
      * Pre-condición: el Handler ya validó que el solicitante tiene permisos.
      */
     public Mono<Void> delete(Long agencyId, String usuarioEmail, String[] roles) {
-        return tourPackageRepository.findByAgencyId(agencyId)
+        return tourPackageRepository.findByAgencyId(agencyId, 100, 0)
                 .flatMap(pkg -> tourPackageRepository.delete(pkg.getId())  // ← pkg.getId(), no agencyId
                         .then(auditLogRepository.registrar(
                                 AuditLog.builder()
@@ -111,7 +111,7 @@ public class AgencyUseCase {
         return agencyRepository.findByUserEmail(userEmail)
                 .switchIfEmpty(Flux.error(new IllegalStateException("Agencia no encontrada para el usuario")))
                 .flatMap(agency -> Mono.zip(
-                                tourPackageRepository.findByAgencyId(agency.getId()).collectList(),
+                                tourPackageRepository.findByAgencyId(agency.getId(), limit, 0).collectList(),
                                 tourPackageRepository.topSoldByAgency(agency.getId(), from, to, limit).collectList(),
                                 tourPackageRepository.salesSummaryByAgency(agency.getId(), from, to)
                                         .defaultIfEmpty(TourPackageSalesSummary.builder()
@@ -146,13 +146,10 @@ public class AgencyUseCase {
                 .switchIfEmpty(Mono.error(new NotFoundException("Agencia no encontrada")))
                 .flatMap(agency -> agencyRepository.findAllByUserEmail(requesterEmail)
                         .filter(a -> a.getId().equals(agencyId))
-                        .collectList()
-                        .flatMap(list -> {
-                            if (list.isEmpty()) {
-                                return Mono.error(new IllegalStateException("No tienes permisos para esta agencia"));
-                            }
-                            return Mono.just(agency);
-                        })
+                        .hasElements()
+                        .flatMap(hasAccess -> hasAccess
+                                ? Mono.just(agency)
+                                : Mono.error(new IllegalStateException("No tienes permisos para esta agencia")))
                 );
     }
 }

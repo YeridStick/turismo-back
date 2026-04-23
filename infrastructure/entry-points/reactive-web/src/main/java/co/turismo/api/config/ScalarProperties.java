@@ -1,14 +1,17 @@
 package co.turismo.api.config;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * Propiedades de configuración para Scalar API Reference UI.
  * Permite personalizar el aspecto y comportamiento de la documentación.
+ * Se desactiva automáticamente si springdoc.api-docs.enabled=false
  */
 @Configuration
 @ConfigurationProperties(prefix = "scalar")
+@ConditionalOnProperty(name = "springdoc.api-docs.enabled", havingValue = "true", matchIfMissing = true)
 public class ScalarProperties {
 
     /**

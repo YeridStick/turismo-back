@@ -12,8 +12,8 @@ import java.util.concurrent.TimeUnit;
 public class LocalRateLimitStore implements RateLimitStore {
 
     private final Cache<String, Bucket> cache = Caffeine.newBuilder()
-            .maximumSize(100_000)
-            .expireAfterAccess(30, TimeUnit.MINUTES)
+            .maximumSize(10_000)
+            .expireAfterAccess(10, TimeUnit.MINUTES)
             .build();
 
     @Override

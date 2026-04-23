@@ -199,18 +199,13 @@ class TourPackageUseCaseTest {
                 .placeIds(new Long[]{1L, 2L})
                 .build();
 
-        Place p1 = Place.builder().id(1L).build();
-        Place p2 = Place.builder().id(2L).build();
-
         when(tourPackageRepository.findAll(10, 0))
                 .thenReturn(Flux.just(pkg));
-        when(placeRepository.findByIds(any(Long[].class), anyInt(), anyInt()))
-                .thenReturn(Flux.just(p1, p2));
 
         StepVerifier.create(useCase.findAll(10, 0))
                 .assertNext(result -> {
-                    assertEquals(2, result.getPlaces().size());
-                    assertEquals(List.of(1L, 2L), Arrays.asList(result.getPlaceIds()));
+                    assertEquals(1L, result.getId());
+                    assertEquals(2, result.getPlaceIds().length);
                 })
                 .verifyComplete();
     }
@@ -223,17 +218,13 @@ class TourPackageUseCaseTest {
                 .placeIds(new Long[]{1L})
                 .build();
 
-        Place p1 = Place.builder().id(1L).build();
-
-        when(tourPackageRepository.findByAgencyId(10L))
+        when(tourPackageRepository.findByAgencyId(10L, null, null))
                 .thenReturn(Flux.just(pkg));
-        when(placeRepository.findByIds(any(Long[].class), anyInt(), anyInt()))
-                .thenReturn(Flux.just(p1));
 
-        StepVerifier.create(useCase.findByAgencyId(10L))
+        StepVerifier.create(useCase.findByAgencyId(10L, null, null))
                 .assertNext(result -> {
                     assertEquals(10L, result.getAgencyId());
-                    assertEquals(1, result.getPlaces().size());
+                    assertEquals(1, result.getPlaceIds().length);
                 })
                 .verifyComplete();
     }

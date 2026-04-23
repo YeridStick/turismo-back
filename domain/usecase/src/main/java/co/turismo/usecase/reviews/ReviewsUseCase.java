@@ -40,6 +40,10 @@ public class ReviewsUseCase {
         return reviewRepository.findByPlaceId(placeId);
     }
 
+    public Flux<Review> listPaginated(Long placeId, int limit, int offset) {
+        return reviewRepository.findByPlaceIdPaginated(placeId, limit, offset);
+    }
+
     public Mono<PlaceRatingSummary> summary(Long placeId) {
         return reviewRepository.ratingSummary(placeId);
     }

@@ -17,6 +17,6 @@ USER 1000
 EXPOSE 7860
 
 ENV SERVER_PORT=7860
-ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseG1GC"
+ENV JAVA_OPTS="-Xms64m -Xmx160m -XX:MaxMetaspaceSize=80m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxDirectMemorySize=24m -XX:G1ReservePercent=15 -XX:InitiatingHeapOccupancyPercent=25 -Xss384k -XX:+ExitOnOutOfMemoryError"
 
 ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -Dserver.port=${SERVER_PORT} -jar app.jar"]

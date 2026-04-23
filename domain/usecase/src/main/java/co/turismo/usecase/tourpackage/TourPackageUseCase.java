@@ -47,15 +47,26 @@ public class TourPackageUseCase {
     }
 
     public Flux<TourPackage> findAll(Integer limit, Integer offset) {
-        return tourPackageRepository.findAll(limit, offset)
-                .concatMap(this::attachPlaces);
+        // Nota: attachPlaces evitado en listados para reducir N+1 queries y consumo de memoria
+        // Los lugares se cargan solo en findById (detalle)
+        return tourPackageRepository.findAll(limit, offset);
     }
 
     /**
-     * Lista todos los paquetes turísticos de una agencia específica, incluyendo sus lugares.
+     * Lista todos los paquetes turísticos de una agencia específica.
+     * Nota: attachPlaces evitado en listados para reducir consumo de memoria.
+     * Los lugares se cargan solo en findById (detalle).
      */
-    public Flux<TourPackage> findByAgencyId(Long agencyId) {
-        return tourPackageRepository.findByAgencyId(agencyId)
+    public Flux<TourPackage> findByAgencyId(Long agencyId, Integer limit, Integer offset) {
+        return tourPackageRepository.findByAgencyId(agencyId, limit, offset);
+    }
+
+    /**
+     * Lista paquetes de una agencia con sus lugares completos (solo para casos específicos).
+     * Usar con precaución por el alto consumo de memoria.
+     */
+    public Flux<TourPackage> findByAgencyIdWithPlaces(Long agencyId, Integer limit, Integer offset) {
+        return tourPackageRepository.findByAgencyId(agencyId, limit, offset)
                 .concatMap(this::attachPlaces);
     }
 
