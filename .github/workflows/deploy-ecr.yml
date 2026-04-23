@@ -2,7 +2,7 @@ name: Build and Deploy to ECR
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
   workflow_dispatch:
 
 env:
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     needs: build-and-push-docker
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout code
