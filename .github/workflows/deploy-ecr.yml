@@ -13,7 +13,7 @@ env:
 jobs:
   build-and-push-docker:
     runs-on: ubuntu-latest
-    environment: production
+    environment: Turismo / production
     outputs:
       image: ${{ steps.build-image.outputs.image }}
 
