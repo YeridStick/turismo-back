@@ -5,7 +5,7 @@ metadata:
   labels:
     app: app-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: app-service
@@ -16,32 +16,35 @@ spec:
     spec:
       containers:
         - name: app-service
-          image: IMAGE_PLACEHOLDER # Se reemplaza en el pipeline
+          image: IMAGE_PLACEHOLDER
           ports:
-            - containerPort: 8080
-          resources:
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "500m"
-              memory: "1Gi"
+            - containerPort: 7860
+          envFrom:
+            - secretRef:
+                name: turismo-env
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: app-service
 spec:
-  type: LoadBalancer # Crea un AWS NLB/ALB automáticamente
+  type: LoadBalancer
   selector:
     app: app-service
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 8080
+      targetPort: 7860
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -52,7 +55,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: app-service
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 5
   metrics:
     - type: Resource

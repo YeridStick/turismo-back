@@ -9,6 +9,7 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: turismo/backend
   EKS_CLUSTER_NAME: turismo-cluster
+  K8S_SECRET_NAME: turismo-env
 
 jobs:
   build-and-push-docker:
@@ -21,11 +22,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      #  DEBUG: validar que los secrets existen
-      - name: Debug AWS secrets
+      - name: Validate AWS secrets
         run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo " AWS_ACCESS_KEY_ID missing"; else echo " AWS_ACCESS_KEY_ID present"; fi
-          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo " AWS_SECRET_ACCESS_KEY missing"; else echo " AWS_SECRET_ACCESS_KEY present"; fi
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "AWS_ACCESS_KEY_ID missing"; exit 1; fi
+          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo "AWS_SECRET_ACCESS_KEY missing"; exit 1; fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -44,13 +44,13 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo " Building image..."
+          echo "Building image..."
           docker build \
             --file deployment/Dockerfile \
             --tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest .
 
-          echo " Pushing image..."
+          echo "Pushing image..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
@@ -66,11 +66,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 🔍 DEBUG también aquí por seguridad
-      - name: Debug AWS secrets
+      - name: Validate required secrets
         run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo " AWS_ACCESS_KEY_ID missing"; else echo " AWS_ACCESS_KEY_ID present"; fi
-          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo " AWS_SECRET_ACCESS_KEY missing"; else echo " AWS_SECRET_ACCESS_KEY present"; fi
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "AWS_ACCESS_KEY_ID missing"; exit 1; fi
+          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo "AWS_SECRET_ACCESS_KEY missing"; exit 1; fi
+          if [ -z "${{ secrets.TURISMO_ENV_FILE }}" ]; then echo "TURISMO_ENV_FILE missing"; exit 1; fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -88,22 +88,30 @@ jobs:
 
       - name: Verify cluster access
         run: |
-          echo " Checking cluster..."
           kubectl config current-context
           kubectl get nodes
+
+      - name: Create or update Kubernetes Secret
+        run: |
+          cat > .env <<'EOF'
+          ${{ secrets.TURISMO_ENV_FILE }}
+          EOF
+
+          kubectl delete secret ${{ env.K8S_SECRET_NAME }} --ignore-not-found
+          kubectl create secret generic ${{ env.K8S_SECRET_NAME }} --from-env-file=.env
 
       - name: Deploy to EKS
         env:
           IMAGE_FULL: ${{ needs.build-and-push-docker.outputs.image }}
         run: |
-          echo " Deploying image: $IMAGE_FULL"
+          echo "Deploying image: $IMAGE_FULL"
           sed "s|IMAGE_PLACEHOLDER|$IMAGE_FULL|g" deployment/k8s/deployment.yaml | kubectl apply -f -
 
       - name: Check deployment status
         run: |
-          echo " Waiting for rollout..."
-          kubectl rollout status deployment/app-service --timeout=180s
-          echo " Pods:"
-          kubectl get pods
-          echo " Services:"
+          echo "Waiting for rollout..."
+          kubectl rollout status deployment/app-service --timeout=300s
+          echo "Pods:"
+          kubectl get pods -o wide
+          echo "Services:"
           kubectl get svc
