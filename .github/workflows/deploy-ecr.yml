@@ -96,7 +96,16 @@ jobs:
           cat > .env <<'EOF'
           ${{ secrets.TURISMO_ENV_FILE }}
           EOF
-
+          
+          echo "Validating duplicated env keys..."
+          DUPLICATES=$(grep -v '^\s*#' .env | grep -v '^\s*$' | cut -d '=' -f1 | sort | uniq -d)
+          
+          if [ -n "$DUPLICATES" ]; then
+            echo "Duplicated env keys found:"
+            echo "$DUPLICATES"
+            exit 1
+          fi
+          
           kubectl delete secret ${{ env.K8S_SECRET_NAME }} --ignore-not-found
           kubectl create secret generic ${{ env.K8S_SECRET_NAME }} --from-env-file=.env
 
