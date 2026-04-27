@@ -98,6 +98,61 @@ class PlaceUseCaseTest {
                 .verifyComplete();
     }
 
+    @Test
+    void searchPlaceTextModeShouldReturnMatchingPlaces() {
+        PlaceSearchCriteria criteria = PlaceSearchCriteria.builder()
+                .mode(PlaceSearchMode.TEXT)
+                .q("restaurante")
+                .page(0)
+                .size(10)
+                .build();
+        Place place1 = Place.builder().id(1L).name("Restaurante La Casa").build();
+        Place place2 = Place.builder().id(2L).name("Restaurante El Patio").build();
+
+        when(placeSearchFactory.getStrategy(PlaceSearchMode.TEXT)).thenReturn(placeSearchStrategy);
+        when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.just(place1, place2));
+
+        StepVerifier.create(useCase.searchPlace(criteria))
+                .expectNext(place1, place2)
+                .verifyComplete();
+    }
+
+    @Test
+    void searchPlaceNearbyModeShouldReturnNearbyPlaces() {
+        PlaceSearchCriteria criteria = PlaceSearchCriteria.builder()
+                .mode(PlaceSearchMode.NEARBY)
+                .lat(2.936)
+                .lng(-75.276)
+                .radiusMeters(5000.0)
+                .page(0)
+                .size(20)
+                .build();
+        Place nearby = Place.builder().id(1L).name("Café Cercano").build();
+
+        when(placeSearchFactory.getStrategy(PlaceSearchMode.NEARBY)).thenReturn(placeSearchStrategy);
+        when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.just(nearby));
+
+        StepVerifier.create(useCase.searchPlace(criteria))
+                .expectNext(nearby)
+                .verifyComplete();
+    }
+
+    @Test
+    void searchPlaceWithPaginationShouldRespectPageAndSize() {
+        PlaceSearchCriteria criteria = PlaceSearchCriteria.builder()
+                .mode(PlaceSearchMode.ALL)
+                .page(2)
+                .size(5)
+                .build();
+        // Simulando página 2 con 5 elementos por página (offset 10)
+
+        when(placeSearchFactory.getStrategy(PlaceSearchMode.ALL)).thenReturn(placeSearchStrategy);
+        when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.empty()); // Página vacía al final
+
+        StepVerifier.create(useCase.searchPlace(criteria))
+                .verifyComplete();
+    }
+
     // ── createPlace ──────────────────────────────────────────────────────
 
     @Test

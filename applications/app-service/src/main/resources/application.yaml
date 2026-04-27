@@ -1,6 +1,11 @@
 server:
   port: "${SERVER_PORT:7860}"
   forward-headers-strategy: framework
+  compression:
+    enabled: true
+    min-response-size: 1024
+  netty:
+    connection-timeout: 5s
 
 management:
   endpoints:
@@ -20,17 +25,23 @@ spring:
   main:
     banner-mode: off
     log-startup-info: false
+    lazy-initialization: true
+
   application:
     name: "${APP_NAME:turismo}"
   codec:
-    max-in-memory-size: 256KB
+    max-in-memory-size: "${MAX-IN-MEMORY-SIZE:256KB}"
+
+  jackson:
+    default-property-inclusion: non_null
+
   data:
     redis:
       host: "${REDIS_HOST}"
-      port: "${REDIS_PORT:6379}"
+      port: "${REDIS_PORT}"
       password: "${REDIS_PASSWORD}"
-      database: "${REDIS_DB:0}"
-      timeout: "${REDIS_TIMEOUT:3s}"
+      database: "${REDIS_DB}"
+      timeout: "${REDIS_TIMEOUT}"
       ssl:
         enabled: ${REDIS_SSL:true}
 
@@ -43,16 +54,19 @@ spring:
       username: "${DB_USER}"
       password: "${DB_PASSWORD}"
     pool:
-      initial-size: "${CONN_POOL_INITIAL_SIZE:2}"
-      max-size: "${CONN_POOL_MAX_SIZE:6}"
-      max-idle-time: "${CONN_POOL_IDLE_TIME:5m}"
+      initial-size: "${CONN_POOL_INITIAL_SIZE:5}"
+      max-size: "${CONN_POOL_MAX_SIZE:30}"
+      max-idle-time: "${CONN_POOL_IDLE_TIME:10m}"
+      max-acquire-time: "${CONN_POOL_MAX_ACQUIRE_TIME:3s}"
+      max-create-connection-time: "${CONN_POOL_MAX_CREATE_TIME:5s}"
+      validation-query: "SELECT 1"
+      validation-depth: local
 
   # compat si algún bean lee estas claves viejas
   connection-pool:
-    initial-size: "${CONN_POOL_INITIAL_SIZE:2}"
-    max-size: "${CONN_POOL_MAX_SIZE:6}"
-    max-idle-time: "${CONN_POOL_IDLE_TIME:300}"
-
+    initial-size: "${CONN_POOL_INITIAL_SIZE:5}"
+    max-size: "${CONN_POOL_MAX_SIZE:30}"
+    max-idle-time: "${CONN_POOL_IDLE_TIME:600}"
 
 # OpenAPI / SpringDoc Configuration
 springdoc:
@@ -86,7 +100,7 @@ security:
 
 turismo:
   rate-limiter:
-    enabled: ${RATE_LIMIT_ENABLED:true}
+    enabled: ${RATE_LIMIT_ENABLED:false}
     backend: ${RATE_LIMIT_BACKEND:redis}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
     capacity: ${RATE_LIMIT_CAPACITY:600}
@@ -124,6 +138,11 @@ geocode:
 app:
   public-url: "${APP_PUBLIC_URL}"
   frontend-url: "${APP_FRONTEND_URL}"
+
+reactor:
+  netty:
+    ioWorkerCount: "${REACTOR_NETTY_IO_WORKER_COUNT:2}"
+    ioSelectCount: "${REACTOR_NETTY_IO_SELECT_COUNT:1}"
 
 logging:
   level:
