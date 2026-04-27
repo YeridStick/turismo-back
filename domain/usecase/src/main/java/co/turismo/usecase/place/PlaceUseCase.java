@@ -5,6 +5,7 @@ import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.Place;
 import co.turismo.model.place.strategy.PlaceSearchCriteria;
 import co.turismo.model.place.UpdatePlaceRequest;
+import co.turismo.model.place.gateways.PlaceCachePort;
 import co.turismo.model.place.gateways.PlaceRepository;
 import co.turismo.model.place.strategy.PlaceSearchFactoryGateway;
 import co.turismo.model.userIdentityPort.UserIdentityPort;
@@ -20,23 +21,54 @@ public class PlaceUseCase {
     private final PlaceRepository placeRepository;
     private final UserIdentityPort userIdentityPort;
     private final PlaceSearchFactoryGateway placeSearchFactory;
+    private final PlaceCachePort placeCachePort;
 
     public Mono<Place> createPlace(CreatePlaceRequest cmd) {
-        return placeRepository.create(cmd);
+        return placeRepository.create(cmd)
+                .flatMap(place -> placeCachePort.invalidateSearchCache()
+                        .thenReturn(place)
+                        .onErrorResume(e -> Mono.just(place)));
     }
 
     public Flux<Place> searchPlace(PlaceSearchCriteria placeSearchCriteria) {
-        return placeSearchFactory.getStrategy(placeSearchCriteria.getMode()).execute(placeSearchCriteria);
+        return placeCachePort.getSearchResults(placeSearchCriteria)
+                .flatMapMany(cachedPlaces -> {
+                    if (cachedPlaces != null && !cachedPlaces.isEmpty()) {
+                        return Flux.fromIterable(cachedPlaces);
+                    }
+                    return Flux.empty();
+                })
+                .switchIfEmpty(
+                        placeSearchFactory.getStrategy(placeSearchCriteria.getMode())
+                                .execute(placeSearchCriteria)
+                                .collectList()
+                                .flatMapMany(places ->
+                                        placeCachePort.saveSearchResults(placeSearchCriteria, places)
+                                                .thenReturn(places)
+                                                .flatMapMany(Flux::fromIterable)
+                                                .onErrorResume(e -> Flux.fromIterable(places))
+                                )
+                )
+                .onErrorResume(e ->
+                        placeSearchFactory.getStrategy(placeSearchCriteria.getMode())
+                                .execute(placeSearchCriteria)
+                );
     }
 
     public Mono<Place> verifyPlaceByAdmin(String adminEmail, long placeId, boolean approve) {
         return userIdentityPort.getUserIdForEmail(adminEmail)
                 .switchIfEmpty(Mono.error(new NotFoundException("Admin no encontrado")))
-                .flatMap(admin -> placeRepository.verifyPlace(placeId, approve, approve, admin.id()));
+                .flatMap(admin -> placeRepository.verifyPlace(placeId, approve, approve, admin.id()))
+                .flatMap(place -> placeCachePort.invalidateSearchCache()
+                        .thenReturn(place)
+                        .onErrorResume(e -> Mono.just(place)));
     }
 
     public Mono<Place> setActiveByOwner(String ownerEmail, long placeId, boolean active) {
-        return placeRepository.setActiveIfOwner(ownerEmail, placeId, active);
+        return placeRepository.setActiveIfOwner(ownerEmail, placeId, active)
+                .flatMap(place -> placeCachePort.invalidateSearchCache()
+                        .thenReturn(place)
+                        .onErrorResume(e -> Mono.just(place)));
     }
 
     public Flux<Place> findMine(String ownerEmail, Integer Limit, Integer Offset) {
@@ -44,7 +76,10 @@ public class PlaceUseCase {
     }
 
     public Mono<Place> patch(long id, UpdatePlaceRequest req) {
-        return placeRepository.patch(id, req);
+        return placeRepository.patch(id, req)
+                .flatMap(place -> placeCachePort.invalidateSearchCache()
+                        .thenReturn(place)
+                        .onErrorResume(e -> Mono.just(place)));
     }
 
     public Mono<Place> findByIdPlace(long id) {
@@ -53,7 +88,10 @@ public class PlaceUseCase {
     }
 
     public Mono<Place> setActive(long placeId, boolean active) {
-        return placeRepository.setActive(placeId, active);
+        return placeRepository.setActive(placeId, active)
+                .flatMap(place -> placeCachePort.invalidateSearchCache()
+                        .thenReturn(place)
+                        .onErrorResume(e -> Mono.just(place)));
     }
 
     public Mono<Place> deleteByOwnerOrAdmin(String email, long placeId) {
@@ -69,7 +107,10 @@ public class PlaceUseCase {
                         if (!isOwner) {
                             return Mono.error(new AccessDeniedException("No tienes permiso para eliminar este sitio"));
                         }
-                        return placeRepository.deletePalce(placeId);
+                        return placeRepository.deletePalce(placeId)
+                                .flatMap(deleted -> placeCachePort.invalidateSearchCache()
+                                        .thenReturn(deleted)
+                                        .onErrorResume(e -> Mono.just(deleted)));
                     })
             );
     }

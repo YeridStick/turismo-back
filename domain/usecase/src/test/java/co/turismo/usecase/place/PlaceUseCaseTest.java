@@ -19,13 +19,18 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.nio.file.AccessDeniedException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.UpdatePlaceRequest;
+import co.turismo.model.place.gateways.PlaceCachePort;
+
+import java.util.Collections;
 
 @ExtendWith(MockitoExtension.class)
 class PlaceUseCaseTest {
@@ -38,12 +43,14 @@ class PlaceUseCaseTest {
     private PlaceSearchFactoryGateway placeSearchFactory;
     @Mock
     private PlaceSearchStrategy placeSearchStrategy;
+    @Mock
+    private PlaceCachePort placeCachePort;
 
     private PlaceUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new PlaceUseCase(placeRepository, userIdentityPort, placeSearchFactory);
+        useCase = new PlaceUseCase(placeRepository, userIdentityPort, placeSearchFactory, placeCachePort);
     }
 
     @Test
@@ -77,6 +84,7 @@ class PlaceUseCaseTest {
                 .thenReturn(Mono.just(new UserSummary(1L, "ana@example.com")));
         when(placeRepository.findByPlaces(5L)).thenReturn(Mono.just(place));
         when(placeRepository.deletePalce(5L)).thenReturn(Mono.just(deleted));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.deleteByOwnerOrAdmin("ana@example.com", 5L))
                 .assertNext(result -> assertEquals(5L, result.getId()))
@@ -90,8 +98,10 @@ class PlaceUseCaseTest {
         PlaceSearchCriteria criteria = PlaceSearchCriteria.builder().mode(PlaceSearchMode.ALL).page(0).size(10).build();
         Place place = Place.builder().id(1L).name("Parque").build();
 
+        when(placeCachePort.getSearchResults(criteria)).thenReturn(Mono.empty());
         when(placeSearchFactory.getStrategy(PlaceSearchMode.ALL)).thenReturn(placeSearchStrategy);
         when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.just(place));
+        when(placeCachePort.saveSearchResults(criteria, Collections.singletonList(place))).thenReturn(Mono.just(true));
 
         StepVerifier.create(useCase.searchPlace(criteria))
                 .expectNext(place)
@@ -108,9 +118,12 @@ class PlaceUseCaseTest {
                 .build();
         Place place1 = Place.builder().id(1L).name("Restaurante La Casa").build();
         Place place2 = Place.builder().id(2L).name("Restaurante El Patio").build();
+        List<Place> places = List.of(place1, place2);
 
+        when(placeCachePort.getSearchResults(criteria)).thenReturn(Mono.empty());
         when(placeSearchFactory.getStrategy(PlaceSearchMode.TEXT)).thenReturn(placeSearchStrategy);
         when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.just(place1, place2));
+        when(placeCachePort.saveSearchResults(criteria, places)).thenReturn(Mono.just(true));
 
         StepVerifier.create(useCase.searchPlace(criteria))
                 .expectNext(place1, place2)
@@ -129,8 +142,10 @@ class PlaceUseCaseTest {
                 .build();
         Place nearby = Place.builder().id(1L).name("Café Cercano").build();
 
+        when(placeCachePort.getSearchResults(criteria)).thenReturn(Mono.empty());
         when(placeSearchFactory.getStrategy(PlaceSearchMode.NEARBY)).thenReturn(placeSearchStrategy);
         when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.just(nearby));
+        when(placeCachePort.saveSearchResults(criteria, Collections.singletonList(nearby))).thenReturn(Mono.just(true));
 
         StepVerifier.create(useCase.searchPlace(criteria))
                 .expectNext(nearby)
@@ -146,8 +161,10 @@ class PlaceUseCaseTest {
                 .build();
         // Simulando página 2 con 5 elementos por página (offset 10)
 
+        when(placeCachePort.getSearchResults(criteria)).thenReturn(Mono.empty());
         when(placeSearchFactory.getStrategy(PlaceSearchMode.ALL)).thenReturn(placeSearchStrategy);
         when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.empty()); // Página vacía al final
+        when(placeCachePort.saveSearchResults(criteria, Collections.emptyList())).thenReturn(Mono.just(true));
 
         StepVerifier.create(useCase.searchPlace(criteria))
                 .verifyComplete();
@@ -161,6 +178,7 @@ class PlaceUseCaseTest {
         Place created = Place.builder().id(1L).name("Laguna").build();
 
         when(placeRepository.create(cmd)).thenReturn(Mono.just(created));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.createPlace(cmd))
                 .assertNext(p -> assertEquals(1L, p.getId()))
@@ -185,6 +203,7 @@ class PlaceUseCaseTest {
 
         when(userIdentityPort.getUserIdForEmail("admin@example.com")).thenReturn(Mono.just(admin));
         when(placeRepository.verifyPlace(10L, true, true, 1L)).thenReturn(Mono.just(verified));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.verifyPlaceByAdmin("admin@example.com", 10L, true))
                 .assertNext(p -> assertEquals(10L, p.getId()))
@@ -200,6 +219,7 @@ class PlaceUseCaseTest {
 
         when(userIdentityPort.getUserIdForEmail("admin@example.com")).thenReturn(Mono.just(admin));
         when(placeRepository.verifyPlace(10L, false, false, 1L)).thenReturn(Mono.just(rejected));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.verifyPlaceByAdmin("admin@example.com", 10L, false))
                 .assertNext(p -> assertEquals(10L, p.getId()))
@@ -213,6 +233,7 @@ class PlaceUseCaseTest {
         Place updated = Place.builder().id(3L).build();
 
         when(placeRepository.setActiveIfOwner("owner@example.com", 3L, true)).thenReturn(Mono.just(updated));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.setActiveByOwner("owner@example.com", 3L, true))
                 .assertNext(p -> assertEquals(3L, p.getId()))
@@ -249,6 +270,7 @@ class PlaceUseCaseTest {
         Place patched = Place.builder().id(7L).name("Nuevo nombre").build();
 
         when(placeRepository.patch(7L, req)).thenReturn(Mono.just(patched));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.patch(7L, req))
                 .assertNext(p -> assertEquals("Nuevo nombre", p.getName()))
@@ -262,6 +284,7 @@ class PlaceUseCaseTest {
         Place activated = Place.builder().id(4L).build();
 
         when(placeRepository.setActive(4L, true)).thenReturn(Mono.just(activated));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.setActive(4L, true))
                 .assertNext(p -> assertEquals(4L, p.getId()))
@@ -273,6 +296,7 @@ class PlaceUseCaseTest {
         Place deactivated = Place.builder().id(4L).build();
 
         when(placeRepository.setActive(4L, false)).thenReturn(Mono.just(deactivated));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
 
         StepVerifier.create(useCase.setActive(4L, false))
                 .assertNext(p -> assertEquals(4L, p.getId()))
@@ -288,6 +312,112 @@ class PlaceUseCaseTest {
         StepVerifier.create(useCase.deleteByOwnerOrAdmin("ghost@example.com", 5L))
                 .expectError(NotFoundException.class)
                 .verify();
+    }
+
+// ── Cache Tests ──────────────────────────────────────────────────────
+
+    @Test
+    void searchPlaceCacheMissShouldQueryRepositoryAndSaveToCache() {
+        PlaceSearchCriteria criteria = PlaceSearchCriteria.builder()
+                .mode(PlaceSearchMode.ALL)
+                .page(0)
+                .size(10)
+                .build();
+        Place place = Place.builder().id(1L).name("New Place").build();
+        List<Place> places = List.of(place);
+
+        when(placeCachePort.getSearchResults(criteria)).thenReturn(Mono.empty());
+        when(placeSearchFactory.getStrategy(PlaceSearchMode.ALL)).thenReturn(placeSearchStrategy);
+        when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.just(place));
+        when(placeCachePort.saveSearchResults(criteria, places)).thenReturn(Mono.just(true));
+
+        StepVerifier.create(useCase.searchPlace(criteria))
+                .expectNext(place)
+                .verifyComplete();
+
+        verify(placeCachePort).saveSearchResults(criteria, places);
+    }
+
+    @Test
+    void searchPlaceShouldFallbackToRepositoryWhenCacheFails() {
+        PlaceSearchCriteria criteria = PlaceSearchCriteria.builder()
+                .mode(PlaceSearchMode.ALL)
+                .page(0)
+                .size(10)
+                .build();
+        Place place = Place.builder().id(1L).name("Fallback Place").build();
+
+        when(placeCachePort.getSearchResults(criteria))
+                .thenReturn(Mono.error(new RuntimeException("Redis connection failed")));
+        when(placeSearchFactory.getStrategy(PlaceSearchMode.ALL)).thenReturn(placeSearchStrategy);
+        when(placeSearchStrategy.execute(criteria)).thenReturn(Flux.just(place));
+        // Note: saveSearchResults is NOT called when cache fails - we go directly to fallback
+
+        StepVerifier.create(useCase.searchPlace(criteria))
+                .expectNext(place)
+                .verifyComplete();
+    }
+
+    @Test
+    void createPlaceShouldInvalidateCache() {
+        CreatePlaceRequest cmd = CreatePlaceRequest.builder().name("New Place").build();
+        Place created = Place.builder().id(1L).name("New Place").build();
+
+        when(placeRepository.create(cmd)).thenReturn(Mono.just(created));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
+
+        StepVerifier.create(useCase.createPlace(cmd))
+                .assertNext(p -> assertEquals(1L, p.getId()))
+                .verifyComplete();
+
+        verify(placeCachePort).invalidateSearchCache();
+    }
+
+    @Test
+    void createPlaceShouldSucceedEvenIfCacheInvalidationFails() {
+        CreatePlaceRequest cmd = CreatePlaceRequest.builder().name("New Place").build();
+        Place created = Place.builder().id(1L).name("New Place").build();
+
+        when(placeRepository.create(cmd)).thenReturn(Mono.just(created));
+        when(placeCachePort.invalidateSearchCache())
+                .thenReturn(Mono.error(new RuntimeException("Redis unavailable")));
+
+        StepVerifier.create(useCase.createPlace(cmd))
+                .assertNext(p -> assertEquals(1L, p.getId()))
+                .verifyComplete();
+    }
+
+    @Test
+    void patchShouldInvalidateCache() {
+        UpdatePlaceRequest req = UpdatePlaceRequest.builder().name("Updated").build();
+        Place patched = Place.builder().id(1L).name("Updated").build();
+
+        when(placeRepository.patch(1L, req)).thenReturn(Mono.just(patched));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
+
+        StepVerifier.create(useCase.patch(1L, req))
+                .assertNext(p -> assertEquals("Updated", p.getName()))
+                .verifyComplete();
+
+        verify(placeCachePort).invalidateSearchCache();
+    }
+
+    @Test
+    void deleteShouldInvalidateCache() {
+        Place place = Place.builder().id(5L).ownerUserId(1L).build();
+        Place deleted = Place.builder().id(5L).ownerUserId(1L).build();
+
+        when(userIdentityPort.getUserIdForEmail("ana@example.com"))
+                .thenReturn(Mono.just(new UserSummary(1L, "ana@example.com")));
+        when(placeRepository.findByPlaces(5L)).thenReturn(Mono.just(place));
+        when(placeRepository.deletePalce(5L)).thenReturn(Mono.just(deleted));
+        when(placeCachePort.invalidateSearchCache()).thenReturn(Mono.empty());
+
+        StepVerifier.create(useCase.deleteByOwnerOrAdmin("ana@example.com", 5L))
+                .assertNext(result -> assertEquals(5L, result.getId()))
+                .verifyComplete();
+
+        verify(placeCachePort).invalidateSearchCache();
     }
 }
 

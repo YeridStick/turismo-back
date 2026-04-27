@@ -32,3 +32,5 @@ include ':antispam'
 project(':antispam').projectDir = file('./infrastructure/driven-adapters/antispam')
 include ':brevo'
 project(':brevo').projectDir = file('./infrastructure/driven-adapters/brevo')
+include ':redis-place-cache'
+project(':redis-place-cache').projectDir = file('./infrastructure/driven-adapters/redis-place-cache')
