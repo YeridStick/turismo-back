@@ -14,11 +14,12 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
   // CREATE
   @Query("""
           INSERT INTO places(
-              owner_user_id, name, description, category_id, geom, address, phone, website, image_urls, model_3d_urls,
+              owner_user_id, name, description, category_id, lat, lng, geom, address, phone, website, image_urls, model_3d_urls,
               services, is_verified, is_active, created_at
           )
           VALUES (
               :ownerId, :name, :description, :categoryId,
+              :lat, :lng,
               ST_SetSRID(ST_MakePoint(:lng, :lat), 4326),
               :address, :phone, :website,
               COALESCE(:imageUrls::text[], '{}'::text[]),
@@ -185,6 +186,16 @@ public interface PlaceAdapterRepository extends ReactiveCrudRepository<PlaceData
               name        = COALESCE(:name,        name),
               description = COALESCE(:description, description),
               category_id = COALESCE(:categoryId,  category_id),
+              lat         = CASE
+                             WHEN CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL
+                             THEN CAST(:lat AS FLOAT8)
+                             ELSE lat
+                            END,
+              lng         = CASE
+                             WHEN CAST(:lat AS FLOAT8) IS NOT NULL AND CAST(:lng AS FLOAT8) IS NOT NULL
+                             THEN CAST(:lng AS FLOAT8)
+                             ELSE lng
+                            END,
               address     = COALESCE(:address,     address),
               phone       = COALESCE(:phone,       phone),
               website     = COALESCE(:website,     website),
