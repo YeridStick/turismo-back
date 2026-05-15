@@ -103,7 +103,22 @@ public class AuthenticateHandler {
                 })
                 .flatMap(token -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))));
+                        .bodyValue(ApiResponse.ok(new JwtTokenResponse(token))))
+                .onErrorResume(IllegalArgumentException.class, e ->
+                        ServerResponse.badRequest()
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(ApiResponse.error(400, safeMessage(e, "Solicitud inválida")))
+                )
+                .onErrorResume(RuntimeException.class, e ->
+                        ServerResponse.status(HttpStatus.UNAUTHORIZED)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(ApiResponse.error(401, safeMessage(e, "Credenciales inválidas")))
+                )
+                .onErrorResume(e ->
+                        ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(ApiResponse.error(500, safeMessage(e, "Error inesperado")))
+                );
     }
  
     // ---------- EMAIL VERIFY REQUEST: POST /api/auth/email/request ----------
@@ -261,6 +276,11 @@ public class AuthenticateHandler {
         if (authorizationHeader == null) return null;
         String prefix = "Bearer ";
         return authorizationHeader.startsWith(prefix) ? authorizationHeader.substring(prefix.length()).trim() : null;
+    }
+
+    private static String safeMessage(Throwable e, String fallback) {
+        String msg = e != null ? e.getMessage() : null;
+        return (msg == null || msg.isBlank()) ? fallback : msg;
     }
  
     private Mono<ServerResponse> redirectToFrontend(String token, String status, String message) {
