@@ -42,7 +42,7 @@ public class VisitHandler {
                             body.lat(), body.lng(),
                             body.accuracy_m(),
                             body.device_id(),
-                            body.meta() != null ? body.meta() : "{}",
+                            normalizeMeta(body.meta()),
                             email // ← ahora pasamos email, no userId
                     );
 
@@ -54,6 +54,15 @@ public class VisitHandler {
                         e -> HttpResponses.badRequest(e.getMessage()))
                 .onErrorResume(IllegalStateException.class,
                         e -> HttpResponses.conflict(e.getMessage()));
+    }
+
+    private static String normalizeMeta(com.fasterxml.jackson.databind.JsonNode meta) {
+        if (meta == null || meta.isNull()) return "{}";
+        if (meta.isTextual()) {
+            String value = meta.asText();
+            return (value == null || value.isBlank()) ? "{}" : value;
+        }
+        return meta.toString();
     }
 
     // PATCH /api/visits/{visitId}/confirm

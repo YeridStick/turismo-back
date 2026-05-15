@@ -1,6 +1,7 @@
 package co.turismo.api.dto.visit;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.databind.JsonNode;
 
 @Schema(description = "Datos recopilados desde el dispositivo móvil para iniciar un check-in")
 public record CheckinRequest(
@@ -12,8 +13,8 @@ public record CheckinRequest(
         Integer accuracy_m,
         @Schema(description = "Identificador del dispositivo", example = "android-device-123")
         String device_id,
-        @Schema(description = "Payload adicional en JSON", example = "{\"appVersion\":\"2.3.1\"}")
-        String meta
+        @Schema(description = "Payload adicional en JSON (objeto o string JSON)", example = "{\"appVersion\":\"2.3.1\"}")
+        JsonNode meta
 ) {
 }
 
