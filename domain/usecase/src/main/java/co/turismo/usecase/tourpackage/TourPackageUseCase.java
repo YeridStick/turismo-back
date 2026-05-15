@@ -34,16 +34,12 @@ public class TourPackageUseCase {
 
         return agencyRepository.findByEmail(userEmail)
                 .switchIfEmpty(Mono.error(new NotFoundException("Agencia no encontrada para el email")))
-                .flatMap(agency ->
-                        validatePlacesExist(placeIds)
-                                .then(tourPackageRepository.create(
-                                        request.toBuilder()
-                                                .agencyId(agency.getId())
-                                                .placeIds(placeIds)
-                                                .build()))
-                )
-                .flatMap(created -> resolveFullPackage(created))
-                .flatMap(this::attachPlaces);
+                .flatMap(agency -> createForResolvedAgency(request, placeIds, agency.getId()));
+    }
+
+    public Mono<TourPackage> createForAgency(CreateTourPackageRequest request, Long agencyId) {
+        Long[] placeIds = normalizePlaceIds(request.getPlaceIds());
+        return createForResolvedAgency(request, placeIds, agencyId);
     }
 
     public Flux<TourPackage> findAll(Integer limit, Integer offset) {
@@ -117,6 +113,17 @@ public class TourPackageUseCase {
                 .flatMap(found -> found.size() != placeIds.length
                         ? Mono.error(new ConflictException("Uno o más lugares no existen"))
                         : Mono.empty());
+    }
+
+    private Mono<TourPackage> createForResolvedAgency(CreateTourPackageRequest request, Long[] placeIds, Long agencyId) {
+        return validatePlacesExist(placeIds)
+                .then(tourPackageRepository.create(
+                        request.toBuilder()
+                                .agencyId(agencyId)
+                                .placeIds(placeIds)
+                                .build()))
+                .flatMap(this::resolveFullPackage)
+                .flatMap(this::attachPlaces);
     }
 
     private Mono<TourPackage> resolveFullPackage(TourPackage created) {

@@ -38,10 +38,20 @@ public class TourPackageHandler {
     public Mono<ServerResponse> create(ServerRequest req) {
         return req.principal()
                 .cast(Authentication.class)
-                .map(Authentication::getName)
                 .zipWith(req.bodyToMono(CreatePackageRequest.class)
                         .flatMap(requestValidator::validate))
-                .flatMap(tuple -> tourPackageUseCase.create(tuple.getT1(), toCreateCommand(tuple.getT2())))
+                .flatMap(tuple -> {
+                    Authentication auth = tuple.getT1();
+                    CreatePackageRequest body = tuple.getT2();
+                    CreateTourPackageRequest cmd = toCreateCommand(body);
+
+                    if (hasRole(auth, "ADMIN") && body.hasAdminAgencyTarget()) {
+                        return resolveAdminTargetAgencyId(body)
+                                .flatMap(agencyId -> tourPackageUseCase.createForAgency(cmd, agencyId));
+                    }
+
+                    return tourPackageUseCase.create(auth.getName(), cmd);
+                })
                 .flatMap(pkg -> ServerResponse.status(201)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.created(toResponse(pkg))));
@@ -210,6 +220,17 @@ public class TourPackageHandler {
                 .anyMatch(a -> expected.equalsIgnoreCase(a.getAuthority()));
     }
 
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private Mono<Long> resolveAdminTargetAgencyId(CreatePackageRequest body) {
+        return requestValidator.validate(new AdminAgencyTarget(body.agencyId(), body.agencyEmail()))
+                .flatMap(target -> target.agencyId() != null
+                        ? Mono.just(target.agencyId())
+                        : agencyUseCase.findByEmail(target.agencyEmail()).map(a -> a.getId()));
+    }
+
     private static int parseQueryParam(ServerRequest req, String name, int defaultValue) {
         return req.queryParam(name)
                 .map(Integer::parseInt)
@@ -266,11 +287,35 @@ public class TourPackageHandler {
             String tag,
             List<String> includes,
             String image,
+            @Positive(message = "agencyId debe ser mayor a 0")
+            Long agencyId,
+            String agencyEmail,
 
             @NotNull(message = "placeIds es obligatorio")
             @Size(min = 1, message = "Debe incluir al menos un lugar")
             List<Long> placeIds
-    ) {}
+    ) {
+        @AssertTrue(message = "No puedes enviar agencyId y agencyEmail al mismo tiempo")
+        public boolean isSingleAdminAgencyTarget() {
+            return !hasText(agencyEmail) || agencyId == null;
+        }
+
+        public boolean hasAdminAgencyTarget() {
+            return agencyId != null || hasText(agencyEmail);
+        }
+    }
+
+    private record AdminAgencyTarget(
+            @Positive(message = "agencyId debe ser mayor a 0")
+            Long agencyId,
+            @Email(message = "agencyEmail debe tener un formato válido")
+            String agencyEmail
+    ) {
+        @AssertTrue(message = "Debes enviar agencyId o agencyEmail")
+        public boolean isAnyTargetPresent() {
+            return agencyId != null || hasText(agencyEmail);
+        }
+    }
 
     @Schema(name = "UpdatePackageBody")
     public record UpdatePackageBody(

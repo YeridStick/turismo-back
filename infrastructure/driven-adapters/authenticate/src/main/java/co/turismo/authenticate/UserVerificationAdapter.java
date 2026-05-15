@@ -34,9 +34,6 @@ public class UserVerificationAdapter implements UserVerificationGateway {
     @Override
     public Mono<EmailVerificationResult> sendVerificationEmail(String emailRaw) {
         String email = normalize(emailRaw);
-        if (email == null || email.isBlank()) {
-            return Mono.error(new IllegalArgumentException("Email requerido"));
-        }
  
         return userRepository.isActiveByEmail(email)
                 .filter(Boolean::booleanValue)

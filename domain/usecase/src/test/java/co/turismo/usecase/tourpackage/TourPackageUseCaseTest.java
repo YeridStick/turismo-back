@@ -193,6 +193,27 @@ class TourPackageUseCaseTest {
     }
 
     @Test
+    void createForAgencyShouldUseAgencyIdWhenProvided() {
+        CreateTourPackageRequest request = CreateTourPackageRequest.builder()
+                .title("Plan Huila")
+                .placeIds(new Long[]{1L})
+                .build();
+
+        Place p1 = Place.builder().id(1L).build();
+
+        when(placeRepository.findByIds(any(Long[].class), anyInt(), anyInt()))
+                .thenReturn(Flux.just(p1), Flux.just(p1));
+        when(tourPackageRepository.create(any(CreateTourPackageRequest.class)))
+                .thenReturn(Mono.just(TourPackage.builder().id(10L).agencyId(77L).placeIds(new Long[]{1L}).build()));
+        when(tourPackageRepository.findById(10L))
+                .thenReturn(Mono.just(TourPackage.builder().id(10L).agencyId(77L).placeIds(new Long[]{1L}).build()));
+
+        StepVerifier.create(useCase.createForAgency(request, 77L))
+                .assertNext(pkg -> assertEquals(77L, pkg.getAgencyId()))
+                .verifyComplete();
+    }
+
+    @Test
     void findAllShouldAttachPlaces() {
         TourPackage pkg = TourPackage.builder()
                 .id(1L)

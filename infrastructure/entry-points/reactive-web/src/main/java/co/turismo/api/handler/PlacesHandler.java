@@ -1,6 +1,5 @@
 package co.turismo.api.handler;
 
-import co.turismo.api.dto.place.SearchRequest;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.model.place.CreatePlaceRequest;
 import co.turismo.model.place.Place;
@@ -14,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
