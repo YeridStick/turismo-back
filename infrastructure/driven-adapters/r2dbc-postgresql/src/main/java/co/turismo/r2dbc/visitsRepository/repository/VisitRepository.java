@@ -73,18 +73,20 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
     @Query("""
       SELECT 1
         FROM place_visits
-       WHERE place_id = :placeId
+       WHERE place_id = :placeIdCheck
          AND status   = 'confirmed'
          AND confirmed_on_utc = (now() AT TIME ZONE 'UTC')::date
          AND (
-               (:userId IS NOT NULL AND user_id = :userId)
-            OR (:userId IS NULL    AND device_id = :deviceId)
+               (:userIdCheck IS NOT NULL AND user_id = :userIdMatch)
+            OR (:userIdNullCheck IS NULL    AND device_id = :deviceIdMatch)
          )
        LIMIT 1
     """)
-    Mono<Integer> existsConfirmedToday(@Param("placeId") Long placeId,
-                                       @Param("userId") Long userId,
-                                       @Param("deviceId") String deviceId);
+    Mono<Integer> existsConfirmedToday(@Param("placeIdCheck") Long placeId,
+                                       @Param("userIdCheck") Long userId,
+                                       @Param("userIdMatch") Long userIdForMatch,
+                                       @Param("userIdNullCheck") Long userIdForNullCheck,
+                                       @Param("deviceIdMatch") String deviceId);
 
     @Query("""
         INSERT INTO place_visit_daily(day, place_id, visits)
