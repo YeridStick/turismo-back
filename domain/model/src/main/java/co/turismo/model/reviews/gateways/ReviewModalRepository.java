@@ -2,6 +2,7 @@ package co.turismo.model.reviews.gateways;
 
 import co.turismo.model.reviews.PlaceRatingSummary;
 import co.turismo.model.reviews.Review;
+import co.turismo.model.reviews.TopRatedPlace;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -10,4 +11,5 @@ public interface ReviewModalRepository {
     Flux<Review> findByPlaceIdPaginated(Long placeId, int limit, int offset);
     Mono<Review> create(Review review);
     Mono<PlaceRatingSummary> ratingSummary(Long placeId);
+    Flux<TopRatedPlace> findTopRatedPlaces(int limit);
 }

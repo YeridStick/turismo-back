@@ -2,6 +2,7 @@ package co.turismo.usecase.reviews;
 
 import co.turismo.model.reviews.PlaceRatingSummary;
 import co.turismo.model.reviews.Review;
+import co.turismo.model.reviews.TopRatedPlace;
 import co.turismo.model.reviews.gateways.ReviewModalRepository;
 import co.turismo.model.user.gateways.UserRepository;
 import co.turismo.model.userIdentityPort.UserIdentityPort;
@@ -46,5 +47,9 @@ public class ReviewsUseCase {
 
     public Mono<PlaceRatingSummary> summary(Long placeId) {
         return reviewRepository.ratingSummary(placeId);
+    }
+
+    public Flux<TopRatedPlace> topRatedPlaceFlux(int limit) {
+        return reviewRepository.findTopRatedPlaces(limit);
     }
 }

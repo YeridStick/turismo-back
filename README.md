@@ -132,3 +132,11 @@ Para verificar que el caché está funcionando:
 - **Datos temporalemente viejos:** Los resultados de búsqueda pueden estar desactualizados hasta 60 segundos (TTL configurable)
 - **Consistencia eventual:** Después de una operación de escritura, el caché antiguo puede persistir brevemente hasta que se complete la invalidación
 - **Memoria de Redis:** Monitorear el uso de memoria de Redis en producción, especialmente si hay muchas combinaciones de parámetros de búsqueda únicas
+
+## Desarrollo local (Windows)
+
+Si Gradle falla con errores de bloqueo de archivos `.jar` (`Unable to delete file`), ejecuta:
+
+```powershell
+.\fix-gradle-lock.ps1 -ProjectRoot "C:\Users\yerid\Downloads\turismo-back"
+```

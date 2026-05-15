@@ -27,6 +27,7 @@ import co.turismo.model.place.Place;
 
 import co.turismo.model.place.strategy.PlaceSearchMode;
 import co.turismo.model.reviews.Review;
+import co.turismo.model.reviews.TopRatedPlace;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -692,6 +693,19 @@ public class RouterRest {
                                 .response(jsonResponse("200", "Estadísticas de calificación", ReviewsHandler.RatingSummaryResponse.class))
                 )
 
+                .GET(
+                        ConstantsEntryPoint.API_BASE_PATH + "/pruebas/places/top-rated",
+                        reviewsHandler::topRatedPlaces,
+                        ops -> ops.operationId("reviewsTopRatedPlaces")
+                                .summary("Obtiene los lugares con mejores calificaciones")
+                                .description("Retorna el listado de lugares mejor valorados según promedio y cantidad de reseñas")
+                                .tag("Reviews")
+                                .parameter(limitQueryParam())
+                                .response(jsonResponse("200", "Listado de lugares mejor calificados", ReviewsHandler.TopRatedPlaceResponse.class)
+                                )
+                )
+
+
                 .POST(ConstantsEntryPoint.API_BASE_PATH + "/pruebas/places/{id}/feedback",
                         feedbackHandler::create,
                         ops -> ops.operationId("feedbackCreate")
@@ -704,6 +718,16 @@ public class RouterRest {
                 )
 
                 .build();
+    }
+
+    private static org.springdoc.core.fn.builders.parameter.Builder limitQueryParam() {
+        return queryParam(
+                "limit",
+                false,
+                "Cantidad máxima de lugares a retornar",
+                Integer.class,
+                "3"
+        );
     }
 
     private static org.springdoc.core.fn.builders.apiresponse.Builder jsonResponse(String code, String description, Class<?> schemaClass) {

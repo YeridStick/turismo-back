@@ -1,7 +1,6 @@
 package co.turismo.api.handler;
 
 import co.turismo.api.dto.response.ApiResponse;
-import co.turismo.model.reviews.Review;
 import co.turismo.usecase.reviews.ReviewsUseCase;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -11,8 +10,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.*;
 import reactor.core.publisher.Mono;
-
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -57,6 +54,20 @@ public class ReviewsHandler {
                         .bodyValue(new RatingSummaryResponse(s.getPlaceId(), s.getAvgRating(), s.getReviewsCount())));
     }
 
+    /** GET público: top lugares con mejores reseñas */
+    public Mono<ServerResponse> topRatedPlaces(ServerRequest req) {
+        int limit = req.queryParam("limit")
+                .map(Integer::parseInt)
+                .map(v -> Math.min(MAX_LIMIT, Math.max(1, v)))
+                .orElse(3);
+
+        return reviews.topRatedPlaceFlux(limit)
+                .collectList()
+                .flatMap(list -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(list)));
+    }
+
     /** POST protegido: crea reseña con email autenticado */
     public Mono<ServerResponse> create(ServerRequest req) {
         Long placeId = Long.valueOf(req.pathVariable("id"));
@@ -86,6 +97,43 @@ public class ReviewsHandler {
             @Schema(description = "Promedio de calificaciones", example = "4.5")
             double avgRating,
             @Schema(description = "Número de reseñas consideradas", example = "245")
+            long reviewsCount
+    ) {
+    }
+
+    @Schema(
+            name = "TopRatedPlaceResponse",
+            description = "Información resumida de los lugares mejor calificados"
+    )
+    public record TopRatedPlaceResponse(
+            @Schema(
+                    description = "Identificador único del lugar",
+                    example = "15"
+            )
+            Long id,
+
+            @Schema(
+                    description = "Nombre del lugar turístico",
+                    example = "La Mano del Gigante"
+            )
+            String name,
+
+            @Schema(
+                    description = "Descripción corta del lugar",
+                    example = "Mirador turístico reconocido por su vista panorámica y estructura icónica."
+            )
+            String description,
+
+            @Schema(
+                    description = "Promedio total de calificaciones recibidas",
+                    example = "4.8"
+            )
+            double avgRating,
+
+            @Schema(
+                    description = "Cantidad total de reseñas registradas",
+                    example = "312"
+            )
             long reviewsCount
     ) {
     }
