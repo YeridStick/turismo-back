@@ -29,11 +29,9 @@ public class AgencyUseCase {
     public Mono<Agency> create(String creatorEmail, CreateAgencyRequest request) {
         return userRepository.findByEmail(creatorEmail)
                 .switchIfEmpty(Mono.error(new IllegalStateException("Usuario no encontrado")))
-                .flatMap(user -> agencyRepository.findByEmail(creatorEmail)
-                        .flatMap(ignored -> Mono.error(new IllegalStateException("El usuario ya tiene una agencia registrada")))
-                        .then(agencyRepository.create(request)
-                                .flatMap(agency -> agencyRepository.addUserToAgency(agency.getId(), user.getId())
-                                        .thenReturn(agency))));
+                .flatMap(user -> agencyRepository.create(request)
+                        .flatMap(agency -> agencyRepository.addUserToAgency(agency.getId(), user.getId())
+                                .thenReturn(agency)));
     }
 
     public Mono<Agency> addUserToMyAgency(String requesterEmail, String userEmail) {

@@ -160,9 +160,10 @@ CREATE TABLE IF NOT EXISTS agency_users (
     agency_id BIGINT REFERENCES agencies(id) ON DELETE CASCADE,
     user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (agency_id, user_id),
-    UNIQUE (user_id)
+    PRIMARY KEY (agency_id, user_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_agency_users_user_id ON agency_users (user_id);
 
 -- 7. Paquetes Turísticos
 CREATE TABLE IF NOT EXISTS tour_packages (

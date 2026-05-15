@@ -73,7 +73,6 @@ class AgencyUseCaseTest {
         CreateAgencyRequest request = CreateAgencyRequest.builder().name("Turismo Sur").build();
 
         when(userRepository.findByEmail("owner@example.com")).thenReturn(Mono.just(creator));
-        when(agencyRepository.findByEmail("owner@example.com")).thenReturn(Mono.empty());
         when(agencyRepository.create(request)).thenReturn(Mono.just(agency));
         when(agencyRepository.addUserToAgency(10L, 7L)).thenReturn(Mono.empty());
 
@@ -360,4 +359,3 @@ class AgencyUseCaseTest {
         verify(agencyRepository).removeUserFromAgency(3L, 7L);
     }
 }
-

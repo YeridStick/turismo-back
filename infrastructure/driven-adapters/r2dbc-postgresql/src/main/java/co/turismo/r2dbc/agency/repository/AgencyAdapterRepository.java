@@ -88,7 +88,7 @@ public interface AgencyAdapterRepository extends ReactiveCrudRepository<AgencyDa
     @Query("""
         INSERT INTO agency_users (agency_id, user_id, created_at)
         VALUES (:agencyId, :userId, NOW())
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (agency_id, user_id) DO NOTHING
     """)
     Mono<Void> addUserToAgency(@Param("agencyId") Long agencyId, @Param("userId") Long userId);
 
