@@ -21,9 +21,9 @@ public class VisitHandler {
 
     private final VisitsUseCase visitsUseCase;
 
-    // POST /api/places/{placeId}/checkin
+    // POST /api/places/{id}/checkin
     public Mono<ServerResponse> checkin(ServerRequest req) {
-        Long placeId = Long.valueOf(req.pathVariable("placeId"));
+        Long placeId = Long.valueOf(req.pathVariable("id"));
 
         Mono<String> emailMono = req.principal()
                 .cast(Authentication.class)

@@ -631,7 +631,7 @@ public class RouterRest {
                         ops -> ops.operationId("visitsCheckin")
                                 .summary("Check-in en lugar")
                                 .tag("Visits")
-                                .parameter(pathParam("placeId", "Identificador del lugar visitado", Long.class))
+                                .parameter(pathParam("id", "Identificador del lugar visitado", Long.class))
                                 .requestBody(jsonBody(CheckinRequest.class, true))
                                 .response(jsonResponse("200", "Check-in registrado", ApiCheckinResponse.class))
                                 .response(apiErrorResponse("400", "Solicitud inválida"))

@@ -66,7 +66,7 @@ public class ConstantsEntryPoint {
     public static final String DEBUG_RECOVERY_EMAIL = "/debug/recovery-email";
 
     // Visits
-    public static final String VISITS_CHECKIN_PATH         = "/pruebas/places/{placeId}/checkin";
+    public static final String VISITS_CHECKIN_PATH         = "/pruebas/places/{id}/checkin";
     public static final String VISITS_CONFIRM_PATH         = "/pruebas/visits/{visitId}/confirm";
     public static final String ANALYTICS_TOP_PLACES_PATH   = "/pruebas/analytics/places/top";
 }
