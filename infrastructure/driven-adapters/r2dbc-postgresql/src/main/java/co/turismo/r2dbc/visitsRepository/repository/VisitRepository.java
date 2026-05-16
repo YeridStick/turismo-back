@@ -1,6 +1,7 @@
 package co.turismo.r2dbc.visitsRepository.repository;
 
 import co.turismo.r2dbc.visitsRepository.dto.PlaceBriefRow;
+import co.turismo.r2dbc.visitsRepository.dto.UserFavoritePlaceRow;
 import co.turismo.r2dbc.visitsRepository.dto.PlaceNearbyRow;
 import co.turismo.r2dbc.visitsRepository.dto.TopPlaceRowDto;
 import co.turismo.r2dbc.visitsRepository.entity.PlaceVisitData;
@@ -69,6 +70,23 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
                                       @Param("accuracyM") Integer accuracyM,
                                       @Param("meta") String metaJson);
 
+    @Query("""
+      SELECT 1
+        FROM place_visits
+       WHERE place_id = :placeIdCheck
+         AND status   = 'confirmed'
+         AND confirmed_at >= (now() - INTERVAL '24 hours')
+         AND (
+               (:userIdCheck IS NOT NULL AND user_id = :userIdMatch)
+            OR (:userIdNullCheck IS NULL    AND device_id = :deviceIdMatch)
+         )
+       LIMIT 1
+    """)
+    Mono<Integer> existsConfirmedInLast24Hours(@Param("placeIdCheck") Long placeId,
+                                                @Param("userIdCheck") Long userId,
+                                                @Param("userIdMatch") Long userIdForMatch,
+                                                @Param("userIdNullCheck") Long userIdForNullCheck,
+                                                @Param("deviceIdMatch") String deviceId);
 
     @Query("""
       SELECT 1
@@ -131,6 +149,21 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
                                            @Param("limit") int limit);
 
     @Query("""
+      SELECT p.id AS placeId,
+             p.name AS name,
+             COUNT(v.id)::int AS visits
+        FROM place_visits v
+        JOIN places p ON p.id = v.place_id
+       WHERE v.user_id = :userId
+         AND v.status = 'confirmed'
+       GROUP BY p.id, p.name
+       ORDER BY visits DESC
+       LIMIT :limit
+    """)
+    Flux<TopPlaceRowDto> topPlacesByUser(@Param("userId") Long userId,
+                                         @Param("limit") int limit);
+
+    @Query("""
       SELECT id,
              name,
              address,
@@ -167,6 +200,43 @@ public interface VisitRepository extends ReactiveCrudRepository<PlaceVisitData, 
                                     @Param("lng") double lng,
                                     @Param("radius") int radius,
                                     @Param("limit") int limit);
+
+    @Query("""
+      INSERT INTO user_place_favorites(user_id, place_id)
+      VALUES (:userId, :placeId)
+      ON CONFLICT (user_id, place_id) DO NOTHING
+    """)
+    Mono<Void> addFavorite(@Param("userId") Long userId,
+                           @Param("placeId") Long placeId);
+
+    @Query("""
+      DELETE FROM user_place_favorites
+       WHERE user_id = :userId
+         AND place_id = :placeId
+    """)
+    Mono<Void> removeFavorite(@Param("userId") Long userId,
+                              @Param("placeId") Long placeId);
+
+    @Query("""
+      SELECT
+          p.id,
+          p.name,
+          p.address,
+          p.description,
+          p.category_id,
+          ST_Y(p.geom::geometry) AS lat,
+          ST_X(p.geom::geometry) AS lng,
+          p.image_urls,
+          f.created_at AS favorited_at
+      FROM user_place_favorites f
+      JOIN places p ON p.id = f.place_id
+      WHERE f.user_id = :userId
+      ORDER BY f.created_at DESC
+      LIMIT :limit OFFSET :offset
+    """)
+    Flux<UserFavoritePlaceRow> listFavoritesByUser(@Param("userId") Long userId,
+                                                   @Param("limit") int limit,
+                                                   @Param("offset") int offset);
 
 
 }

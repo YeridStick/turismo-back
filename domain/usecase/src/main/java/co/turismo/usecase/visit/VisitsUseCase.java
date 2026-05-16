@@ -5,6 +5,7 @@ import co.turismo.model.userIdentityPort.UserSummary;
 import co.turismo.model.visits.PlaceBriefUC;
 import co.turismo.model.visits.PlaceNearby;
 import co.turismo.model.visits.TopPlace;
+import co.turismo.model.visits.UserFavoritePlace;
 import co.turismo.model.visits.VisitStatus;
 import co.turismo.model.visits.gateways.VisitGateway;
 import lombok.RequiredArgsConstructor;
@@ -47,21 +48,24 @@ public class VisitsUseCase {
                                 .map(UserSummary::id)
                 );
 
-        // 2) Validar distancia y crear pending
-        return gateway.computeDistanceIfWithin(cmd.placeId(), cmd.lat(), cmd.lng(), RADIUS_M)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Fuera del radio permitido")))
-                .zipWith(userIdMono)
-                .flatMap(tuple -> {
-                    int distance = tuple.getT1();
-                    Long userId  = tuple.getT2();
-
-                    return gateway.insertPending(
-                                    cmd.placeId(), userId, cmd.deviceId(),
-                                    distance, cmd.accuracyM(),
-                                    cmd.metaJson() != null ? cmd.metaJson() : "{}"
-                            )
-                            .map(v -> new CheckinRes(v.getId(), v.getStatus().name(), MIN_STAY_SECONDS, distance));
-                });
+        // 2) Regla 24h por usuario/sitio, luego validación de distancia y pending
+        return userIdMono.flatMap(userId ->
+                gateway.existsConfirmedInLast24Hours(cmd.placeId(), userId, cmd.deviceId())
+                        .flatMap(already -> {
+                            if (Boolean.TRUE.equals(already)) {
+                                return Mono.error(new IllegalStateException(
+                                        "Ya registraste visita en este sitio en las últimas 24 horas"));
+                            }
+                            return gateway.computeDistanceIfWithin(cmd.placeId(), cmd.lat(), cmd.lng(), RADIUS_M)
+                                    .switchIfEmpty(Mono.error(new IllegalStateException("Fuera del radio permitido")))
+                                    .flatMap(distance -> gateway.insertPending(
+                                                    cmd.placeId(), userId, cmd.deviceId(),
+                                                    distance, cmd.accuracyM(),
+                                                    cmd.metaJson() != null ? cmd.metaJson() : "{}"
+                                            )
+                                            .map(v -> new CheckinRes(v.getId(), v.getStatus().name(), MIN_STAY_SECONDS, distance)));
+                        })
+        );
     }
 
     /* ---------- CONFIRM ---------- */
@@ -104,5 +108,37 @@ public class VisitsUseCase {
 
     public Flux<TopPlace> top(LocalDate from, LocalDate to, int limit) {
         return gateway.topPlaces(from, to, limit);
+    }
+
+    public Flux<TopPlace> myTopVisited(String email, int limit) {
+        return userIdentityPortGateway.getUserIdForEmail(email)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Usuario no encontrado con email: " + email)))
+                .flatMapMany(user -> gateway.topPlacesByUser(user.id(), limit));
+    }
+
+    public Mono<Void> addFavorite(String email, Long placeId) {
+        if (placeId == null) {
+            return Mono.error(new IllegalArgumentException("placeId es requerido"));
+        }
+        return userIdentityPortGateway.getUserIdForEmail(email)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Usuario no encontrado con email: " + email)))
+                .flatMap(user -> gateway.getPlaceBrief(placeId)
+                        .switchIfEmpty(Mono.error(new IllegalArgumentException("Lugar no encontrado")))
+                        .then(gateway.addFavorite(user.id(), placeId)));
+    }
+
+    public Mono<Void> removeFavorite(String email, Long placeId) {
+        if (placeId == null) {
+            return Mono.error(new IllegalArgumentException("placeId es requerido"));
+        }
+        return userIdentityPortGateway.getUserIdForEmail(email)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Usuario no encontrado con email: " + email)))
+                .flatMap(user -> gateway.removeFavorite(user.id(), placeId));
+    }
+
+    public Flux<UserFavoritePlace> myFavorites(String email, int limit, int offset) {
+        return userIdentityPortGateway.getUserIdForEmail(email)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException("Usuario no encontrado con email: " + email)))
+                .flatMapMany(user -> gateway.listFavoritesByUser(user.id(), limit, offset));
     }
 }

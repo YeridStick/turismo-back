@@ -661,6 +661,49 @@ public class RouterRest {
                                 .response(jsonResponse("200", "Ranking de visitas", ApiTopPlacesResponse.class))
                 )
 
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USER_TOP_VISITS_PATH,
+                        visitHandler::myTopVisited,
+                        ops -> ops.operationId("userTopVisitedPlaces")
+                                .summary("Mis lugares más visitados")
+                                .description("Retorna el ranking de lugares con más visitas confirmadas del usuario autenticado.")
+                                .tag("Visits")
+                                .parameter(queryParam("limit", false, "Cantidad de resultados", Integer.class, "10"))
+                                .response(jsonResponse("200", "Ranking personal de visitas", ApiTopPlacesResponse.class))
+                                .response(apiErrorResponse("401", "No autenticado"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USER_FAVORITES_PATH,
+                        visitHandler::myFavorites,
+                        ops -> ops.operationId("userFavoritesList")
+                                .summary("Mis lugares favoritos")
+                                .tag("Favorites")
+                                .parameter(queryParam("limit", false, "Cantidad de resultados", Integer.class, "20"))
+                                .parameter(queryParam("offset", false, "Desplazamiento para paginación", Integer.class, "0"))
+                                .response(jsonResponse("200", "Favoritos del usuario", ApiUserFavoritePlacesResponse.class))
+                                .response(apiErrorResponse("401", "No autenticado"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USER_FAVORITE_BY_PLACE_PATH,
+                        visitHandler::addFavorite,
+                        ops -> ops.operationId("userFavoriteAdd")
+                                .summary("Agregar lugar a favoritos")
+                                .tag("Favorites")
+                                .parameter(pathParam("placeId", "Identificador del lugar", Long.class))
+                                .response(jsonResponse("200", "Favorito agregado", ApiMessageResponse.class))
+                                .response(apiErrorResponse("401", "No autenticado"))
+                                .response(apiErrorResponse("400", "Lugar inválido"))
+                )
+
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.USER_FAVORITE_BY_PLACE_PATH,
+                        visitHandler::removeFavorite,
+                        ops -> ops.operationId("userFavoriteRemove")
+                                .summary("Eliminar lugar de favoritos")
+                                .tag("Favorites")
+                                .parameter(pathParam("placeId", "Identificador del lugar", Long.class))
+                                .response(jsonResponse("200", "Favorito eliminado", ApiMessageResponse.class))
+                                .response(apiErrorResponse("401", "No autenticado"))
+                )
+
                 // =========================
                 // Reviews & Feedback
                 // =========================

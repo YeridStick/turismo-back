@@ -88,6 +88,12 @@ public class VisitRepositoryAdapter
                 .map(VisitRepositoryAdapter::toDomain);
     }
 
+    @Override
+    public Mono<Boolean> existsConfirmedInLast24Hours(Long placeId, Long userId, String deviceId) {
+        return repository.existsConfirmedInLast24Hours(placeId, userId, userId, userId, deviceId)
+                .map(x -> true)
+                .defaultIfEmpty(false);
+    }
 
     @Override
     public Mono<Boolean> existsConfirmedToday(Long placeId, Long userId, String deviceId) {
@@ -114,6 +120,12 @@ public class VisitRepositoryAdapter
     }
 
     @Override
+    public Flux<TopPlace> topPlacesByUser(Long userId, int limit) {
+        return repository.topPlacesByUser(userId, limit)
+                .map(r -> new TopPlace(r.getPlaceId(), r.getName(), r.getVisits()));
+    }
+
+    @Override
     public Mono<PlaceVisit> findById(Long visitId) {
         return repository.findById(visitId).map(VisitRepositoryAdapter::toDomain);
     }
@@ -129,5 +141,31 @@ public class VisitRepositoryAdapter
                         r.getImageUrls() != null ? r.getImageUrls() : java.util.List.of(),
                         r.getDistanceM()
                 ));
+    }
+
+    @Override
+    public Mono<Void> addFavorite(Long userId, Long placeId) {
+        return repository.addFavorite(userId, placeId);
+    }
+
+    @Override
+    public Mono<Void> removeFavorite(Long userId, Long placeId) {
+        return repository.removeFavorite(userId, placeId);
+    }
+
+    @Override
+    public Flux<UserFavoritePlace> listFavoritesByUser(Long userId, int limit, int offset) {
+        return repository.listFavoritesByUser(userId, limit, offset)
+                .map(r -> UserFavoritePlace.builder()
+                        .placeId(r.getId())
+                        .name(r.getName())
+                        .address(r.getAddress())
+                        .description(r.getDescription())
+                        .categoryId(r.getCategoryId())
+                        .lat(r.getLat())
+                        .lng(r.getLng())
+                        .imageUrls(r.getImageUrls() != null ? r.getImageUrls() : java.util.List.of())
+                        .favoritedAt(r.getFavoritedAt())
+                        .build());
     }
 }

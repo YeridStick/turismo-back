@@ -4,6 +4,7 @@ import co.turismo.model.visits.PlaceBriefUC;
 import co.turismo.model.visits.PlaceNearby;
 import co.turismo.model.visits.PlaceVisit;
 import co.turismo.model.visits.TopPlace;
+import co.turismo.model.visits.UserFavoritePlace;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -17,15 +18,22 @@ public interface VisitGateway {
 
     Mono<PlaceVisit> confirmVisit(Long visitId, Double lat, Double lng, Integer accuracyM, String metaJson);
 
+    Mono<Boolean> existsConfirmedInLast24Hours(Long placeId, Long userId, String deviceId);
+
     Mono<Boolean> existsConfirmedToday(Long placeId, Long userId, String deviceId);
 
     Mono<Void> upsertDaily(Long placeId);
 
     Flux<TopPlace> topPlaces(LocalDate from, LocalDate to, int limit);
     Flux<TopPlace> topPlacesByAgency(Long agencyId, LocalDate from, LocalDate to, int limit);
+    Flux<TopPlace> topPlacesByUser(Long userId, int limit);
 
     Mono<PlaceVisit> findById(Long visitId);
     Mono<PlaceBriefUC> getPlaceBrief(Long placeId);
 
     Flux<PlaceNearby> findNearby(double lat, double lng, int radius, int limit);
+
+    Mono<Void> addFavorite(Long userId, Long placeId);
+    Mono<Void> removeFavorite(Long userId, Long placeId);
+    Flux<UserFavoritePlace> listFavoritesByUser(Long userId, int limit, int offset);
 }

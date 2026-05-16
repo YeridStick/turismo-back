@@ -286,6 +286,25 @@ CREATE TABLE IF NOT EXISTS place_visit_daily (
     PRIMARY KEY (day, place_id)
 );
 
+-- 13. Favoritos de usuarios
+CREATE TABLE IF NOT EXISTS user_place_favorites (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    place_id BIGINT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, place_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_place_favorites_user_created_at
+    ON user_place_favorites(user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_place_visits_user_place_confirmed_at
+    ON place_visits(user_id, place_id, confirmed_at DESC)
+    WHERE status = 'confirmed' AND user_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_place_visits_device_place_confirmed_at
+    ON place_visits(device_id, place_id, confirmed_at DESC)
+    WHERE status = 'confirmed' AND device_id IS NOT NULL;
+
 -- 12. Vista para Resumen de Ratings
 CREATE OR REPLACE VIEW place_rating_summary AS
 SELECT 

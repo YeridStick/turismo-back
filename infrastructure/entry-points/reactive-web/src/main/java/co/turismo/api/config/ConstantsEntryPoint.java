@@ -69,4 +69,7 @@ public class ConstantsEntryPoint {
     public static final String VISITS_CHECKIN_PATH         = "/pruebas/places/{id}/checkin";
     public static final String VISITS_CONFIRM_PATH         = "/pruebas/visits/{visitId}/confirm";
     public static final String ANALYTICS_TOP_PLACES_PATH   = "/pruebas/analytics/places/top";
+    public static final String USER_TOP_VISITS_PATH        = "/pruebas/users/me/visits/top";
+    public static final String USER_FAVORITES_PATH         = "/pruebas/users/me/favorites";
+    public static final String USER_FAVORITE_BY_PLACE_PATH = "/pruebas/users/me/favorites/{placeId}";
 }

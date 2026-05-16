@@ -62,6 +62,7 @@ class VisitsUseCaseTest {
 
         when(userIdentityPort.getUserIdForEmail("ana@example.com"))
                 .thenReturn(Mono.just(new UserSummary(9L, "ana@example.com")));
+        when(gateway.existsConfirmedInLast24Hours(1L, 9L, "device-1")).thenReturn(Mono.just(false));
         when(gateway.computeDistanceIfWithin(1L, 2.0, 3.0, 80)).thenReturn(Mono.just(30));
         when(gateway.insertPending(1L, 9L, "device-1", 30, 20, "{}")).thenReturn(Mono.just(pending));
 
@@ -73,6 +74,21 @@ class VisitsUseCaseTest {
                     assertEquals(30, res.distanceM());
                 })
                 .verifyComplete();
+    }
+
+    @Test
+    void checkinShouldFailWhenAlreadyConfirmedInLast24Hours() {
+        VisitsUseCase.CheckinCmd cmd = new VisitsUseCase.CheckinCmd(
+                1L, 2.0, 3.0, 20, "device-1", "{}", "ana@example.com"
+        );
+
+        when(userIdentityPort.getUserIdForEmail("ana@example.com"))
+                .thenReturn(Mono.just(new UserSummary(9L, "ana@example.com")));
+        when(gateway.existsConfirmedInLast24Hours(1L, 9L, "device-1")).thenReturn(Mono.just(true));
+
+        StepVerifier.create(useCase.checkin(cmd))
+                .expectErrorMatches(error -> error.getMessage().contains("últimas 24 horas"))
+                .verify();
     }
 
     @Test
@@ -128,4 +144,3 @@ class VisitsUseCaseTest {
         verify(gateway).upsertDaily(1L);
     }
 }
-

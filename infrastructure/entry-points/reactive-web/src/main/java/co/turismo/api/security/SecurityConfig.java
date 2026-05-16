@@ -199,6 +199,10 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST,  "/api/pruebas/places/*/checkin").permitAll()
                         .pathMatchers(HttpMethod.PATCH, "/api/pruebas/visits/*/confirm").authenticated()
                         .pathMatchers(HttpMethod.GET,   "/api/pruebas/analytics/places/top").permitAll()
+                        .pathMatchers(HttpMethod.GET,   "/api/pruebas/users/me/visits/top").authenticated()
+                        .pathMatchers(HttpMethod.GET,   "/api/pruebas/users/me/favorites").authenticated()
+                        .pathMatchers(HttpMethod.POST,  "/api/pruebas/users/me/favorites/*").authenticated()
+                        .pathMatchers(HttpMethod.DELETE,"/api/pruebas/users/me/favorites/*").authenticated()
                         .pathMatchers("/api/pruebas/**").permitAll()
 
                         // ---- Protegido: Places / Admin ----
