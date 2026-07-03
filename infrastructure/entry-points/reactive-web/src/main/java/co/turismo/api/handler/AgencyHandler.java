@@ -75,7 +75,22 @@ public class AgencyHandler {
     }
 
     public Mono<ServerResponse> list(ServerRequest req) {
-        return agencyUseCase.findAll()
+        int limit = parseLimit(req.queryParam("limit").orElse(null), 20);
+        int offset = parseOffset(req.queryParam("offset").orElse(null), 0);
+
+        return agencyUseCase.findAll(limit, offset)
+                .collectList()
+                .flatMap(list -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(ApiResponse.ok(list)));
+    }
+
+    public Mono<ServerResponse> searchByName(ServerRequest req) {
+        String query = req.queryParam("q").orElse("");
+        int limit = parseLimit(req.queryParam("limit").orElse(null), 20);
+        int offset = parseOffset(req.queryParam("offset").orElse(null), 0);
+
+        return agencyUseCase.searchByName(query, limit, offset)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)

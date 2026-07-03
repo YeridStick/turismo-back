@@ -6,7 +6,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
 
     // --- Actuator + Prometheus ---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -25,7 +24,6 @@ dependencies {
 
     // --- Rate Limiting ---
     implementation 'com.bucket4j:bucket4j_jdk17-core:8.15.0'
-    implementation 'com.bucket4j:bucket4j_jdk17-lettuce:8.15.0'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
 
     // --- Utilidades ---

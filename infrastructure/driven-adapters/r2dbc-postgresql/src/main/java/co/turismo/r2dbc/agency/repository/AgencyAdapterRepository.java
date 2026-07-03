@@ -120,6 +120,41 @@ public interface AgencyAdapterRepository extends ReactiveCrudRepository<AgencyDa
     reactor.core.publisher.Flux<AgencyData> findAllProjected();
 
     @Query("""
+        SELECT id,
+               name,
+               description,
+               phone,
+               email,
+               website,
+               logo_url,
+               created_at
+        FROM agencies
+        ORDER BY created_at DESC
+        LIMIT :limit
+        OFFSET :offset
+    """)
+    Flux<AgencyData> findAllProjected(@Param("limit") int limit, @Param("offset") int offset);
+
+    @Query("""
+        SELECT id,
+               name,
+               description,
+               phone,
+               email,
+               website,
+               logo_url,
+               created_at
+        FROM agencies
+        WHERE lower(name) LIKE concat('%', lower(:name), '%')
+        ORDER BY created_at DESC
+        LIMIT :limit
+        OFFSET :offset
+    """)
+    Flux<AgencyData> findByNameLike(@Param("name") String name,
+                                    @Param("limit") int limit,
+                                    @Param("offset") int offset);
+
+    @Query("""
         UPDATE agencies
         SET name = COALESCE(:name, name),
             description = COALESCE(:description, description),

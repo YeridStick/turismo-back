@@ -4,6 +4,9 @@ import co.turismo.model.agency.Agency;
 import co.turismo.model.agency.AgencyDashboard;
 import co.turismo.model.agency.CreateAgencyRequest;
 import co.turismo.model.agency.gateways.AgencyRepository;
+import co.turismo.model.agency.strategy.AgencySearchCriteria;
+import co.turismo.model.agency.strategy.AgencySearchFactoryGateway;
+import co.turismo.model.agency.strategy.AgencySearchMode;
 import co.turismo.model.auditLog.AuditLog;
 import co.turismo.model.auditLog.gateways.AuditLogRepository;
 import co.turismo.model.error.NotFoundException;
@@ -25,6 +28,7 @@ public class AgencyUseCase {
     private final TourPackageRepository tourPackageRepository;
     private final VisitGateway visitGateway;
     private final AuditLogRepository auditLogRepository;
+    private final AgencySearchFactoryGateway agencySearchFactory;
 
     public Mono<Agency> create(String creatorEmail, CreateAgencyRequest request) {
         return userRepository.findByEmail(creatorEmail)
@@ -45,6 +49,28 @@ public class AgencyUseCase {
 
     public Flux<Agency> findAll() {
         return agencyRepository.findAll();
+    }
+
+    public Flux<Agency> findAll(Integer limit, Integer offset) {
+        return agencySearchFactory.getStrategy(AgencySearchMode.ALL)
+                .execute(AgencySearchCriteria.builder()
+                        .mode(AgencySearchMode.ALL)
+                        .limit(limit == null ? 20 : limit)
+                        .offset(offset == null ? 0 : offset)
+                        .build());
+    }
+
+    public Flux<Agency> searchByName(String name, Integer limit, Integer offset) {
+        if (name == null || name.isBlank()) {
+            return Flux.error(new IllegalArgumentException("q es obligatorio"));
+        }
+        return agencySearchFactory.getStrategy(AgencySearchMode.NAME)
+                .execute(AgencySearchCriteria.builder()
+                        .mode(AgencySearchMode.NAME)
+                        .q(name.trim())
+                        .limit(limit == null ? 20 : limit)
+                        .offset(offset == null ? 0 : offset)
+                        .build());
     }
 
     public Flux<Agency> findByUserEmail(String email) {

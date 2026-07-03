@@ -1,29 +1,18 @@
 package co.turismo.authenticate;
 
 import co.turismo.authenticate.dto.SessionSnapshot;
+import co.turismo.authenticate.utils.AuthSessionStore;
 import co.turismo.authenticate.utils.JwtProvider;
-import co.turismo.authenticate.utils.RevocationStore;
-import co.turismo.authenticate.utils.SessionStore;
 import co.turismo.model.authenticationsession.gateways.AuthenticationSessionRepository;
+import co.turismo.model.user.gateways.UserRepository;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Date;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -34,8 +23,8 @@ import java.util.stream.Collectors;
 public class AuthenticateGateway implements AuthenticationSessionRepository {
 
     private final JwtProvider jwt;
-    private final SessionStore sessions;
-    private final RevocationStore revocations;
+    private final AuthSessionStore sessions;
+    private final UserRepository userRepository;
 
     @Value("${security.session.bind-ip:false}")           private boolean bindIp;
     @Value("${security.session.refresh-grace-minutes:15}") private long    graceMins;
@@ -47,14 +36,15 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
         String  token      = jwt.generate(normalize(email), normalizeRoles(roles), jti, expiration);
 
         SessionSnapshot session = new SessionSnapshot(normalize(email), normalizeRoles(roles), bindIp ? ip : null);
-        return sessions.save(token, session, expiration, Duration.ofMinutes(graceMins))
+        return userRepository.findByEmail(session.email())
+                .flatMap(user -> sessions.save(token, user.getId(), session, jti, expiration, Duration.ofMinutes(graceMins)))
                 .thenReturn(token);
     }
 
     @Override
     public Mono<Boolean> validateToken(String token, String ip) {
         return Mono.fromCallable(() -> jwt.parseStrict(token))
-                .flatMap(claims -> revocations.isRevoked(claims.getId())
+                .flatMap(claims -> sessions.isRevoked(claims.getId())
                         .flatMap(revoked -> revoked
                                 ? Mono.just(false)
                                 : sessions.load(token)
@@ -70,11 +60,11 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
         Instant graceLimit = oldExpiry.plus(Duration.ofMinutes(graceMins));
 
         if (Instant.now().isAfter(graceLimit)) {
-            return sessions.delete(oldToken)
+            return sessions.revokeByToken(oldToken)
                     .then(Mono.error(new IllegalStateException("Token fuera de ventana de gracia")));
         }
 
-        return revocations.isRevoked(oldClaims.getId())
+        return sessions.isRevoked(oldClaims.getId())
                 .flatMap(revoked -> revoked
                         ? Mono.error(new IllegalStateException("Token revocado"))
                         : sessions.load(oldToken)
@@ -84,13 +74,15 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
                                 return Mono.error(new SecurityException("IP no coincide"));
 
                             Instant newExpiry = jwt.nextExpiration();
-                            String  newToken  = jwt.generate(session.email(), session.roles(),
-                                    UUID.randomUUID().toString(), newExpiry);
+                            String newJti = UUID.randomUUID().toString();
+                            String newToken = jwt.generate(session.email(), session.roles(), newJti, newExpiry);
                             Duration graceTtl = Duration.between(Instant.now(), graceLimit);
 
-                            return sessions.save(newToken, session, newExpiry, Duration.ofMinutes(graceMins))
-                                    .then(revocations.revoke(oldClaims.getId(), graceTtl))
-                                    .then(sessions.delete(oldToken))
+                            return userRepository.findByEmail(session.email())
+                                    .flatMap(user -> sessions.save(newToken, user.getId(), session,
+                                            newJti, newExpiry, Duration.ofMinutes(graceMins)))
+                                    .then(sessions.revokeByJti(oldClaims.getId(), graceTtl))
+                                    .then(sessions.revokeByToken(oldToken))
                                     .thenReturn(newToken);
                         }));
     }
@@ -101,10 +93,10 @@ public class AuthenticateGateway implements AuthenticationSessionRepository {
                 .flatMap(claims -> {
                     Duration ttl = Duration.between(Instant.now(),
                             claims.getExpiration().toInstant().plus(Duration.ofMinutes(graceMins)));
-                    return revocations.revoke(claims.getId(), ttl)
-                            .then(sessions.delete(token));
+                    return sessions.revokeByJti(claims.getId(), ttl)
+                            .then(sessions.revokeByToken(token));
                 })
-                .onErrorResume(e -> sessions.delete(token));
+                .onErrorResume(e -> sessions.revokeByToken(token));
     }
 
     private boolean isIpValid(String sessionIp, String requestIp) {

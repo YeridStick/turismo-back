@@ -20,4 +20,6 @@ public interface AgencyRepository {
     Mono<Void> updateAgencyUser(Long agencyId, Long oldUserId, Long newUserId);
     Mono<Void> removeUserFromAgency(Long agencyId, Long userId);
     Flux<Agency> findAll();
+    Flux<Agency> findAll(Integer limit, Integer offset);
+    Flux<Agency> findByNameLike(String name, Integer limit, Integer offset);
 }

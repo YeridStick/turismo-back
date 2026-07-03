@@ -72,6 +72,18 @@ public class AgencyRepositoryAdapter extends ReactiveAdapterOperations<Agency, A
     }
 
     @Override
+    public Flux<Agency> findAll(Integer limit, Integer offset) {
+        return repository.findAllProjected(limit != null ? limit : 20, offset != null ? offset : 0)
+                .map(this::toEntity);
+    }
+
+    @Override
+    public Flux<Agency> findByNameLike(String name, Integer limit, Integer offset) {
+        return repository.findByNameLike(name, limit != null ? limit : 20, offset != null ? offset : 0)
+                .map(this::toEntity);
+    }
+
+    @Override
     public Mono<Agency> update(Long id, co.turismo.model.agency.UpdateAgencyRequest request) {
         return repository.updateAgency(
                         id,

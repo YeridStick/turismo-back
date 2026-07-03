@@ -45,6 +45,7 @@ public class ConstantsEntryPoint {
 
     // Agencies
     public static final String AGENCIES_BASE_PATH = "/agencies";
+    public static final String AGENCIES_SEARCH_PATH = "/agencies/search";
     public static final String AGENCIES_USERS_PATH = "/agencies/users";
     public static final String AGENCIES_BY_USER_PATH = "/agencies/by-user";
     public static final String AGENCIES_MY_PATH = "/agencies/my";          // Agencias del usuario autenticado

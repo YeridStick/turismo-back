@@ -393,7 +393,22 @@ public class RouterRest {
                         ops -> ops.operationId("agencyList")
                                 .summary("Listado de agencias")
                                 .tag("Agencies")
+                                .parameter(queryParam("limit", false, "Cantidad de resultados por página", Integer.class, "20"))
+                                .parameter(queryParam("offset", false, "Desplazamiento para paginación", Integer.class, "0"))
                                 .response(jsonResponse("200", "Listado de agencias", ApiAgencyListResponse.class))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_SEARCH_PATH,
+                        agencyHandler::searchByName,
+                        ops -> ops.operationId("agencySearchByName")
+                                .summary("Buscar agencias por nombre")
+                                .description("Busca agencias por coincidencia aproximada del nombre.")
+                                .tag("Agencies")
+                                .parameter(queryParam("q", true, "Texto a buscar en el nombre de la agencia", String.class, "huila"))
+                                .parameter(queryParam("limit", false, "Cantidad de resultados por página", Integer.class, "20"))
+                                .parameter(queryParam("offset", false, "Desplazamiento para paginación", Integer.class, "0"))
+                                .response(jsonResponse("200", "Listado de agencias encontradas", ApiAgencyListResponse.class))
+                                .response(apiErrorResponse("400", "Parámetros inválidos"))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_BY_USER_PATH,
@@ -456,6 +471,8 @@ public class RouterRest {
                                 .description("Devuelve todos los paquetes turísticos de una agencia en específico. Endpoint público.")
                                 .tag("Agencies")
                                 .parameter(pathParam("id", "Identificador interno de la agencia", Long.class))
+                                .parameter(queryParam("limit", false, "Cantidad de resultados por página", Integer.class, "20"))
+                                .parameter(queryParam("offset", false, "Desplazamiento para paginación", Integer.class, "0"))
                                 .response(jsonResponse("200", "Listado de paquetes", ApiTourPackageListResponse.class))
                                 .response(apiErrorResponse("404", "Agencia no encontrada"))
                 )
@@ -511,7 +528,7 @@ public class RouterRest {
                         ops -> ops.operationId("packagesList")
                                 .summary("Listado de paquetes turísticos")
                                 .tag("Packages")
-                                .parameter(queryParam("offset", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("offset", false, "Desplazamiento para paginación", Integer.class, "0"))
                                 .parameter(queryParam("limit", false, "Cantidad de resultados por página", Integer.class, "10"))
                                 .response(jsonResponse("200", "Listado de paquetes", ApiTourPackageListResponse.class))
                 )

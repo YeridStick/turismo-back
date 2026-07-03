@@ -314,7 +314,7 @@ k6 run -e BASE_URL=http://localhost:7860 deployment/k6-capacity-test.js
 1. **Ejecutar pruebas k6** y documentar resultados vs baseline
 2. **Aplicar índices SQL** si no aplicados aún
 3. **Monitorear métricas** con Prometheus/Grafana si disponible
-4. **Considerar caching** Redis para queries frecuentes (ALL sin filtros)
+4. **Validar con EXPLAIN ANALYZE** las queries frecuentes (ALL sin filtros)
 5. **Evaluar sharding** si la base de datos crece > 100k lugares
 
 ---

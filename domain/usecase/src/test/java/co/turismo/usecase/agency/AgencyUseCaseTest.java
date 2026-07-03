@@ -3,6 +3,10 @@ package co.turismo.usecase.agency;
 import co.turismo.model.agency.Agency;
 import co.turismo.model.agency.CreateAgencyRequest;
 import co.turismo.model.agency.gateways.AgencyRepository;
+import co.turismo.model.agency.strategy.AgencySearchCriteria;
+import co.turismo.model.agency.strategy.AgencySearchFactoryGateway;
+import co.turismo.model.agency.strategy.AgencySearchMode;
+import co.turismo.model.agency.strategy.AgencySearchStrategy;
 import co.turismo.model.auditLog.gateways.AuditLogRepository;
 import co.turismo.model.error.NotFoundException;
 import co.turismo.model.tourpackage.gateways.TourPackageRepository;
@@ -42,6 +46,10 @@ class AgencyUseCaseTest {
     private VisitGateway visitGateway;
     @Mock
     private AuditLogRepository auditLogRepository;
+    @Mock
+    private AgencySearchFactoryGateway agencySearchFactory;
+    @Mock
+    private AgencySearchStrategy agencySearchStrategy;
 
     private AgencyUseCase useCase;
 
@@ -52,7 +60,8 @@ class AgencyUseCaseTest {
                 userRepository,
                 tourPackageRepository,
                 visitGateway,
-                auditLogRepository
+                auditLogRepository,
+                agencySearchFactory
         );
     }
 
@@ -162,6 +171,48 @@ class AgencyUseCaseTest {
 
         StepVerifier.create(useCase.findAll())
                 .verifyComplete();
+    }
+
+    @Test
+    void findAllPaginatedShouldUseSearchStrategy() {
+        Agency agency = Agency.builder().id(1L).build();
+        when(agencySearchFactory.getStrategy(AgencySearchMode.ALL)).thenReturn(agencySearchStrategy);
+        when(agencySearchStrategy.execute(any(AgencySearchCriteria.class))).thenReturn(Flux.just(agency));
+
+        StepVerifier.create(useCase.findAll(15, 30))
+                .expectNext(agency)
+                .verifyComplete();
+
+        verify(agencySearchFactory).getStrategy(AgencySearchMode.ALL);
+        verify(agencySearchStrategy).execute(argThat(criteria ->
+                criteria.getMode() == AgencySearchMode.ALL
+                        && criteria.getLimit() == 15
+                        && criteria.getOffset() == 30));
+    }
+
+    @Test
+    void searchByNameShouldUseNameSearchStrategy() {
+        Agency agency = Agency.builder().id(2L).name("Turismo Huila").build();
+        when(agencySearchFactory.getStrategy(AgencySearchMode.NAME)).thenReturn(agencySearchStrategy);
+        when(agencySearchStrategy.execute(any(AgencySearchCriteria.class))).thenReturn(Flux.just(agency));
+
+        StepVerifier.create(useCase.searchByName(" huila ", 10, 0))
+                .expectNext(agency)
+                .verifyComplete();
+
+        verify(agencySearchFactory).getStrategy(AgencySearchMode.NAME);
+        verify(agencySearchStrategy).execute(argThat(criteria ->
+                criteria.getMode() == AgencySearchMode.NAME
+                        && "huila".equals(criteria.getQ())
+                        && criteria.getLimit() == 10
+                        && criteria.getOffset() == 0));
+    }
+
+    @Test
+    void searchByNameShouldFailWhenQueryIsBlank() {
+        StepVerifier.create(useCase.searchByName(" ", 10, 0))
+                .expectErrorMatches(error -> error.getMessage().contains("q es obligatorio"))
+                .verify();
     }
 
 // ── findAllByUserEmail ───────────────────────────────────────────────
