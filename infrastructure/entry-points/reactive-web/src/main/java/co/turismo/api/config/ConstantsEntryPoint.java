@@ -39,6 +39,10 @@ public class ConstantsEntryPoint {
     public static final String PACKAGES_BASE_PATH = "/packages";
     public static final String PACKAGES_ID_PATH = "/packages/{id}";
 
+    // Payments
+    public static final String PAYMENTS_CHECKOUT_PATH = "/payments/checkout";
+    public static final String PAYMENTS_WEBHOOK_PATH = "/payments/webhook";
+
     // Categories
     public static final String CATEGORIES_BASE_PATH = "/categories";
     public static final String CATEGORIES_ID_PATH = "/categories/{id}";

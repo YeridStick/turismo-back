@@ -23,6 +23,7 @@ import co.turismo.api.handler.PlacesHandler.PlaceCreateRequest;
 import co.turismo.api.handler.PlacesHandler.UpdateRequest;
 import co.turismo.api.handler.PlacesHandler.VerifyRequest;
 import co.turismo.model.feedback.Feedback;
+import co.turismo.model.payment.PaymentCheckoutResult;
 import co.turismo.model.place.Place;
 
 import co.turismo.model.place.strategy.PlaceSearchMode;
@@ -58,6 +59,7 @@ public class RouterRest {
             ReviewsHandler reviewsHandler,
             FeedbackHandler feedbackHandler,
             TourPackageHandler tourPackageHandler,
+            PaymentHandler paymentHandler,
             AgencyHandler agencyHandler,
             CategoryHandler categoryHandler,
             DebugEmailHandler debugEmailHandler
@@ -560,6 +562,29 @@ public class RouterRest {
                                 .tag("Packages")
                                 .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
                                 .response(jsonResponse("204", "Eliminado", null))
+                )
+
+                // =========================
+                // Payments
+                // =========================
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PAYMENTS_CHECKOUT_PATH,
+                        paymentHandler::createCheckout,
+                        ops -> ops.operationId("paymentCheckout")
+                                .summary("Crear preferencia de pago Mercado Pago")
+                                .tag("Payments")
+                                .requestBody(jsonBody(PaymentHandler.CheckoutRequest.class, true))
+                                .response(jsonResponse("201", "Preferencia creada", PaymentCheckoutResult.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PAYMENTS_WEBHOOK_PATH,
+                        paymentHandler::webhook,
+                        ops -> ops.operationId("paymentWebhook")
+                                .summary("Webhook Mercado Pago")
+                                .description("Endpoint público para recibir eventos de Mercado Pago y consultar el estado real del pago.")
+                                .tag("Payments")
+                                .response(jsonResponse("200", "Evento procesado", PaymentHandler.WebhookResponse.class))
+                                .response(apiErrorResponse("400", "Evento inválido"))
                 )
 
                 // =========================
