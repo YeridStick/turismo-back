@@ -5,7 +5,6 @@ dependencies {
 	implementation project(':antispam')
 	implementation project(':brevo')
 	implementation project(':locationiq')
-	implementation project(':mercado-pago')
 	implementation project(':reactive-web')
 	implementation project(':authenticate')
 	implementation project(':r2dbc-postgresql')

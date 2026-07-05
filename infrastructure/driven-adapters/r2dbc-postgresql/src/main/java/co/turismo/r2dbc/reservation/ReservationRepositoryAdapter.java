@@ -1,7 +1,7 @@
-package co.turismo.r2dbc.payment;
+package co.turismo.r2dbc.reservation;
 
-import co.turismo.model.payment.PaymentReservation;
-import co.turismo.model.payment.gateways.PaymentReservationGateway;
+import co.turismo.model.reservation.ReservationDraft;
+import co.turismo.model.reservation.gateways.ReservationGateway;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,14 +11,14 @@ import reactor.core.publisher.Mono;
 
 @Repository
 @RequiredArgsConstructor
-public class ReservationPaymentRepositoryAdapter implements PaymentReservationGateway {
+public class ReservationRepositoryAdapter implements ReservationGateway {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ReservationPaymentRepositoryAdapter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ReservationRepositoryAdapter.class);
 
     private final DatabaseClient db;
 
     @Override
-    public Mono<PaymentReservation> createPendingReservation(PaymentReservation reservation) {
+    public Mono<ReservationDraft> createPendingReservation(ReservationDraft reservation) {
         String sql = """
             INSERT INTO reservations (
                 id,
@@ -68,39 +68,5 @@ public class ReservationPaymentRepositoryAdapter implements PaymentReservationGa
                         reservation.getEndDate(),
                         rows))
                 .thenReturn(reservation);
-    }
-
-    @Override
-    public Mono<Void> markReservationAsPaid(String reservationId, String paymentId) {
-        String sql = """
-            UPDATE reservations
-            SET status = 'paid',
-                payment_id = :paymentId,
-                paid_at = NOW(),
-                updated_at = NOW()
-            WHERE id = :reservationId
-            """;
-
-        DatabaseClient.GenericExecuteSpec spec = db.sql(sql)
-                .bind("reservationId", reservationId);
-
-        spec = paymentId == null
-                ? spec.bindNull("paymentId", String.class)
-                : spec.bind("paymentId", paymentId);
-
-        return spec
-                .fetch()
-                .rowsUpdated()
-                .doOnNext(rows -> {
-                    if (rows == 0) {
-                        LOG.warn("No se actualizó ninguna reserva pagada. reservationId={} paymentId={}", reservationId, paymentId);
-                    } else {
-                        LOG.info("Reserva marcada como pagada. reservationId={} paymentId={} rowsUpdated={}",
-                                reservationId,
-                                paymentId,
-                                rows);
-                    }
-                })
-                .then();
     }
 }

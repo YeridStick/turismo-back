@@ -150,9 +150,6 @@ logging:
     co.turismo.brevo: INFO
     co.turismo.usecase.authenticate.AccountRecoveryUseCase: INFO
     co.turismo.r2dbc.usersRepository.adapter.UserRepositoryAdapter: INFO
-    co.turismo.mercadopago: DEBUG
-    org.springframework.web.reactive.function.client.WebClient: DEBUG
-    reactor.netty.http.client: DEBUG
 
 brevo:
   base-url: "${BREVO_BASE_URL:https://api.brevo.com/v3}"
@@ -161,14 +158,3 @@ brevo:
   sender:
     email: "${BREVO_SENDER_EMAIL}"
     name: "${BREVO_SENDER_NAME}"
-
-mercadopago:
-  base-url: "${MERCADOPAGO_BASE_URL:https://api.mercadopago.com}"
-  access-token: "${MERCADOPAGO_ACCESS_TOKEN}"
-  timeout-ms: "${MERCADOPAGO_TIMEOUT_MS:5000}"
-  webhook-url: "${MERCADOPAGO_WEBHOOK_URL:https://stupid-doodles-write.loca.lt/api/payments/webhook}"
-  success-deep-link: "${MERCADOPAGO_SUCCESS_DEEP_LINK:tuapp://pago-exitoso}"
-  failure-deep-link: "${MERCADOPAGO_FAILURE_DEEP_LINK:tuapp://pago-fallido}"
-  pending-deep-link: "${MERCADOPAGO_PENDING_DEEP_LINK:tuapp://pago-pendiente}"
-  payer-email: "${MERCADOPAGO_PAYER_EMAIL:}"
-  include-back-urls: ${MERCADOPAGO_INCLUDE_BACK_URLS:false}

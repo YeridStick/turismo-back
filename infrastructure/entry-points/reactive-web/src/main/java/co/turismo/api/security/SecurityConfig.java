@@ -176,9 +176,6 @@ public class SecurityConfig {
                         .pathMatchers("/api/auth/**").permitAll()
                         .pathMatchers("/admin/auth/**").permitAll()
 
-                        // ---- Público: webhooks externos ----
-                        .pathMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
-
                         // ---- Público: places ----
                         .pathMatchers(HttpMethod.GET, "/api/places/nearby").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/places/all").permitAll()
@@ -225,9 +222,6 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST,   "/api/packages").hasAnyRole("AGENCY", "ADMIN")
                         .pathMatchers(HttpMethod.PATCH,  "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
                         .pathMatchers(HttpMethod.DELETE, "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
-
-                        // ---- Protegido: Payments ----
-                        .pathMatchers(HttpMethod.POST, "/api/payments/checkout").authenticated()
 
                         // ---- Protegido: Agencies ----
                         .pathMatchers(HttpMethod.POST,   "/api/agencies").hasAnyRole("ADMIN", "AGENCY")

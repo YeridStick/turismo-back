@@ -1,4 +1,4 @@
-package co.turismo.model.payment;
+package co.turismo.model.reservation;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder(toBuilder = true)
-public class PaymentReservation {
+public class ReservationDraft {
     private String id;
     private String userEmail;
     private Long tourPackageId;

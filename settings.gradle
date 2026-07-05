@@ -32,5 +32,3 @@ include ':antispam'
 project(':antispam').projectDir = file('./infrastructure/driven-adapters/antispam')
 include ':brevo'
 project(':brevo').projectDir = file('./infrastructure/driven-adapters/brevo')
-include ':mercado-pago'
-project(':mercado-pago').projectDir = file('./infrastructure/driven-adapters/mercado-pago')
