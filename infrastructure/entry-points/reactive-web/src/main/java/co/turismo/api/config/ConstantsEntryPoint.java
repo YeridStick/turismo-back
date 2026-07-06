@@ -39,6 +39,26 @@ public class ConstantsEntryPoint {
     public static final String PACKAGES_BASE_PATH = "/packages";
     public static final String PACKAGES_ID_PATH = "/packages/{id}";
 
+    // Reservations
+    public static final String RESERVATIONS_BASE_PATH = "/reservations";
+    public static final String RESERVATIONS_ME_PATH = "/reservations/me";
+    public static final String RESERVATIONS_ID_PATH = "/reservations/{reservationId}";
+    public static final String RESERVATIONS_MESSAGES_PATH = "/reservations/{reservationId}/messages";
+    public static final String AGENCIES_ME_RESERVATIONS_PATH = "/agencies/me/reservations";
+    public static final String AGENCIES_ME_RESERVATIONS_ID_PATH = "/agencies/me/reservations/{reservationId}";
+    public static final String AGENCIES_ME_RESERVATIONS_STATUS_PATH = "/agencies/me/reservations/{reservationId}/status";
+    public static final String AGENCIES_ME_RESERVATIONS_MESSAGES_PATH = "/agencies/me/reservations/{reservationId}/messages";
+    public static final String AGENCIES_ID_RESERVATIONS_PATH = "/agencies/{agencyId}/reservations";
+    public static final String AGENCIES_ID_RESERVATIONS_ID_PATH = "/agencies/{agencyId}/reservations/{reservationId}";
+    public static final String AGENCIES_ID_RESERVATIONS_STATUS_PATH = "/agencies/{agencyId}/reservations/{reservationId}/status";
+    public static final String AGENCIES_ID_RESERVATIONS_MESSAGES_PATH = "/agencies/{agencyId}/reservations/{reservationId}/messages";
+
+    // Notifications
+    public static final String NOTIFICATIONS_BASE_PATH = "/notifications";
+    public static final String NOTIFICATIONS_STREAM_PATH = "/notifications/stream";
+    public static final String NOTIFICATIONS_READ_ALL_PATH = "/notifications/read-all";
+    public static final String NOTIFICATIONS_READ_PATH = "/notifications/{notificationId}/read";
+
     // Categories
     public static final String CATEGORIES_BASE_PATH = "/categories";
     public static final String CATEGORIES_ID_PATH = "/categories/{id}";

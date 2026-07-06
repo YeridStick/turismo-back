@@ -223,6 +223,21 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.PATCH,  "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
                         .pathMatchers(HttpMethod.DELETE, "/api/packages/*").hasAnyRole("AGENCY", "ADMIN")
 
+                        // ---- Protegido: Reservations ----
+                        .pathMatchers(HttpMethod.POST, "/api/reservations").authenticated()
+                        .pathMatchers(HttpMethod.PATCH, "/api/reservations/*").authenticated()
+                        .pathMatchers(HttpMethod.DELETE, "/api/reservations/*").authenticated()
+                        .pathMatchers(HttpMethod.GET, "/api/reservations/**").authenticated()
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/me/reservations").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/me/reservations/**").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/api/agencies/me/reservations/*/messages").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.PATCH, "/api/agencies/me/reservations/*/status").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/*/reservations").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/agencies/*/reservations/**").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/api/agencies/*/reservations/*/messages").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers(HttpMethod.PATCH, "/api/agencies/*/reservations/*/status").hasAnyRole("AGENCY", "ADMIN")
+                        .pathMatchers("/api/notifications/**").authenticated()
+
                         // ---- Protegido: Agencies ----
                         .pathMatchers(HttpMethod.POST,   "/api/agencies").hasAnyRole("ADMIN", "AGENCY")
                         .pathMatchers(HttpMethod.POST,   "/api/agencies/users").hasAnyRole("ADMIN", "AGENCY")
