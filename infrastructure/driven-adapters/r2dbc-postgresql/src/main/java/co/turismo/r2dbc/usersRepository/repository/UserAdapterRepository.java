@@ -25,6 +25,15 @@ public interface UserAdapterRepository extends ReactiveCrudRepository<UserData, 
     Flux<UserData> findByAgencyId(@Param("agencyId") Long agencyId);
 
     @Query("""
+        SELECT DISTINCT u.*
+          FROM users u
+          JOIN user_roles ur ON ur.user_id = u.id
+          JOIN roles r       ON r.id = ur.role_id
+         WHERE upper(r.role_name) = upper(:roleName)
+    """)
+    Flux<UserData> findByRoleName(@Param("roleName") String roleName);
+
+    @Query("""
         SELECT r.role_name
           FROM users u
           JOIN user_roles ur ON ur.user_id = u.id

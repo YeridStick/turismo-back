@@ -58,6 +58,9 @@ public class RouterRest {
             ReviewsHandler reviewsHandler,
             FeedbackHandler feedbackHandler,
             TourPackageHandler tourPackageHandler,
+            ReservationHandler reservationHandler,
+            ReservationMessageHandler reservationMessageHandler,
+            AppNotificationHandler appNotificationHandler,
             AgencyHandler agencyHandler,
             CategoryHandler categoryHandler,
             DebugEmailHandler debugEmailHandler
@@ -560,6 +563,237 @@ public class RouterRest {
                                 .tag("Packages")
                                 .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
                                 .response(jsonResponse("204", "Eliminado", null))
+                )
+
+                // =========================
+                // Reservations
+                // =========================
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_BASE_PATH,
+                        reservationHandler::create,
+                        ops -> ops.operationId("reservationCreate")
+                                .summary("Crear solicitud de reserva")
+                                .tag("Reservations")
+                                .requestBody(jsonBody(ReservationHandler.CreateReservationBody.class, true))
+                                .response(jsonResponse("201", "Solicitud creada", ReservationHandler.ReservationResponse.class))
+                                .response(apiErrorResponse("400", "Datos inválidos"))
+                                .response(apiErrorResponse("404", "Paquete no encontrado"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_ME_PATH,
+                        reservationHandler::myReservations,
+                        ops -> ops.operationId("reservationMine")
+                                .summary("Mis solicitudes de reserva")
+                                .tag("Reservations")
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "20"))
+                                .response(jsonResponse("200", "Reservas del usuario", ReservationHandler.ReservationResponse.class))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_ID_PATH,
+                        reservationHandler::myReservationById,
+                        ops -> ops.operationId("reservationMineById")
+                                .summary("Detalle de mi solicitud de reserva")
+                                .tag("Reservations")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .response(jsonResponse("200", "Reserva encontrada", ReservationHandler.ReservationResponse.class))
+                                .response(apiErrorResponse("404", "No encontrada"))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_ID_PATH,
+                        reservationHandler::updateMine,
+                        ops -> ops.operationId("reservationUpdateMine")
+                                .summary("Editar mi solicitud de reserva dentro de los primeros 2 minutos")
+                                .tag("Reservations")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .requestBody(jsonBody(ReservationHandler.UpdateReservationBody.class, true))
+                                .response(jsonResponse("200", "Solicitud actualizada", ReservationHandler.ReservationResponse.class))
+                                .response(apiErrorResponse("409", "Ventana de edición expirada"))
+                )
+
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_ID_PATH,
+                        reservationHandler::deleteMine,
+                        ops -> ops.operationId("reservationDeleteMine")
+                                .summary("Eliminar mi solicitud de reserva dentro de los primeros 2 minutos")
+                                .tag("Reservations")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .response(jsonResponse("200", "Solicitud eliminada", ReservationHandler.DeleteReservationResponse.class))
+                                .response(apiErrorResponse("409", "Ventana de eliminación expirada"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_MESSAGES_PATH,
+                        reservationMessageHandler::customerMessages,
+                        ops -> ops.operationId("reservationMessagesMine")
+                                .summary("Mensajes de mi solicitud de reserva")
+                                .tag("Reservation Messages")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de mensajes por página", Integer.class, "50"))
+                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageHandler.ReservationMessageResponse.class))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_MESSAGES_PATH,
+                        reservationMessageHandler::sendCustomerMessage,
+                        ops -> ops.operationId("reservationMessageSendMine")
+                                .summary("Enviar mensaje en mi solicitud de reserva")
+                                .tag("Reservation Messages")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .requestBody(jsonBody(ReservationMessageHandler.SendReservationMessageBody.class, true))
+                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .response(apiErrorResponse("409", "Chat cerrado"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_PATH,
+                        reservationHandler::agencyReservations,
+                        ops -> ops.operationId("agencyReservationList")
+                                .summary("Solicitudes de reserva de mi agencia")
+                                .tag("Agency Reservations")
+                                .parameter(queryParam("status", false, "Estado de reserva", String.class, "requested"))
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "20"))
+                                .response(jsonResponse("200", "Reservas de la agencia", ReservationHandler.ReservationResponse.class))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_ID_PATH,
+                        reservationHandler::agencyReservationById,
+                        ops -> ops.operationId("agencyReservationById")
+                                .summary("Detalle de solicitud de mi agencia")
+                                .tag("Agency Reservations")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .response(jsonResponse("200", "Reserva encontrada", ReservationHandler.ReservationResponse.class))
+                                .response(apiErrorResponse("404", "No encontrada"))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_STATUS_PATH,
+                        reservationHandler::updateAgencyStatus,
+                        ops -> ops.operationId("agencyReservationStatusUpdate")
+                                .summary("Actualizar estado de solicitud de mi agencia")
+                                .tag("Agency Reservations")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .requestBody(jsonBody(ReservationHandler.UpdateReservationStatusBody.class, true))
+                                .response(jsonResponse("200", "Estado actualizado", ReservationHandler.ReservationResponse.class))
+                                .response(apiErrorResponse("409", "Transición inválida"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_MESSAGES_PATH,
+                        reservationMessageHandler::agencyMessages,
+                        ops -> ops.operationId("agencyReservationMessages")
+                                .summary("Mensajes de solicitud de mi agencia")
+                                .tag("Agency Reservation Messages")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de mensajes por página", Integer.class, "50"))
+                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageHandler.ReservationMessageResponse.class))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_MESSAGES_PATH,
+                        reservationMessageHandler::sendAgencyMessage,
+                        ops -> ops.operationId("agencyReservationMessageSend")
+                                .summary("Enviar mensaje como agencia")
+                                .tag("Agency Reservation Messages")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .requestBody(jsonBody(ReservationMessageHandler.SendReservationMessageBody.class, true))
+                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .response(apiErrorResponse("409", "Chat cerrado"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ID_RESERVATIONS_PATH,
+                        reservationHandler::agencyReservationsByAgencyId,
+                        ops -> ops.operationId("agencyReservationListByAgencyId")
+                                .summary("Solicitudes de reserva por agencia seleccionada")
+                                .tag("Agency Reservations")
+                                .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
+                                .parameter(queryParam("status", false, "Estado de reserva", String.class, "requested"))
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "20"))
+                                .response(jsonResponse("200", "Reservas de la agencia", ReservationHandler.ReservationResponse.class))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ID_RESERVATIONS_ID_PATH,
+                        reservationHandler::agencyReservationByAgencyId,
+                        ops -> ops.operationId("agencyReservationByAgencyId")
+                                .summary("Detalle de solicitud por agencia seleccionada")
+                                .tag("Agency Reservations")
+                                .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .response(jsonResponse("200", "Reserva encontrada", ReservationHandler.ReservationResponse.class))
+                                .response(apiErrorResponse("404", "No encontrada"))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ID_RESERVATIONS_STATUS_PATH,
+                        reservationHandler::updateAgencyStatusByAgencyId,
+                        ops -> ops.operationId("agencyReservationStatusUpdateByAgencyId")
+                                .summary("Actualizar estado de solicitud por agencia seleccionada")
+                                .tag("Agency Reservations")
+                                .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .requestBody(jsonBody(ReservationHandler.UpdateReservationStatusBody.class, true))
+                                .response(jsonResponse("200", "Estado actualizado", ReservationHandler.ReservationResponse.class))
+                                .response(apiErrorResponse("409", "Transición inválida"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ID_RESERVATIONS_MESSAGES_PATH,
+                        reservationMessageHandler::agencyMessagesByAgencyId,
+                        ops -> ops.operationId("agencyReservationMessagesByAgencyId")
+                                .summary("Mensajes de solicitud por agencia seleccionada")
+                                .tag("Agency Reservation Messages")
+                                .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de mensajes por página", Integer.class, "50"))
+                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageHandler.ReservationMessageResponse.class))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ID_RESERVATIONS_MESSAGES_PATH,
+                        reservationMessageHandler::sendAgencyMessageByAgencyId,
+                        ops -> ops.operationId("agencyReservationMessageSendByAgencyId")
+                                .summary("Enviar mensaje como agencia seleccionada")
+                                .tag("Agency Reservation Messages")
+                                .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .requestBody(jsonBody(ReservationMessageHandler.SendReservationMessageBody.class, true))
+                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .response(apiErrorResponse("409", "Chat cerrado"))
+                )
+
+                // =========================
+                // Notifications
+                // =========================
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.NOTIFICATIONS_BASE_PATH,
+                        appNotificationHandler::listMine,
+                        ops -> ops.operationId("notificationListMine")
+                                .summary("Mis notificaciones")
+                                .tag("Notifications")
+                                .parameter(queryParam("unreadOnly", false, "Solo no leídas", Boolean.class, "false"))
+                                .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
+                                .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "30"))
+                                .response(jsonResponse("200", "Notificaciones del usuario", AppNotificationHandler.NotificationResponse.class))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.NOTIFICATIONS_STREAM_PATH,
+                        appNotificationHandler::streamMine,
+                        ops -> ops.operationId("notificationStreamMine")
+                                .summary("Stream SSE de mis notificaciones")
+                                .tag("Notifications")
+                                .response(responseBuilder()
+                                        .responseCode("200")
+                                        .description("Stream text/event-stream de notificaciones"))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.NOTIFICATIONS_READ_PATH,
+                        appNotificationHandler::markAsRead,
+                        ops -> ops.operationId("notificationMarkAsRead")
+                                .summary("Marcar notificación como leída")
+                                .tag("Notifications")
+                                .parameter(pathParam("notificationId", "ID de la notificación", Long.class))
+                                .response(jsonResponse("200", "Notificación actualizada", AppNotificationHandler.NotificationResponse.class))
+                )
+
+                .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.NOTIFICATIONS_READ_ALL_PATH,
+                        appNotificationHandler::markAllAsRead,
+                        ops -> ops.operationId("notificationMarkAllAsRead")
+                                .summary("Marcar todas mis notificaciones como leídas")
+                                .tag("Notifications")
+                                .response(jsonResponse("200", "Notificaciones actualizadas", AppNotificationHandler.MarkAllNotificationsReadResponse.class))
                 )
 
                 // =========================

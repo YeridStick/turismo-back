@@ -4,7 +4,7 @@ import co.turismo.model.geocode.GeocodeResult;
 import co.turismo.model.geocode.gateways.GeocodingGateway;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 
 @Repository
-@RequiredArgsConstructor
 public class LocationIqAdapter implements GeocodingGateway {
 
     private final WebClient locationIqWebClient;
@@ -28,6 +27,10 @@ public class LocationIqAdapter implements GeocodingGateway {
 
     private final Cache<String, GeocodeResult> cache =
             Caffeine.newBuilder().maximumSize(1_000).expireAfterWrite(Duration.ofHours(6)).build();
+
+    public LocationIqAdapter(@Qualifier("locationIqWebClient") WebClient locationIqWebClient) {
+        this.locationIqWebClient = locationIqWebClient;
+    }
 
     @Override
     public Mono<List<GeocodeResult>> forward(String rawAddress, int limit) {

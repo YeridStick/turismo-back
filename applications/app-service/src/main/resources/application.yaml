@@ -35,16 +35,6 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
-  data:
-    redis:
-      host: "${REDIS_HOST}"
-      port: "${REDIS_PORT}"
-      password: "${REDIS_PASSWORD}"
-      database: "${REDIS_DB}"
-      timeout: "${REDIS_TIMEOUT}"
-      ssl:
-        enabled: ${REDIS_SSL:true}
-
   r2dbc:
     postgresql:
       host: "${DB_HOST}"
@@ -54,10 +44,10 @@ spring:
       username: "${DB_USER}"
       password: "${DB_PASSWORD}"
     pool:
-      initial-size: "${CONN_POOL_INITIAL_SIZE:5}"
-      max-size: "${CONN_POOL_MAX_SIZE:30}"
-      max-idle-time: "${CONN_POOL_IDLE_TIME:10m}"
-      max-acquire-time: "${CONN_POOL_MAX_ACQUIRE_TIME:3s}"
+      initial-size: "${CONN_POOL_INITIAL_SIZE:4}"
+      max-size: "${CONN_POOL_MAX_SIZE:48}"
+      max-idle-time: "${CONN_POOL_IDLE_TIME:300m}"
+      max-acquire-time: "${CONN_POOL_MAX_ACQUIRE_TIME:2s}"
       max-create-connection-time: "${CONN_POOL_MAX_CREATE_TIME:5s}"
       validation-query: "SELECT 1"
       validation-depth: local
@@ -65,7 +55,7 @@ spring:
   # compat si algún bean lee estas claves viejas
   connection-pool:
     initial-size: "${CONN_POOL_INITIAL_SIZE:5}"
-    max-size: "${CONN_POOL_MAX_SIZE:30}"
+    max-size: "${CONN_POOL_MAX_SIZE:48}"
     max-idle-time: "${CONN_POOL_IDLE_TIME:600}"
 
 # OpenAPI / SpringDoc Configuration
@@ -87,7 +77,7 @@ scalar:
   search-hot-key: "${SCALAR_SEARCH_HOT_KEY:k}"
 
 cors:
-  allowed-origins: "https://client.scalar.com,http://localhost:8083,http://localhost:8081,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173,https://turismo-eta-swart.vercel.app"
+  allowed-origins: "${CORS_ORIGINS:https://client.scalar.com,http://localhost:8083,http://localhost:8081,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173,https://turismo-eta-swart.vercel.app}"
 
 security:
   jwt:
@@ -95,18 +85,13 @@ security:
   session:
     bind-ip: ${SEC_BIND_IP:false}
     refresh-grace-minutes: ${SEC_REFRESH_GRACE_MINUTES:15}
-    redis:
-      key-prefix: "${SEC_REDIS_KEY_PREFIX}"
 
 turismo:
   rate-limiter:
     enabled: ${RATE_LIMIT_ENABLED:false}
-    backend: ${RATE_LIMIT_BACKEND:redis}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
     capacity: ${RATE_LIMIT_CAPACITY:600}
     refill-per-window: ${RATE_LIMIT_REFILL:600}
-    redis:
-      key-prefix: "${RATE_LIMIT_REDIS_KEY_PREFIX}"
     per-path:
       "/api/auth":
         capacity: ${RATE_LIMIT_AUTH_CAPACITY:30}

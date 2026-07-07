@@ -14,6 +14,7 @@ public interface UserRepository {
     Flux<String> findRoleNameByEmail(String email);
     Mono<User> save(User user);
     Flux<User> findByAgencyId(Long agencyId);
+    Flux<User> findByRoleName(String roleName);
 
     // existentes
     Mono<Void> registerOtpFail(String email);
