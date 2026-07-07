@@ -8,9 +8,11 @@ import co.turismo.model.notification.EmailMessage;
 import co.turismo.model.notification.gateways.AppNotificationGateway;
 import co.turismo.model.notification.gateways.EmailGateway;
 import co.turismo.model.reservation.ReservationDraft;
+import co.turismo.model.reservation.ReservationMessage;
 import co.turismo.model.reservation.ReservationRequestDetails;
 import co.turismo.model.reservation.ReservationStatusChange;
 import co.turismo.model.reservation.gateways.ReservationGateway;
+import co.turismo.model.reservation.gateways.ReservationMessageGateway;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.model.tourpackage.gateways.TourPackageRepository;
 import co.turismo.model.user.gateways.UserRepository;
@@ -54,6 +56,8 @@ class ReservationUseCaseTest {
     private EmailGateway emailGateway;
     @Mock
     private AppNotificationGateway appNotificationGateway;
+    @Mock
+    private ReservationMessageGateway reservationMessageGateway;
 
     private ReservationUseCase useCase;
 
@@ -65,10 +69,14 @@ class ReservationUseCaseTest {
                 agencyRepository,
                 userRepository,
                 emailGateway,
-                appNotificationGateway
+                appNotificationGateway,
+                reservationMessageGateway
         );
         lenient().when(userRepository.isEmailVerified("user@example.com")).thenReturn(Mono.just(false));
+        lenient().when(userRepository.findByAgencyId(2L)).thenReturn(Flux.empty());
+        lenient().when(userRepository.findByRoleName("ADMIN")).thenReturn(Flux.empty());
         lenient().when(appNotificationGateway.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        lenient().when(reservationMessageGateway.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     }
 
     @Test
@@ -313,20 +321,20 @@ class ReservationUseCaseTest {
 
     @Test
     void validStatusTransitionShouldUpdateReservation() {
-        ReservationDraft current = reservation("requested");
-        ReservationDraft updated = reservation("contacted");
+        ReservationDraft current = reservation("contacted");
+        ReservationDraft updated = reservation("awaiting_payment");
         when(agencyRepository.findByUserEmail("agency@example.com"))
                 .thenReturn(Flux.just(Agency.builder().id(2L).build()));
         when(reservationGateway.findByIdForAgency("reserva-1", 2L)).thenReturn(Mono.just(current));
         when(reservationGateway.updateAgencyStatus(
                 eq("reserva-1"),
                 eq(2L),
-                eq("contacted"),
-                eq("Se contactó"),
+                eq("awaiting_payment"),
+                eq("Instrucciones enviadas"),
                 eq(null),
                 eq(null),
                 eq(null),
-                any(OffsetDateTime.class),
+                eq(null),
                 eq(null),
                 eq(null)
         )).thenReturn(Mono.just(updated));
@@ -334,11 +342,35 @@ class ReservationUseCaseTest {
         StepVerifier.create(useCase.updateAgencyStatus(ReservationStatusChange.builder()
                         .reservationId("reserva-1")
                         .agencyUserEmail("agency@example.com")
+                        .status("awaiting_payment")
+                        .notes("Instrucciones enviadas")
+                        .build()))
+                .assertNext(result -> assertEquals("awaiting_payment", result.getStatus()))
+                .verifyComplete();
+
+        ArgumentCaptor<ReservationMessage> messageCaptor = ArgumentCaptor.forClass(ReservationMessage.class);
+        verify(reservationMessageGateway).save(messageCaptor.capture());
+        assertEquals("reserva-1", messageCaptor.getValue().getReservationId());
+        assertEquals("SYSTEM", messageCaptor.getValue().getSenderType());
+        assertTrue(messageCaptor.getValue().getBody().contains("esperando pago"));
+        assertTrue(messageCaptor.getValue().getBody().contains("Instrucciones enviadas"));
+    }
+
+    @Test
+    void requestedReservationShouldNotBeManuallyMarkedAsContacted() {
+        ReservationDraft current = reservation("requested");
+        when(agencyRepository.findByUserEmail("agency@example.com"))
+                .thenReturn(Flux.just(Agency.builder().id(2L).build()));
+        when(reservationGateway.findByIdForAgency("reserva-1", 2L)).thenReturn(Mono.just(current));
+
+        StepVerifier.create(useCase.updateAgencyStatus(ReservationStatusChange.builder()
+                        .reservationId("reserva-1")
+                        .agencyUserEmail("agency@example.com")
                         .status("contacted")
                         .notes("Se contactó")
                         .build()))
-                .assertNext(result -> assertEquals("contacted", result.getStatus()))
-                .verifyComplete();
+                .expectError(ConflictException.class)
+                .verify();
     }
 
     @Test

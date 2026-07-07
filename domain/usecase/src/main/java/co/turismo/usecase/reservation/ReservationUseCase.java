@@ -12,9 +12,12 @@ import co.turismo.model.reservation.ContactPreference;
 import co.turismo.model.reservation.ReservationDraft;
 import co.turismo.model.reservation.ReservationRequestDetails;
 import co.turismo.model.reservation.ReservationStatusChange;
+import co.turismo.model.reservation.ReservationMessage;
 import co.turismo.model.reservation.gateways.ReservationGateway;
+import co.turismo.model.reservation.gateways.ReservationMessageGateway;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.model.tourpackage.gateways.TourPackageRepository;
+import co.turismo.model.user.User;
 import co.turismo.model.user.gateways.UserRepository;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
@@ -42,14 +45,17 @@ public class ReservationUseCase {
     private static final String STATUS_CONFIRMED = "confirmed";
     private static final String STATUS_REJECTED = "rejected";
     private static final String STATUS_CANCELLED = "cancelled";
+    private static final String SENDER_SYSTEM = "SYSTEM";
+    private static final String SYSTEM_SENDER_EMAIL = "system@turismo.local";
     private static final String PROVIDER_AGENCY_MANAGED = "agency_managed";
     private static final String PAYMENT_PENDING = "pending";
     private static final String PAYMENT_VERIFIED_BY_AGENCY = "verified_by_agency";
     private static final Duration CUSTOMER_EDIT_WINDOW = Duration.ofMinutes(2);
     private static final String NOTIFICATION_RESERVATION_STATUS_CHANGED = "RESERVATION_STATUS_CHANGED";
+    private static final String NOTIFICATION_RESERVATION_REQUEST_CREATED = "RESERVATION_REQUEST_CREATED";
 
     private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
-            STATUS_REQUESTED, Set.of(STATUS_CONTACTED, STATUS_REJECTED, STATUS_CANCELLED),
+            STATUS_REQUESTED, Set.of(STATUS_REJECTED, STATUS_CANCELLED),
             STATUS_CONTACTED, Set.of(STATUS_AWAITING_PAYMENT, STATUS_REJECTED, STATUS_CANCELLED),
             STATUS_AWAITING_PAYMENT, Set.of(STATUS_CONFIRMED, STATUS_REJECTED, STATUS_CANCELLED)
     );
@@ -60,6 +66,7 @@ public class ReservationUseCase {
     private final UserRepository userRepository;
     private final EmailGateway emailGateway;
     private final AppNotificationGateway appNotificationGateway;
+    private final ReservationMessageGateway reservationMessageGateway;
 
     public Mono<ReservationDraft> createRequest(ReservationRequestDetails details) {
         return validateCreate(details)
@@ -68,7 +75,9 @@ public class ReservationUseCase {
                 .flatMap(tourPackage -> validatePackage(tourPackage).thenReturn(tourPackage))
                 .map(tourPackage -> buildReservation(details, tourPackage))
                 .flatMap(reservationGateway::createPendingReservation)
-                .flatMap(reservation -> sendCreatedEmailIfEmailPreference(reservation).thenReturn(reservation));
+                .flatMap(reservation -> sendCreatedEmailIfEmailPreference(reservation)
+                        .then(notifyAgencyReservationCreated(reservation))
+                        .thenReturn(reservation));
     }
 
     public Mono<ReservationDraft> updateRequest(String userEmail, String reservationId, ReservationRequestDetails details) {
@@ -114,6 +123,19 @@ public class ReservationUseCase {
                 .flatMapMany(agencyId -> reservationGateway.findByAgencyId(agencyId, normalizeStatus(status), limit, offset));
     }
 
+    public Flux<ReservationDraft> findForMyAgency(
+            String agencyUserEmail,
+            boolean admin,
+            String status,
+            int limit,
+            int offset
+    ) {
+        if (admin) {
+            return reservationGateway.findAllForAdmin(normalizeStatus(status), limit, offset);
+        }
+        return findForMyAgency(agencyUserEmail, status, limit, offset);
+    }
+
     public Flux<ReservationDraft> findForAgency(
             String agencyUserEmail,
             Long agencyId,
@@ -136,6 +158,14 @@ public class ReservationUseCase {
                         requireText(reservationId, "reservationId requerido"),
                         agencyId))
                 .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")));
+    }
+
+    public Mono<ReservationDraft> findForMyAgencyById(String agencyUserEmail, boolean admin, String reservationId) {
+        if (admin) {
+            return reservationGateway.findByIdForAdmin(requireText(reservationId, "reservationId requerido"))
+                    .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")));
+        }
+        return findForMyAgencyById(agencyUserEmail, reservationId);
     }
 
     public Mono<ReservationDraft> findForAgencyById(
@@ -164,7 +194,28 @@ public class ReservationUseCase {
                         .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
                         .flatMap(current -> validateTransition(current.getStatus(), nextStatus)
                                 .then(Mono.defer(() -> updateStatus(change, agencyId, nextStatus)))
-                                .flatMap(updated -> notifyStatusChanged(updated).thenReturn(updated))));
+                                .flatMap(updated -> appendStatusMessage(updated, nextStatus, change.getNotes())
+                                        .then(notifyStatusChanged(updated))
+                                        .thenReturn(updated))));
+    }
+
+    public Mono<ReservationDraft> updateAgencyStatus(ReservationStatusChange change, boolean admin) {
+        if (!admin) {
+            return updateAgencyStatus(change);
+        }
+
+        String nextStatus = normalizeStatus(requireText(change.getStatus(), "status requerido"));
+        if (!isAgencyManagedStatus(nextStatus)) {
+            return Mono.error(new ConflictException("Estado de reserva inválido"));
+        }
+
+        return reservationGateway.findByIdForAdmin(requireText(change.getReservationId(), "reservationId requerido"))
+                .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
+                .flatMap(current -> validateTransition(current.getStatus(), nextStatus)
+                        .then(Mono.defer(() -> updateStatus(change, current.getAgencyId(), nextStatus)))
+                        .flatMap(updated -> appendStatusMessage(updated, nextStatus, change.getNotes())
+                                .then(notifyStatusChanged(updated))
+                                .thenReturn(updated)));
     }
 
     public Mono<ReservationDraft> updateAgencyStatusForAgency(
@@ -184,7 +235,9 @@ public class ReservationUseCase {
                         .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
                         .flatMap(current -> validateTransition(current.getStatus(), nextStatus)
                                 .then(Mono.defer(() -> updateStatus(change, allowedAgencyId, nextStatus)))
-                                .flatMap(updated -> notifyStatusChanged(updated).thenReturn(updated))));
+                                .flatMap(updated -> appendStatusMessage(updated, nextStatus, change.getNotes())
+                                        .then(notifyStatusChanged(updated))
+                                        .thenReturn(updated))));
     }
 
     private Mono<Void> validateCreate(ReservationRequestDetails details) {
@@ -392,6 +445,46 @@ public class ReservationUseCase {
                 .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")));
     }
 
+    private Mono<Void> appendStatusMessage(ReservationDraft reservation, String status, String notes) {
+        String body = buildStatusMessage(status, notes);
+        if (body == null) {
+            return Mono.empty();
+        }
+
+        return reservationMessageGateway.save(ReservationMessage.builder()
+                        .reservationId(reservation.getId())
+                        .senderEmail(SYSTEM_SENDER_EMAIL)
+                        .senderType(SENDER_SYSTEM)
+                        .body(body)
+                        .build())
+                .then()
+                .onErrorResume(error -> {
+                    LOG.log(Level.WARNING, "No se pudo agregar mensaje de estado al chat", error);
+                    return Mono.empty();
+                });
+    }
+
+    private String buildStatusMessage(String status, String notes) {
+        String normalizedStatus = normalizeStatus(status);
+        String base = switch (normalizedStatus) {
+            case STATUS_CONTACTED -> "La agencia tomó tu solicitud y ya inició la gestión.";
+            case STATUS_AWAITING_PAYMENT -> "La agencia marcó tu solicitud como esperando pago.";
+            case STATUS_CONFIRMED -> "Tu reserva fue confirmada por la agencia.";
+            case STATUS_REJECTED -> "La agencia rechazó esta solicitud.";
+            case STATUS_CANCELLED -> "Esta solicitud fue cancelada.";
+            default -> null;
+        };
+
+        String normalizedNotes = normalizeOptional(notes);
+        if (base == null) {
+            return null;
+        }
+        if (normalizedNotes == null) {
+            return base;
+        }
+        return truncateMessage(base + "\n\nNota de la agencia: " + normalizedNotes);
+    }
+
     private Mono<Void> notifyStatusChanged(ReservationDraft reservation) {
         String recipientEmail = normalizeOptional(reservation.getUserEmail());
         if (recipientEmail == null) {
@@ -410,6 +503,34 @@ public class ReservationUseCase {
                 .then()
                 .onErrorResume(error -> {
                     LOG.log(Level.WARNING, "No se pudo crear la notificación de cambio de estado", error);
+                    return Mono.empty();
+                });
+    }
+
+    private Mono<Void> notifyAgencyReservationCreated(ReservationDraft reservation) {
+        Long agencyId = reservation.getAgencyId();
+        if (agencyId == null || agencyId <= 0) {
+            return Mono.empty();
+        }
+
+        return Flux.concat(
+                        userRepository.findByAgencyId(agencyId),
+                        userRepository.findByRoleName("ADMIN"))
+                .map(User::getEmail)
+                .filter(email -> email != null && !email.isBlank())
+                .distinct(String::toLowerCase)
+                .flatMap(email -> appNotificationGateway.save(AppNotification.builder()
+                        .recipientEmail(email)
+                        .type(NOTIFICATION_RESERVATION_REQUEST_CREATED)
+                        .title("Nueva solicitud de reserva")
+                        .message("Un cliente creó una solicitud de reserva")
+                        .reservationId(reservation.getId())
+                        .agencyId(agencyId)
+                        .read(false)
+                        .build()))
+                .then()
+                .onErrorResume(error -> {
+                    LOG.log(Level.WARNING, "No se pudo crear notificación de nueva solicitud", error);
                     return Mono.empty();
                 });
     }
@@ -501,6 +622,13 @@ public class ReservationUseCase {
 
     private static String normalizeOptional(String value) {
         return hasText(value) ? value.trim() : null;
+    }
+
+    private static String truncateMessage(String value) {
+        if (value == null || value.length() <= 2000) {
+            return value;
+        }
+        return value.substring(0, 1997) + "...";
     }
 
     private static String requireText(String value, String message) {

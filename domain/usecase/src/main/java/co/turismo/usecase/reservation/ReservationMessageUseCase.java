@@ -26,6 +26,9 @@ public class ReservationMessageUseCase {
 
     private static final String SENDER_CUSTOMER = "CUSTOMER";
     private static final String SENDER_AGENCY = "AGENCY";
+    private static final String SENDER_SYSTEM = "SYSTEM";
+    private static final String SYSTEM_SENDER_EMAIL = "system@turismo.local";
+    private static final String STATUS_REQUESTED = "requested";
     private static final String NOTIFICATION_RESERVATION_MESSAGE = "RESERVATION_MESSAGE";
     private static final Set<String> CLOSED_STATUSES = Set.of("confirmed", "rejected", "cancelled");
 
@@ -46,6 +49,21 @@ public class ReservationMessageUseCase {
                 .flatMap(agencyId -> reservationGateway.findByIdForAgency(requireText(reservationId, "reservationId requerido"), agencyId)
                         .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada"))))
                 .flatMapMany(reservation -> reservationMessageGateway.findByReservationId(reservationId, limit, offset));
+    }
+
+    public Flux<ReservationMessage> findForAgency(
+            String agencyUserEmail,
+            boolean admin,
+            String reservationId,
+            int limit,
+            int offset
+    ) {
+        if (admin) {
+            return reservationGateway.findByIdForAdmin(requireText(reservationId, "reservationId requerido"))
+                    .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
+                    .flatMapMany(reservation -> reservationMessageGateway.findByReservationId(reservationId, limit, offset));
+        }
+        return findForAgency(agencyUserEmail, reservationId, limit, offset);
     }
 
     public Flux<ReservationMessage> findForAgency(
@@ -78,9 +96,28 @@ public class ReservationMessageUseCase {
                 .flatMap(agencyId -> reservationGateway.findByIdForAgency(requireText(reservationId, "reservationId requerido"), agencyId)
                         .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada"))))
                 .flatMap(reservation -> validateOpen(reservation)
+                        .then(markContactedIfFirstAgencyContact(reservation))
                         .then(save(reservationId, agencyUserEmail, SENDER_AGENCY, body))
                         .flatMap(message -> notifyCustomer(reservation)
                                 .thenReturn(message)));
+    }
+
+    public Mono<ReservationMessage> sendFromAgency(
+            String agencyUserEmail,
+            boolean admin,
+            String reservationId,
+            String body
+    ) {
+        if (admin) {
+            return reservationGateway.findByIdForAdmin(requireText(reservationId, "reservationId requerido"))
+                    .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
+                    .flatMap(reservation -> validateOpen(reservation)
+                            .then(markContactedIfFirstAgencyContact(reservation))
+                            .then(save(reservationId, agencyUserEmail, SENDER_AGENCY, body))
+                            .flatMap(message -> notifyCustomer(reservation)
+                                    .thenReturn(message)));
+        }
+        return sendFromAgency(agencyUserEmail, reservationId, body);
     }
 
     public Mono<ReservationMessage> sendFromAgency(
@@ -96,9 +133,37 @@ public class ReservationMessageUseCase {
                                 allowedAgencyId)
                         .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada"))))
                 .flatMap(reservation -> validateOpen(reservation)
+                        .then(markContactedIfFirstAgencyContact(reservation))
                         .then(save(reservationId, agencyUserEmail, SENDER_AGENCY, body))
                         .flatMap(message -> notifyCustomer(reservation)
                                 .thenReturn(message)));
+    }
+
+    private Mono<Void> markContactedIfFirstAgencyContact(ReservationDraft reservation) {
+        String status = reservation.getStatus() == null ? "" : reservation.getStatus().trim().toLowerCase();
+        if (!STATUS_REQUESTED.equals(status)) {
+            return Mono.empty();
+        }
+
+        return reservationGateway.markContactedByAgencyReply(reservation.getId(), reservation.getAgencyId())
+                .switchIfEmpty(Mono.error(new ConflictException("No se pudo marcar la solicitud como contactada")))
+                .flatMap(updated -> saveSystemMessage(
+                        updated.getId(),
+                        "La agencia tomó tu solicitud y ya inició la gestión.")
+                        .then()
+                        .onErrorResume(error -> {
+                            LOG.log(Level.WARNING, "No se pudo agregar mensaje automático de contacto", error);
+                            return Mono.empty();
+                        }));
+    }
+
+    private Mono<ReservationMessage> saveSystemMessage(String reservationId, String body) {
+        return reservationMessageGateway.save(ReservationMessage.builder()
+                .reservationId(reservationId)
+                .senderEmail(SYSTEM_SENDER_EMAIL)
+                .senderType(SENDER_SYSTEM)
+                .body(body)
+                .build());
     }
 
     private Mono<ReservationMessage> save(String reservationId, String senderEmail, String senderType, String body) {
@@ -136,9 +201,14 @@ public class ReservationMessageUseCase {
             return Mono.empty();
         }
 
-        return userRepository.findByAgencyId(agencyId)
-                .flatMap(user -> notifyOne(
-                        user.getEmail(),
+        return Flux.concat(
+                        userRepository.findByAgencyId(agencyId),
+                        userRepository.findByRoleName("ADMIN"))
+                .map(user -> user.getEmail())
+                .filter(email -> email != null && !email.isBlank())
+                .distinct(String::toLowerCase)
+                .flatMap(email -> notifyOne(
+                        email,
                         "Nuevo mensaje de cliente",
                         "El cliente respondió la solicitud " + reservation.getId(),
                         reservation))

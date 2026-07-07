@@ -112,7 +112,12 @@ public class ReservationHandler {
 
         return request.principal()
                 .cast(Authentication.class)
-                .flatMapMany(auth -> reservationUseCase.findForMyAgency(auth.getName(), status.orElse(null), size, offset))
+                .flatMapMany(auth -> reservationUseCase.findForMyAgency(
+                        auth.getName(),
+                        hasRole(auth, "ADMIN"),
+                        status.orElse(null),
+                        size,
+                        offset))
                 .map(this::toResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
@@ -148,7 +153,10 @@ public class ReservationHandler {
 
         return request.principal()
                 .cast(Authentication.class)
-                .flatMap(auth -> reservationUseCase.findForMyAgencyById(auth.getName(), reservationId))
+                .flatMap(auth -> reservationUseCase.findForMyAgencyById(
+                        auth.getName(),
+                        hasRole(auth, "ADMIN"),
+                        reservationId))
                 .map(this::toResponse)
                 .flatMap(response -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -179,13 +187,14 @@ public class ReservationHandler {
                 .cast(Authentication.class)
                 .zipWith(request.bodyToMono(UpdateReservationStatusBody.class)
                         .flatMap(requestValidator::validate))
-                .map(tuple -> ReservationStatusChange.builder()
-                        .reservationId(reservationId)
-                        .agencyUserEmail(tuple.getT1().getName())
-                        .status(tuple.getT2().status())
-                        .notes(tuple.getT2().notes())
-                        .build())
-                .flatMap(reservationUseCase::updateAgencyStatus)
+                .flatMap(tuple -> reservationUseCase.updateAgencyStatus(
+                        ReservationStatusChange.builder()
+                                .reservationId(reservationId)
+                                .agencyUserEmail(tuple.getT1().getName())
+                                .status(tuple.getT2().status())
+                                .notes(tuple.getT2().notes())
+                                .build(),
+                        hasRole(tuple.getT1(), "ADMIN")))
                 .map(this::toResponse)
                 .flatMap(response -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)

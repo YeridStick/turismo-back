@@ -229,6 +229,33 @@ public class ReservationRepositoryAdapter implements ReservationGateway {
     }
 
     @Override
+    public Flux<ReservationDraft> findAllForAdmin(String status, int limit, int offset) {
+        String sql = RESERVATION_SELECT + """
+                    WHERE r.created_at <= NOW() - INTERVAL '2 minutes'
+                      AND (:status IS NULL OR r.status = :status)
+                    ORDER BY r.created_at DESC
+                    LIMIT :limit OFFSET :offset
+                """;
+
+        return bindNullable(db.sql(sql), "status", status, String.class)
+                .bind("limit", limit)
+                .bind("offset", offset)
+                .map((row, metadata) -> toReservation(row))
+                .all();
+    }
+
+    @Override
+    public Mono<ReservationDraft> findByIdForAdmin(String reservationId) {
+        return db.sql(RESERVATION_SELECT + """
+                    WHERE r.id = :reservationId
+                      AND r.created_at <= NOW() - INTERVAL '2 minutes'
+                """)
+                .bind("reservationId", reservationId)
+                .map((row, metadata) -> toReservation(row))
+                .one();
+    }
+
+    @Override
     public Flux<ReservationDraft> findByAgencyId(Long agencyId, String status, int limit, int offset) {
         String sql = RESERVATION_SELECT + """
                     WHERE r.agency_id = :agencyId
@@ -256,6 +283,52 @@ public class ReservationRepositoryAdapter implements ReservationGateway {
                 .bind("agencyId", agencyId)
                 .map((row, metadata) -> toReservation(row))
                 .one();
+    }
+
+    @Override
+    public Mono<ReservationDraft> markContactedByAgencyReply(String reservationId, Long agencyId) {
+        String sql = """
+            WITH updated AS (
+                UPDATE reservations
+                SET status = 'contacted',
+                    updated_at = NOW()
+                WHERE id = :reservationId
+                  AND agency_id = :agencyId
+                  AND status = 'requested'
+                RETURNING id
+            )
+            INSERT INTO reservation_details (
+                reservation_id,
+                payment_status,
+                contacted_at,
+                created_at,
+                updated_at
+            )
+            SELECT
+                id,
+                'pending',
+                NOW(),
+                NOW(),
+                NOW()
+            FROM updated
+            ON CONFLICT (reservation_id) DO UPDATE
+            SET payment_status = COALESCE(reservation_details.payment_status, EXCLUDED.payment_status),
+                contacted_at = COALESCE(reservation_details.contacted_at, EXCLUDED.contacted_at),
+                updated_at = NOW()
+            """;
+
+        return db.sql(sql)
+                .bind("reservationId", reservationId)
+                .bind("agencyId", agencyId)
+                .fetch()
+                .rowsUpdated()
+                .doOnNext(rows -> LOG.info(
+                        "Reserva marcada como contactada por respuesta de agencia. reservationId={} agencyId={} rowsUpdated={}",
+                        reservationId,
+                        agencyId,
+                        rows))
+                .filter(rows -> rows > 0)
+                .flatMap(rows -> findByIdForAgency(reservationId, agencyId));
     }
 
     @Override

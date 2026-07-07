@@ -91,6 +91,12 @@ public class UserRepositoryAdapter
     }
 
     @Override
+    public Flux<User> findByRoleName(String roleName) {
+        return repository.findByRoleName(roleName)
+                .map(this::toEntity);
+    }
+
+    @Override
     public Mono<Void> registerOtpFail(String email){ return repository.registerOtpFail(email); }
     @Override
     public Mono<Void> registerSuccessfulLogin(String email){ return repository.registerSuccessfulLogin(email); }

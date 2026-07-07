@@ -44,10 +44,12 @@ Content-Type: application/json
 Transiciones permitidas para agencia:
 
 ```text
-requested -> contacted | rejected | cancelled
+requested -> rejected | cancelled
 contacted -> awaiting_payment | rejected | cancelled
 awaiting_payment -> confirmed | rejected | cancelled
 ```
+
+Nota: `contacted` no se debe enviar por `PATCH /status`. El backend pasa la solicitud a `contacted` automaticamente cuando la agencia/admin responde al cliente por chat.
 
 ## Modelo ReservationResponse
 
@@ -186,7 +188,10 @@ Si ya pasaron 2 minutos: `409`.
 
 ## Endpoints De Reservacion Agencia
 
-Para panel con agencia seleccionada usar los endpoints con `{agencyId}`. Los endpoints `/me` se mantienen para el caso simple donde el token pertenece a una sola agencia.
+Para panel con agencia seleccionada usar los endpoints con `{agencyId}`. Los endpoints `/me` tambien sirven como inbox principal:
+
+- Con rol `AGENCY`, `/me` usa la agencia vinculada al email autenticado.
+- Con rol `ADMIN`, `/me` funciona como inbox global de solicitudes de agencia, sin depender de estar vinculado a una agencia.
 
 ### Listar solicitudes de mi agencia
 
@@ -204,6 +209,8 @@ Query:
 
 Notas:
 
+- Con `AGENCY`, solo devuelve solicitudes de la agencia vinculada al usuario autenticado.
+- Con `ADMIN`, devuelve solicitudes de todas las agencias.
 - Solo devuelve solicitudes con mas de 2 minutos de creadas.
 - Respuesta `200`, `data = ReservationResponse[]`.
 
@@ -215,7 +222,8 @@ Auth: `AGENCY` o `ADMIN`.
 
 Notas:
 
-- Solo devuelve si la solicitud pertenece a una agencia vinculada al usuario autenticado.
+- Con `AGENCY`, solo devuelve si la solicitud pertenece a una agencia vinculada al usuario autenticado.
+- Con `ADMIN`, puede ver la solicitud sin vinculo directo a la agencia.
 - Solo devuelve si ya pasaron 2 minutos desde `createdAt`.
 
 Respuesta `200`, `data = ReservationResponse`.
@@ -238,7 +246,6 @@ Request:
 Estados aceptados:
 
 ```text
-contacted
 awaiting_payment
 confirmed
 rejected
@@ -247,7 +254,7 @@ cancelled
 
 Notas para UI:
 
-- Usar `contacted` cuando la agencia toma la solicitud.
+- No usar `PATCH /status` para `contacted`; para contactar, la agencia/admin debe enviar un mensaje por chat.
 - Usar `awaiting_payment` cuando la agencia ya envio instrucciones/proceso de pago.
 - Usar `confirmed` cuando la agencia valido el pago por su cuenta. Backend marca `paymentProvider = agency_managed`, `paymentStatus = verified_by_agency` y llena `paidAt`.
 - Usar `rejected` o `cancelled` para cerrar sin confirmar.
@@ -303,6 +310,12 @@ El chat guarda mensajes por REST, pero la app puede recibir avisos en vivo con e
 2. Cuando llegue evento `RESERVATION_MESSAGE`, volver a consultar los mensajes de esa solicitud.
 3. Cuando llegue evento `RESERVATION_STATUS_CHANGED`, volver a consultar el detalle de esa solicitud.
 
+El backend tambien agrega mensajes automaticos de trazabilidad en el chat:
+
+- Cuando la agencia/admin envia el primer mensaje sobre una solicitud en `requested`, la solicitud pasa automaticamente a `contacted` y se agrega un mensaje `SYSTEM`.
+- Cuando la agencia/admin cambia el estado, se agrega un mensaje `SYSTEM` describiendo el cambio.
+- Si el cambio de estado trae `notes`, esas notas se agregan al mensaje `SYSTEM`, util para instrucciones de pago en `awaiting_payment`.
+
 Modelo `ReservationMessageResponse`:
 
 ```json
@@ -321,6 +334,7 @@ Modelo `ReservationMessageResponse`:
 ```text
 CUSTOMER
 AGENCY
+SYSTEM
 ```
 
 ### Cliente: listar mensajes
@@ -364,6 +378,11 @@ Notas:
 
 Auth: `AGENCY` o `ADMIN`.
 
+Notas:
+
+- Con `AGENCY`, valida que la solicitud pertenezca a su agencia vinculada.
+- Con `ADMIN`, permite abrir el hilo por `reservationId` aunque no este vinculado a esa agencia.
+
 Respuesta `200`, `data = ReservationMessageResponse[]`.
 
 ### Agencia seleccionada: listar mensajes
@@ -391,6 +410,8 @@ Request:
 Notas:
 
 - `message` obligatorio, maximo 2000 caracteres.
+- Con `AGENCY`, valida que la solicitud pertenezca a su agencia vinculada.
+- Con `ADMIN`, permite responder por `reservationId` aunque no este vinculado a esa agencia.
 - Si la solicitud esta `confirmed`, `rejected` o `cancelled`, responde `409`.
 - Respuesta `201`, `data = ReservationMessageResponse`.
 
@@ -564,6 +585,7 @@ Tipos actuales:
 
 | Tipo | Cuándo llega | Acción recomendada en frontend |
 | --- | --- | --- |
+| `RESERVATION_REQUEST_CREATED` | Cliente creó una solicitud de reserva. | Refrescar listado de solicitudes de la agencia. |
 | `RESERVATION_MESSAGE` | Agencia o cliente envió mensaje. | Refrescar mensajes de `reservationId` y mostrar badge/toast. |
 | `RESERVATION_STATUS_CHANGED` | Agencia/admin cambió estado. | Refrescar detalle/listado de la solicitud. |
 
@@ -585,6 +607,11 @@ const source = new EventSource(`${API_BASE_URL}/api/notifications/stream`, {
 source.addEventListener('RESERVATION_MESSAGE', (event) => {
   const notification = JSON.parse(event.data);
   // refrescar chat notification.reservationId
+});
+
+source.addEventListener('RESERVATION_REQUEST_CREATED', (event) => {
+  const notification = JSON.parse(event.data);
+  // refrescar listado de solicitudes notification.agencyId
 });
 
 source.addEventListener('RESERVATION_STATUS_CHANGED', (event) => {
@@ -713,7 +740,7 @@ Respuesta `204`, sin body.
 2. Mostrar pantalla de exito con contador de 2 minutos para editar/eliminar.
 3. Si pasan 2 minutos, ocultar acciones de editar/eliminar y mostrar estado `requested`.
 4. Agencia consulta `GET /api/agencies/{agencyId}/reservations?status=requested` cuando el panel tiene agencia seleccionada.
-5. Agencia abre detalle, envia mensaje interno o cambia estado a `contacted`.
+5. Agencia abre detalle y envia mensaje interno; backend cambia automaticamente el estado a `contacted`.
 6. Si el pago lo gestiona la agencia, cambia a `awaiting_payment` y usa chat para instrucciones.
 7. Cuando valide pago, agencia cambia a `confirmed`; frontend debe bloquear input del chat.
 8. Si agencia cambia a `rejected` o `cancelled`, frontend tambien debe bloquear input del chat.

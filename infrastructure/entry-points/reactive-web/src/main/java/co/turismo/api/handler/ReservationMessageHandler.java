@@ -68,7 +68,12 @@ public class ReservationMessageHandler {
 
         return request.principal()
                 .cast(Authentication.class)
-                .flatMapMany(auth -> reservationMessageUseCase.findForAgency(auth.getName(), reservationId, size, offset))
+                .flatMapMany(auth -> reservationMessageUseCase.findForAgency(
+                        auth.getName(),
+                        hasRole(auth, "ADMIN"),
+                        reservationId,
+                        size,
+                        offset))
                 .map(this::toResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
@@ -107,6 +112,7 @@ public class ReservationMessageHandler {
                         .flatMap(requestValidator::validate))
                 .flatMap(tuple -> reservationMessageUseCase.sendFromAgency(
                         tuple.getT1().getName(),
+                        hasRole(tuple.getT1(), "ADMIN"),
                         reservationId,
                         tuple.getT2().message()))
                 .map(this::toResponse)
