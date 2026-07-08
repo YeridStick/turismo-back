@@ -1,9 +1,10 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.notification.MarkAllNotificationsReadResponse;
+import co.turismo.api.dto.notification.NotificationResponse;
 import co.turismo.api.dto.response.ApiResponse;
-import co.turismo.model.notification.AppNotification;
+import co.turismo.api.mapper.AppNotificationMapper;
 import co.turismo.usecase.notification.AppNotificationUseCase;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -13,8 +14,6 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.time.OffsetDateTime;
 
 @Component
 @RequiredArgsConstructor
@@ -35,7 +34,7 @@ public class AppNotificationHandler {
         return request.principal()
                 .cast(Authentication.class)
                 .flatMapMany(auth -> appNotificationUseCase.findMine(auth.getName(), unreadOnly, size, offset))
-                .map(this::toResponse)
+                .map(AppNotificationMapper::toNotificationResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -49,7 +48,7 @@ public class AppNotificationHandler {
                 .map(notification -> ServerSentEvent.<NotificationResponse>builder()
                         .event(notification.getType())
                         .id(String.valueOf(notification.getId()))
-                        .data(toResponse(notification))
+                        .data(AppNotificationMapper.toNotificationResponse(notification))
                         .build());
 
         return ServerResponse.ok()
@@ -63,7 +62,7 @@ public class AppNotificationHandler {
         return request.principal()
                 .cast(Authentication.class)
                 .flatMap(auth -> appNotificationUseCase.markAsRead(auth.getName(), notificationId))
-                .map(this::toResponse)
+                .map(AppNotificationMapper::toNotificationResponse)
                 .flatMap(notification -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(notification)));
@@ -73,23 +72,10 @@ public class AppNotificationHandler {
         return request.principal()
                 .cast(Authentication.class)
                 .flatMap(auth -> appNotificationUseCase.markAllAsRead(auth.getName()))
-                .flatMap(updated -> ServerResponse.ok()
+                .map(AppNotificationMapper::toMarkAllNotificationsReadResponse)
+                .flatMap(response -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new MarkAllNotificationsReadResponse(updated))));
-    }
-
-    private NotificationResponse toResponse(AppNotification notification) {
-        return new NotificationResponse(
-                notification.getId(),
-                notification.getRecipientEmail(),
-                notification.getType(),
-                notification.getTitle(),
-                notification.getMessage(),
-                notification.getReservationId(),
-                notification.getAgencyId(),
-                notification.getRead(),
-                notification.getCreatedAt()
-        );
+                        .bodyValue(ApiResponse.ok(response)));
     }
 
     private static int parsePage(ServerRequest request) {
@@ -121,22 +107,4 @@ public class AppNotificationHandler {
             throw new IllegalArgumentException(message);
         }
     }
-
-    @Schema(name = "NotificationResponse")
-    public record NotificationResponse(
-            Long id,
-            String recipientEmail,
-            String type,
-            String title,
-            String message,
-            String reservationId,
-            Long agencyId,
-            Boolean read,
-            OffsetDateTime createdAt
-    ) {}
-
-    @Schema(name = "MarkAllNotificationsReadResponse")
-    public record MarkAllNotificationsReadResponse(
-            Long updated
-    ) {}
 }

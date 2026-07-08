@@ -3,10 +3,8 @@ package co.turismo.api.handler;
 import co.turismo.api.dto.auth.RegisterUserRequest;
 import co.turismo.api.dto.auth.PasswordUpdateRequest;
 import co.turismo.api.http.HttpResponses;
-import co.turismo.api.dto.response.UserInfoResponse;
-import co.turismo.api.dto.response.PasswordUpdateResponse;
 import co.turismo.api.error.RequestValidator;
-import co.turismo.model.user.RegisterUserCommand;
+import co.turismo.api.mapper.UserMapper;
 import co.turismo.model.user.UpdateUserProfileRequest;
 import co.turismo.model.user.User;
 import co.turismo.usecase.user.UserUseCase;
@@ -27,14 +25,8 @@ public class UserHandler {
     public Mono<ServerResponse> createUser(ServerRequest request) {
         return request.bodyToMono(RegisterUserRequest.class)
                 .flatMap(requestValidator::validate)
-                .flatMap(req -> userUseCase.register(new RegisterUserCommand(
-                        req.full_name(),
-                        req.email(),
-                        req.url_avatar(),
-                        req.identification_type(),
-                        req.identification_number(),
-                        req.password()
-                )))
+                .map(UserMapper::toRegisterCommand)
+                .flatMap(userUseCase::register)
                 .flatMap(HttpResponses::ok);
     }
  
@@ -42,10 +34,7 @@ public class UserHandler {
         String email = request.queryParam("userEmail").orElse("");
         return userUseCase.getUserInfo(email)
                 .flatMap(info -> ServerResponse.ok()
-                        .bodyValue(new UserInfoResponse(
-                                info.user(),
-                                info.emailVerified()
-                        )));
+                        .bodyValue(UserMapper.toUserInfoResponse(info)));
     }
  
     public Mono<ServerResponse> updateMyProfile(ServerRequest req) {
@@ -67,7 +56,7 @@ public class UserHandler {
                 .flatMap(t -> userUseCase.setPassword(t.getT1(), t.getT2().password()))
                 .flatMap(result -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(new PasswordUpdateResponse("success", "Contrasena procesada correctamente")));
+                        .bodyValue(UserMapper.toPasswordUpdateResponse()));
     }
  
     public Mono<ServerResponse> getAllUsers(ServerRequest req) {

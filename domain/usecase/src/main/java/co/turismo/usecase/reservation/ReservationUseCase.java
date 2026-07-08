@@ -8,6 +8,7 @@ import co.turismo.model.notification.EmailMessage;
 import co.turismo.model.notification.AppNotification;
 import co.turismo.model.notification.gateways.AppNotificationGateway;
 import co.turismo.model.notification.gateways.EmailGateway;
+import co.turismo.model.payment.gateways.PaymentTransactionRepository;
 import co.turismo.model.reservation.ContactPreference;
 import co.turismo.model.reservation.ReservationDraft;
 import co.turismo.model.reservation.ReservationRequestDetails;
@@ -67,6 +68,7 @@ public class ReservationUseCase {
     private final EmailGateway emailGateway;
     private final AppNotificationGateway appNotificationGateway;
     private final ReservationMessageGateway reservationMessageGateway;
+    private final PaymentTransactionRepository paymentTransactionRepository;
 
     public Mono<ReservationDraft> createRequest(ReservationRequestDetails details) {
         return validateCreate(details)
@@ -193,6 +195,7 @@ public class ReservationUseCase {
                                 agencyId)
                         .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
                         .flatMap(current -> validateTransition(current.getStatus(), nextStatus)
+                                .then(validateNoWompiCompetition(current.getId(), nextStatus))
                                 .then(Mono.defer(() -> updateStatus(change, agencyId, nextStatus)))
                                 .flatMap(updated -> appendStatusMessage(updated, nextStatus, change.getNotes())
                                         .then(notifyStatusChanged(updated))
@@ -212,6 +215,7 @@ public class ReservationUseCase {
         return reservationGateway.findByIdForAdmin(requireText(change.getReservationId(), "reservationId requerido"))
                 .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
                 .flatMap(current -> validateTransition(current.getStatus(), nextStatus)
+                        .then(validateNoWompiCompetition(current.getId(), nextStatus))
                         .then(Mono.defer(() -> updateStatus(change, current.getAgencyId(), nextStatus)))
                         .flatMap(updated -> appendStatusMessage(updated, nextStatus, change.getNotes())
                                 .then(notifyStatusChanged(updated))
@@ -234,6 +238,7 @@ public class ReservationUseCase {
                                 allowedAgencyId)
                         .switchIfEmpty(Mono.error(new NotFoundException("Reserva no encontrada")))
                         .flatMap(current -> validateTransition(current.getStatus(), nextStatus)
+                                .then(validateNoWompiCompetition(current.getId(), nextStatus))
                                 .then(Mono.defer(() -> updateStatus(change, allowedAgencyId, nextStatus)))
                                 .flatMap(updated -> appendStatusMessage(updated, nextStatus, change.getNotes())
                                         .then(notifyStatusChanged(updated))
@@ -417,6 +422,19 @@ public class ReservationUseCase {
             return Mono.error(new ConflictException("La ventana de edición de 2 minutos ya expiró"));
         }
         return Mono.empty();
+    }
+
+    private Mono<Void> validateNoWompiCompetition(String reservationId, String nextStatus) {
+        if (!STATUS_CONFIRMED.equals(nextStatus)) {
+            return Mono.empty();
+        }
+        return paymentTransactionRepository.existsPaidWompiTransaction(reservationId)
+                .flatMap(paid -> Boolean.TRUE.equals(paid)
+                        ? Mono.error(new ConflictException("La reserva ya fue pagada por Wompi"))
+                        : paymentTransactionRepository.existsBlockingWompiTransaction(reservationId, OffsetDateTime.now()))
+                .flatMap(blocking -> Boolean.TRUE.equals(blocking)
+                        ? Mono.error(new ConflictException("Existe un pago Wompi en proceso para esta reserva"))
+                        : Mono.empty());
     }
 
     private OffsetDateTime editableUntil(ReservationDraft reservation) {

@@ -1,6 +1,6 @@
 package co.turismo.api.dto.response.docs;
 
-import co.turismo.api.handler.TourPackageHandler;
+import co.turismo.api.dto.tourpackage.TourPackageResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -12,6 +12,6 @@ public record ApiTourPackageListResponse(
         @Schema(example = "OK")
         String message,
         @Schema(description = "Listado de paquetes")
-        List<TourPackageHandler.TourPackageResponse> data
+        List<TourPackageResponse> data
 ) {
 }

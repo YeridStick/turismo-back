@@ -1,13 +1,10 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.reservationmessage.SendReservationMessageBody;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.error.RequestValidator;
-import co.turismo.model.reservation.ReservationMessage;
+import co.turismo.api.mapper.ReservationMessageMapper;
 import co.turismo.usecase.reservation.ReservationMessageUseCase;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,8 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
-
-import java.time.OffsetDateTime;
 
 @Component
 @RequiredArgsConstructor
@@ -37,7 +32,7 @@ public class ReservationMessageHandler {
         return request.principal()
                 .cast(Authentication.class)
                 .flatMapMany(auth -> reservationMessageUseCase.findForCustomer(auth.getName(), reservationId, size, offset))
-                .map(this::toResponse)
+                .map(ReservationMessageMapper::toResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -55,7 +50,7 @@ public class ReservationMessageHandler {
                         tuple.getT1().getName(),
                         reservationId,
                         tuple.getT2().message()))
-                .map(this::toResponse)
+                .map(ReservationMessageMapper::toResponse)
                 .flatMap(response -> ServerResponse.status(HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.of(201, "Message sent", response)));
@@ -74,7 +69,7 @@ public class ReservationMessageHandler {
                         reservationId,
                         size,
                         offset))
-                .map(this::toResponse)
+                .map(ReservationMessageMapper::toResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -96,7 +91,7 @@ public class ReservationMessageHandler {
                         reservationId,
                         size,
                         offset))
-                .map(this::toResponse)
+                .map(ReservationMessageMapper::toResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,7 +110,7 @@ public class ReservationMessageHandler {
                         hasRole(tuple.getT1(), "ADMIN"),
                         reservationId,
                         tuple.getT2().message()))
-                .map(this::toResponse)
+                .map(ReservationMessageMapper::toResponse)
                 .flatMap(response -> ServerResponse.status(HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.of(201, "Message sent", response)));
@@ -135,21 +130,10 @@ public class ReservationMessageHandler {
                         hasRole(tuple.getT1(), "ADMIN"),
                         reservationId,
                         tuple.getT2().message()))
-                .map(this::toResponse)
+                .map(ReservationMessageMapper::toResponse)
                 .flatMap(response -> ServerResponse.status(HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.of(201, "Message sent", response)));
-    }
-
-    private ReservationMessageResponse toResponse(ReservationMessage message) {
-        return new ReservationMessageResponse(
-                message.getId(),
-                message.getReservationId(),
-                message.getSenderEmail(),
-                message.getSenderType(),
-                message.getBody(),
-                message.getCreatedAt()
-        );
     }
 
     private static int parsePage(ServerRequest request) {
@@ -188,22 +172,4 @@ public class ReservationMessageHandler {
                 .anyMatch(authority -> expected.equalsIgnoreCase(authority.getAuthority()));
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = false)
-    @Schema(name = "SendReservationMessageRequest")
-    public record SendReservationMessageBody(
-            @NotBlank(message = "message es obligatorio")
-            @Size(max = 2000, message = "message excede la longitud permitida")
-            @Schema(example = "Hola, quiero confirmar el proceso de pago.")
-            String message
-    ) {}
-
-    @Schema(name = "ReservationMessageResponse")
-    public record ReservationMessageResponse(
-            Long id,
-            String reservationId,
-            String senderEmail,
-            String senderType,
-            String message,
-            OffsetDateTime createdAt
-    ) {}
 }

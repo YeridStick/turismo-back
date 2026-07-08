@@ -1,14 +1,14 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.tourpackage.AdminAgencyTarget;
+import co.turismo.api.dto.tourpackage.CreatePackageRequest;
+import co.turismo.api.dto.tourpackage.UpdatePackageBody;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.error.RequestValidator;
-import co.turismo.model.place.Place;
-import co.turismo.model.tourpackage.CreateTourPackageRequest;
+import co.turismo.api.mapper.TourPackageMapper;
 import co.turismo.model.tourpackage.TourPackage;
 import co.turismo.usecase.agency.AgencyUseCase;
 import co.turismo.usecase.tourpackage.TourPackageUseCase;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,11 +19,6 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
-
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -43,7 +38,7 @@ public class TourPackageHandler {
                 .flatMap(tuple -> {
                     Authentication auth = tuple.getT1();
                     CreatePackageRequest body = tuple.getT2();
-                    CreateTourPackageRequest cmd = toCreateCommand(body);
+                    var cmd = TourPackageMapper.toCreateCommand(body);
 
                     if (hasRole(auth, "ADMIN") && body.hasAdminAgencyTarget()) {
                         return resolveAdminTargetAgencyId(body)
@@ -54,7 +49,7 @@ public class TourPackageHandler {
                 })
                 .flatMap(pkg -> ServerResponse.status(201)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.created(toResponse(pkg))));
+                        .bodyValue(ApiResponse.created(TourPackageMapper.toResponse(pkg))));
     }
 
     public Mono<ServerResponse> list(ServerRequest req) {
@@ -62,7 +57,7 @@ public class TourPackageHandler {
         int offset = parseQueryParam(req, "offset", 0);
 
         return tourPackageUseCase.findAll(limit, offset)
-                .map(this::toResponse)
+                .map(TourPackageMapper::toResponse)
                 .collectList()
                 .flatMap(list -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,7 +70,7 @@ public class TourPackageHandler {
         int offset = parseQueryParam(req, "offset", 0);
 
         return tourPackageUseCase.findById(id, limit, offset)
-                .map(this::toResponse)
+                .map(TourPackageMapper::toResponse)
                 .flatMap(pkg -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.ok(pkg)));
@@ -92,7 +87,7 @@ public class TourPackageHandler {
                         .flatMap(requestValidator::validate))
                 .flatMap(tuple -> {
                     Authentication auth = tuple.getT1();
-                    var cmd = toUpdateCommand(tuple.getT2());
+                    var cmd = TourPackageMapper.toUpdateCommand(tuple.getT2());
 
                     if (hasRole(auth, "ADMIN")) {
                         return tourPackageUseCase.update(packageId, cmd);
@@ -102,7 +97,7 @@ public class TourPackageHandler {
                 })
                 .flatMap(pkg -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(toResponse(pkg))));
+                        .bodyValue(ApiResponse.ok(TourPackageMapper.toResponse(pkg))));
     }
 
     // ── DELETE ────────────────────────────────────────────────────────────────
@@ -150,78 +145,10 @@ public class TourPackageHandler {
                 .toArray(String[]::new);
     }
 
-    private static CreateTourPackageRequest toCreateCommand(CreatePackageRequest body) {
-        return CreateTourPackageRequest.builder()
-                .title(body.title())
-                .city(body.city())
-                .description(body.description())
-                .days(body.days())
-                .nights(body.nights())
-                .people(body.people())
-                .rating(body.rating())
-                .reviews(body.reviews())
-                .price(body.price())
-                .originalPrice(body.originalPrice())
-                .discount(body.discount())
-                .tag(body.tag())
-                .includes(body.includes() == null ? new String[0] : body.includes().toArray(String[]::new))
-                .image(body.image())
-                .placeIds(body.placeIds().toArray(Long[]::new))
-                .build();
-    }
-
-    private static co.turismo.model.tourpackage.UpdateTourPackageRequest toUpdateCommand(UpdatePackageBody body) {
-        return co.turismo.model.tourpackage.UpdateTourPackageRequest.builder()
-                .title(body.title())
-                .city(body.city())
-                .description(body.description())
-                .days(body.days())
-                .nights(body.nights())
-                .people(body.people())
-                .rating(body.rating())
-                .reviews(body.reviews())
-                .price(body.price())
-                .originalPrice(body.originalPrice())
-                .discount(body.discount())
-                .tag(body.tag())
-                .includes(body.includes() == null ? null : body.includes().toArray(String[]::new))
-                .image(body.image())
-                .placeIds(body.placeIds() == null ? null : body.placeIds().toArray(Long[]::new))
-                .build();
-    }
-
-    private TourPackageResponse toResponse(TourPackage pkg) {
-        return new TourPackageResponse(
-                pkg.getId() == null ? null : String.valueOf(pkg.getId()),
-                pkg.getTitle(),
-                pkg.getCity(),
-                pkg.getDescription(),
-                pkg.getDays(),
-                pkg.getNights(),
-                pkg.getPeople(),
-                pkg.getRating(),
-                pkg.getReviews(),
-                pkg.getPrice(),
-                pkg.getOriginalPrice(),
-                pkg.getDiscount(),
-                pkg.getTag(),
-                pkg.getIncludes() == null ? List.of() : Arrays.asList(pkg.getIncludes()),
-                pkg.getImage(),
-                List.of(normalizePlaceIds(pkg.getPlaceIds())),
-                pkg.getAgencyId(),
-                pkg.getAgencyName(),
-                pkg.getPlaces() == null ? List.of() : pkg.getPlaces()
-        );
-    }
-
     private static boolean hasRole(Authentication auth, String role) {
         String expected = "ROLE_" + role.toUpperCase();
         return auth.getAuthorities().stream()
                 .anyMatch(a -> expected.equalsIgnoreCase(a.getAuthority()));
-    }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
     private Mono<Long> resolveAdminTargetAgencyId(CreatePackageRequest body) {
@@ -238,128 +165,4 @@ public class TourPackageHandler {
                 .orElse(defaultValue);
     }
 
-    private static Long[] normalizePlaceIds(Long[] placeIds) {
-        if (placeIds == null || placeIds.length == 0) return new Long[0];
-        var set = new LinkedHashSet<Long>();
-        for (Long id : placeIds) {
-            if (id != null && id > 0) set.add(id);
-        }
-        return set.stream().filter(Objects::nonNull).toArray(Long[]::new);
-    }
-
-    // ── DTOs ──────────────────────────────────────────────────────────────────
-
-    @Schema(name = "TourPackageCreateRequest")
-    public record CreatePackageRequest(
-            @NotBlank(message = "title es obligatorio")
-            @Schema(example = "Aventura Completa Huila")
-            String title,
-
-            @Schema(example = "Tatacoa / San Agustín")
-            String city,
-
-            @NotBlank(message = "description es obligatorio")
-            String description,
-
-            @Positive(message = "days debe ser mayor a 0")
-            Integer days,
-
-            @PositiveOrZero(message = "nights debe ser mayor o igual a 0")
-            Integer nights,
-
-            String people,
-
-            @DecimalMin(value = "0.0", message = "rating debe ser >= 0")
-            @DecimalMax(value = "5.0", message = "rating debe ser <= 5")
-            Double rating,
-
-            @PositiveOrZero(message = "reviews debe ser >= 0")
-            Long reviews,
-
-            @NotNull(message = "price es obligatorio")
-            @Positive(message = "price debe ser mayor a 0")
-            Long price,
-
-            @Positive(message = "originalPrice debe ser mayor a 0")
-            Long originalPrice,
-
-            String discount,
-            String tag,
-            List<String> includes,
-            String image,
-            @Positive(message = "agencyId debe ser mayor a 0")
-            Long agencyId,
-            String agencyEmail,
-
-            @NotNull(message = "placeIds es obligatorio")
-            @Size(min = 1, message = "Debe incluir al menos un lugar")
-            List<Long> placeIds
-    ) {
-        @AssertTrue(message = "No puedes enviar agencyId y agencyEmail al mismo tiempo")
-        public boolean isSingleAdminAgencyTarget() {
-            return !hasText(agencyEmail) || agencyId == null;
-        }
-
-        public boolean hasAdminAgencyTarget() {
-            return agencyId != null || hasText(agencyEmail);
-        }
-    }
-
-    private record AdminAgencyTarget(
-            @Positive(message = "agencyId debe ser mayor a 0")
-            Long agencyId,
-            @Email(message = "agencyEmail debe tener un formato válido")
-            String agencyEmail
-    ) {
-        @AssertTrue(message = "Debes enviar agencyId o agencyEmail")
-        public boolean isAnyTargetPresent() {
-            return agencyId != null || hasText(agencyEmail);
-        }
-    }
-
-    @Schema(name = "UpdatePackageBody")
-    public record UpdatePackageBody(
-            @Size(min = 1, message = "title no puede ser vacío si se envía")
-            String title,
-
-            String city,
-
-            @Size(min = 1, message = "description no puede ser vacía si se envía")
-            String description,
-
-            @Positive(message = "days debe ser mayor a 0")
-            Integer days,
-
-            @PositiveOrZero(message = "nights debe ser mayor o igual a 0")
-            Integer nights,
-
-            String people,
-
-            @DecimalMin(value = "0.0") @DecimalMax(value = "5.0")
-            Double rating,
-
-            @PositiveOrZero Long reviews,
-
-            @Positive(message = "price debe ser mayor a 0")
-            Long price,
-
-            @Positive Long originalPrice,
-
-            String discount,
-            String tag,
-            List<String> includes,
-            String image,
-
-            @Size(min = 1, message = "placeIds no puede estar vacío si se envía")
-            List<Long> placeIds
-    ) {}
-
-    @Schema(name = "TourPackageResponse")
-    public record TourPackageResponse(
-            String id, String title, String city, String description,
-            Integer days, Integer nights, String people,
-            Double rating, Long reviews, Long price, Long originalPrice,
-            String discount, String tag, List<String> includes, String image,
-            List<Long> placeIds, Long agencyId, String agencyName, List<Place> places
-    ) {}
 }

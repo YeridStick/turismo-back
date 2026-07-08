@@ -7,6 +7,7 @@ import co.turismo.model.error.NotFoundException;
 import co.turismo.model.notification.EmailMessage;
 import co.turismo.model.notification.gateways.AppNotificationGateway;
 import co.turismo.model.notification.gateways.EmailGateway;
+import co.turismo.model.payment.gateways.PaymentTransactionRepository;
 import co.turismo.model.reservation.ReservationDraft;
 import co.turismo.model.reservation.ReservationMessage;
 import co.turismo.model.reservation.ReservationRequestDetails;
@@ -58,6 +59,8 @@ class ReservationUseCaseTest {
     private AppNotificationGateway appNotificationGateway;
     @Mock
     private ReservationMessageGateway reservationMessageGateway;
+    @Mock
+    private PaymentTransactionRepository paymentTransactionRepository;
 
     private ReservationUseCase useCase;
 
@@ -70,13 +73,16 @@ class ReservationUseCaseTest {
                 userRepository,
                 emailGateway,
                 appNotificationGateway,
-                reservationMessageGateway
+                reservationMessageGateway,
+                paymentTransactionRepository
         );
         lenient().when(userRepository.isEmailVerified("user@example.com")).thenReturn(Mono.just(false));
         lenient().when(userRepository.findByAgencyId(2L)).thenReturn(Flux.empty());
         lenient().when(userRepository.findByRoleName("ADMIN")).thenReturn(Flux.empty());
         lenient().when(appNotificationGateway.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
         lenient().when(reservationMessageGateway.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        lenient().when(paymentTransactionRepository.existsPaidWompiTransaction(any())).thenReturn(Mono.just(false));
+        lenient().when(paymentTransactionRepository.existsBlockingWompiTransaction(any(), any())).thenReturn(Mono.just(false));
     }
 
     @Test

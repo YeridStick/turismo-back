@@ -32,3 +32,5 @@ include ':antispam'
 project(':antispam').projectDir = file('./infrastructure/driven-adapters/antispam')
 include ':brevo'
 project(':brevo').projectDir = file('./infrastructure/driven-adapters/brevo')
+include ':wompi'
+project(':wompi').projectDir = file('./infrastructure/driven-adapters/wompi')

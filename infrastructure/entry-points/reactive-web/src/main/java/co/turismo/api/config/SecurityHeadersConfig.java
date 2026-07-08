@@ -15,8 +15,16 @@ public class SecurityHeadersConfig implements WebFilter {
         HttpHeaders headers = exchange.getResponse().getHeaders();
         String path = exchange.getRequest().getPath().value();
 
-        // CSP permisivo solo para rutas de documentación (Scalar UI)
-        if (isDocumentationPath(path)) {
+        if (isCheckoutPagePath(path)) {
+            // CSP específica para permitir estilos de esta vista y el GET del formulario hacia Wompi.
+            headers.set("Content-Security-Policy",
+                "default-src 'self'; " +
+                "style-src 'self' 'unsafe-inline'; " +
+                "frame-ancestors 'self'; " +
+                "form-action 'self' https://checkout.wompi.co"
+            );
+        } else if (isDocumentationPath(path)) {
+            // CSP permisivo solo para rutas de documentación (Scalar UI)
             headers.set("Content-Security-Policy",
                 "default-src 'self'; " +
                 "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; " +
@@ -49,5 +57,10 @@ public class SecurityHeadersConfig implements WebFilter {
         return path.equals("/scalar") ||
                path.equals("/docs") ||
                path.startsWith("/v3/api-docs");
+    }
+
+    private boolean isCheckoutPagePath(String path) {
+        return path.startsWith("/api/reservations/") &&
+               path.endsWith("/payment/checkout-page");
     }
 }

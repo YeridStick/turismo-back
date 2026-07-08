@@ -3,6 +3,7 @@ package co.turismo.api.handler;
 import co.turismo.api.dto.visit.*;
 import co.turismo.api.dto.common.SimpleMessageResponse;
 import co.turismo.api.http.HttpResponses;
+import co.turismo.api.mapper.VisitMapper;
 import co.turismo.usecase.visit.VisitsUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -12,8 +13,6 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
-import java.util.List;
-
 @Component
 @RequiredArgsConstructor
 public class VisitHandler {
@@ -35,18 +34,9 @@ public class VisitHandler {
                     CheckinRequest body = tuple.getT1();
                     String email = tuple.getT2();
 
-                    var cmd = new VisitsUseCase.CheckinCmd(
-                            placeId,
-                            body.lat(), body.lng(),
-                            body.accuracy_m(),
-                            body.device_id(),
-                            normalizeMeta(body.meta()),
-                            email // ← ahora pasamos email, no userId
-                    );
-
-                    return visitsUseCase.checkin(cmd);
+                    return visitsUseCase.checkin(VisitMapper.toCheckinCommand(placeId, body, email));
                 })
-                .map(r -> new CheckinResponse(r.visitId(), r.status(), r.minStaySeconds(), r.distanceM()))
+                .map(VisitMapper::toCheckinResponse)
                 .flatMap(HttpResponses::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> HttpResponses.badRequest(e.getMessage()))
@@ -54,37 +44,14 @@ public class VisitHandler {
                         e -> HttpResponses.conflict(e.getMessage()));
     }
 
-    private static String normalizeMeta(com.fasterxml.jackson.databind.JsonNode meta) {
-        if (meta == null || meta.isNull()) return "{}";
-        if (meta.isTextual()) {
-            String value = meta.asText();
-            return (value == null || value.isBlank()) ? "{}" : value;
-        }
-        return meta.toString();
-    }
-
     // PATCH /api/visits/{visitId}/confirm
     public Mono<ServerResponse> confirm(ServerRequest req) {
         Long visitId = Long.valueOf(req.pathVariable("visitId"));
         return req.bodyToMono(ConfirmRequest.class)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Body requerido")))
-                .flatMap(b -> visitsUseCase.confirm(new VisitsUseCase.ConfirmCmd(
-                        visitId, b.lat(), b.lng(), b.accuracy_m()
-                )))
-                .map(r -> new ConfirmResponse(
-                        r.status(),
-                        r.confirmedAt(),
-                        new PlaceBrief(
-                                r.place().id(),
-                                r.place().name(),
-                                r.place().lat(),   // primero lat
-                                r.place().lng(),   // luego lng
-                                r.place().address(),
-                                r.place().description(),
-                                r.place().categoryId(),
-                                r.place().imageUrls()
-                        )
-                ))
+                .map(b -> VisitMapper.toConfirmCommand(visitId, b))
+                .flatMap(visitsUseCase::confirm)
+                .map(VisitMapper::toConfirmResponse)
                 .flatMap(HttpResponses::ok)
                 .onErrorResume(IllegalArgumentException.class,
                         e -> HttpResponses.badRequest(e.getMessage()))
@@ -100,19 +67,7 @@ public class VisitHandler {
         int limit  = Math.min(MAX_LIMIT, Math.max(1, Integer.parseInt(req.queryParam("limit").orElse("1"))));
 
         return visitsUseCase.nearby(lat, lng, radius, limit)
-                .map(r -> new PlaceNearbyDTO(
-                        new PlaceBrief(
-                                r.id(),
-                                r.name(),
-                                r.lat(),
-                                r.lng(),
-                                r.address(),
-                                r.description(),
-                                r.categoryId(),
-                                r.imageUrls() == null ? List.of() : r.imageUrls()
-                        ),
-                        r.distanceM()
-                ))
+                .map(VisitMapper::toNearbyResponse)
                 .collectList()
                 .flatMap(HttpResponses::ok);
     }
@@ -128,7 +83,7 @@ public class VisitHandler {
         int limit = Math.min(MAX_LIMIT, Math.max(1, Integer.parseInt(req.queryParam("limit").orElse("20"))));
 
         return visitsUseCase.top(from, to, limit)
-                .map(tp -> new TopPlaceDTO(tp.getPlaceId(), tp.getName(), tp.getVisits()))
+                .map(VisitMapper::toTopPlaceResponse)
                 .collectList()
                 .flatMap(HttpResponses::ok);
     }
@@ -138,7 +93,7 @@ public class VisitHandler {
         int limit = Math.min(MAX_LIMIT, Math.max(1, Integer.parseInt(req.queryParam("limit").orElse("10"))));
         return authenticatedEmail(req)
                 .flatMapMany(email -> visitsUseCase.myTopVisited(email, limit))
-                .map(tp -> new TopPlaceDTO(tp.getPlaceId(), tp.getName(), tp.getVisits()))
+                .map(VisitMapper::toTopPlaceResponse)
                 .collectList()
                 .flatMap(HttpResponses::ok)
                 .onErrorResume(IllegalArgumentException.class,
@@ -154,19 +109,7 @@ public class VisitHandler {
 
         return authenticatedEmail(req)
                 .flatMapMany(email -> visitsUseCase.myFavorites(email, limit, offset))
-                .map(f -> new UserFavoritePlaceDTO(
-                        new PlaceBrief(
-                                f.getPlaceId(),
-                                f.getName(),
-                                f.getLat(),
-                                f.getLng(),
-                                f.getAddress(),
-                                f.getDescription(),
-                                f.getCategoryId(),
-                                f.getImageUrls() == null ? List.of() : f.getImageUrls()
-                        ),
-                        f.getFavoritedAt()
-                ))
+                .map(VisitMapper::toFavoriteResponse)
                 .collectList()
                 .flatMap(HttpResponses::ok)
                 .onErrorResume(IllegalArgumentException.class,

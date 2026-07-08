@@ -11,17 +11,44 @@ import co.turismo.api.dto.auth.RegisterUserRequest;
 import co.turismo.api.dto.auth.TotpConfirmRequest;
 import co.turismo.api.dto.auth.TotpEmailRequest;
 import co.turismo.api.dto.auth.TotpLoginRequest;
+import co.turismo.api.dto.agency.AddAgencyUserBody;
+import co.turismo.api.dto.agency.AgencyUserResponse;
+import co.turismo.api.dto.agency.CreateAgencyBody;
+import co.turismo.api.dto.agency.UpdateAgencyBody;
+import co.turismo.api.dto.agency.UpdateAgencyUserEmailBody;
+import co.turismo.api.dto.category.CreateCategoryBody;
+import co.turismo.api.dto.category.UpdateCategoryBody;
 import co.turismo.api.dto.common.SimpleMessageResponse;
+import co.turismo.api.dto.email.DebugEmailRequest;
+import co.turismo.api.dto.email.RecoveryEmailRequest;
+import co.turismo.api.dto.feedback.CreateFeedbackBody;
+import co.turismo.api.dto.geocode.GeocodeRequest;
+import co.turismo.api.dto.notification.MarkAllNotificationsReadResponse;
+import co.turismo.api.dto.notification.NotificationResponse;
+import co.turismo.api.dto.payment.PaymentStatusResponse;
+import co.turismo.api.dto.payment.WompiCheckoutResponse;
+import co.turismo.api.dto.place.ActiveRequest;
+import co.turismo.api.dto.place.PlaceCreateRequest;
+import co.turismo.api.dto.place.UpdateRequest;
+import co.turismo.api.dto.place.VerifyRequest;
+import co.turismo.api.dto.reservation.CreateReservationBody;
+import co.turismo.api.dto.reservation.DeleteReservationResponse;
+import co.turismo.api.dto.reservation.ReservationResponse;
+import co.turismo.api.dto.reservation.UpdateReservationBody;
+import co.turismo.api.dto.reservation.UpdateReservationStatusBody;
+import co.turismo.api.dto.reservationmessage.ReservationMessageResponse;
+import co.turismo.api.dto.reservationmessage.SendReservationMessageBody;
+import co.turismo.api.dto.review.CreateReviewBody;
+import co.turismo.api.dto.review.RatingSummaryResponse;
+import co.turismo.api.dto.review.TopRatedPlaceResponse;
 import co.turismo.api.dto.response.UserInfoResponse;
 import co.turismo.api.dto.response.PasswordUpdateResponse;
 import co.turismo.api.dto.response.docs.*;
+import co.turismo.api.dto.tourpackage.CreatePackageRequest;
+import co.turismo.api.dto.tourpackage.UpdatePackageBody;
 import co.turismo.api.dto.visit.CheckinRequest;
 import co.turismo.api.dto.visit.ConfirmRequest;
 import co.turismo.api.handler.*;
-import co.turismo.api.handler.PlacesHandler.ActiveRequest;
-import co.turismo.api.handler.PlacesHandler.PlaceCreateRequest;
-import co.turismo.api.handler.PlacesHandler.UpdateRequest;
-import co.turismo.api.handler.PlacesHandler.VerifyRequest;
 import co.turismo.model.feedback.Feedback;
 import co.turismo.model.place.Place;
 
@@ -60,6 +87,7 @@ public class RouterRest {
             TourPackageHandler tourPackageHandler,
             ReservationHandler reservationHandler,
             ReservationMessageHandler reservationMessageHandler,
+            PaymentHandler paymentHandler,
             AppNotificationHandler appNotificationHandler,
             AgencyHandler agencyHandler,
             CategoryHandler categoryHandler,
@@ -344,7 +372,7 @@ public class RouterRest {
                         ops -> ops.operationId("debugSendEmail")
                                 .summary("Enviar correo de prueba")
                                 .tag("Debug")
-                                .requestBody(jsonBody(DebugEmailHandler.DebugEmailRequest.class, true))
+                                .requestBody(jsonBody(DebugEmailRequest.class, true))
                                 .response(jsonResponse("200", "Correo enviado", ApiMessageResponse.class))
                                 .response(messageResponse("400", "Error enviando correo"))
                 )
@@ -363,7 +391,7 @@ public class RouterRest {
                         ops -> ops.operationId("debugSendRecoveryEmail")
                                 .summary("Enviar correo de recuperación de prueba")
                                 .tag("Debug")
-                                .requestBody(jsonBody(DebugEmailHandler.RecoveryEmailRequest.class, true))
+                                .requestBody(jsonBody(RecoveryEmailRequest.class, true))
                                 .response(jsonResponse("200", "Correo enviado", ApiMessageResponse.class))
                                 .response(messageResponse("400", "Error enviando correo"))
                 )
@@ -376,7 +404,7 @@ public class RouterRest {
                         ops -> ops.operationId("agencyCreate")
                                 .summary("Crear agencia")
                                 .tag("Agencies")
-                                .requestBody(jsonBody(AgencyHandler.CreateAgencyBody.class, true))
+                                .requestBody(jsonBody(CreateAgencyBody.class, true))
                                 .response(jsonResponse("201", "Agencia creada", ApiAgencyResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
@@ -386,7 +414,7 @@ public class RouterRest {
                         ops -> ops.operationId("agencyAddUser")
                                 .summary("Agregar usuario a mi agencia")
                                 .tag("Agencies")
-                                .requestBody(jsonBody(AgencyHandler.AddAgencyUserBody.class, true))
+                                .requestBody(jsonBody(AddAgencyUserBody.class, true))
                                 .response(jsonResponse("200", "Usuario asociado", ApiAgencyResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
@@ -443,7 +471,7 @@ public class RouterRest {
                                 .summary("Actualizar agencia")
                                 .tag("Agencies")
                                 .parameter(pathParam("id", "Identificador interno de la agencia", Long.class))
-                                .requestBody(jsonBody(AgencyHandler.UpdateAgencyBody.class, true))
+                                .requestBody(jsonBody(UpdateAgencyBody.class, true))
                                 .response(jsonResponse("200", "Agencia actualizada", ApiAgencyResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
@@ -487,7 +515,7 @@ public class RouterRest {
                                 .description("Devuelve la lista de correos de los usuarios vinculados. Endpoint público.")
                                 .tag("Agencies")
                                 .parameter(pathParam("id", "ID de la agencia", Long.class))
-                                .response(jsonResponse("200", "Listado de usuarios vinculados", AgencyHandler.AgencyUserResponse[].class))
+                                .response(jsonResponse("200", "Listado de usuarios vinculados", AgencyUserResponse[].class))
                 )
 
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_USERS_MANAGE_PATH,
@@ -498,7 +526,7 @@ public class RouterRest {
                                 .tag("Agencies")
                                 .parameter(pathParam("id", "ID de la agencia", Long.class))
                                 .parameter(pathParam("userId", "ID del usuario actual", Long.class))
-                                .requestBody(jsonBody(AgencyHandler.UpdateAgencyUserEmailBody.class, true))
+                                .requestBody(jsonBody(UpdateAgencyUserEmailBody.class, true))
                                 .response(jsonResponse("200", "Usuario actualizado", String.class))
                 )
 
@@ -521,7 +549,7 @@ public class RouterRest {
                         ops -> ops.operationId("packageCreate")
                                 .summary("Crear paquete turístico")
                                 .tag("Packages")
-                                .requestBody(jsonBody(TourPackageHandler.CreatePackageRequest.class, true))
+                                .requestBody(jsonBody(CreatePackageRequest.class, true))
                                 .response(jsonResponse("201", "Paquete creado", ApiTourPackageResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
@@ -552,7 +580,7 @@ public class RouterRest {
                                 .summary("Actualizar paquete turístico")
                                 .tag("Packages")
                                 .parameter(pathParam("id", "Identificador interno del paquete", Long.class))
-                                .requestBody(jsonBody(TourPackageHandler.UpdatePackageBody.class, true))
+                                .requestBody(jsonBody(UpdatePackageBody.class, true))
                                 .response(jsonResponse("200", "Paquete actualizado", ApiTourPackageResponse.class))
                 )
 
@@ -573,8 +601,8 @@ public class RouterRest {
                         ops -> ops.operationId("reservationCreate")
                                 .summary("Crear solicitud de reserva")
                                 .tag("Reservations")
-                                .requestBody(jsonBody(ReservationHandler.CreateReservationBody.class, true))
-                                .response(jsonResponse("201", "Solicitud creada", ReservationHandler.ReservationResponse.class))
+                                .requestBody(jsonBody(CreateReservationBody.class, true))
+                                .response(jsonResponse("201", "Solicitud creada", ReservationResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                                 .response(apiErrorResponse("404", "Paquete no encontrado"))
                 )
@@ -586,7 +614,7 @@ public class RouterRest {
                                 .tag("Reservations")
                                 .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
                                 .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "20"))
-                                .response(jsonResponse("200", "Reservas del usuario", ReservationHandler.ReservationResponse.class))
+                                .response(jsonResponse("200", "Reservas del usuario", ReservationResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_ID_PATH,
@@ -595,7 +623,7 @@ public class RouterRest {
                                 .summary("Detalle de mi solicitud de reserva")
                                 .tag("Reservations")
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .response(jsonResponse("200", "Reserva encontrada", ReservationHandler.ReservationResponse.class))
+                                .response(jsonResponse("200", "Reserva encontrada", ReservationResponse.class))
                                 .response(apiErrorResponse("404", "No encontrada"))
                 )
 
@@ -605,8 +633,8 @@ public class RouterRest {
                                 .summary("Editar mi solicitud de reserva dentro de los primeros 2 minutos")
                                 .tag("Reservations")
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .requestBody(jsonBody(ReservationHandler.UpdateReservationBody.class, true))
-                                .response(jsonResponse("200", "Solicitud actualizada", ReservationHandler.ReservationResponse.class))
+                                .requestBody(jsonBody(UpdateReservationBody.class, true))
+                                .response(jsonResponse("200", "Solicitud actualizada", ReservationResponse.class))
                                 .response(apiErrorResponse("409", "Ventana de edición expirada"))
                 )
 
@@ -616,7 +644,7 @@ public class RouterRest {
                                 .summary("Eliminar mi solicitud de reserva dentro de los primeros 2 minutos")
                                 .tag("Reservations")
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .response(jsonResponse("200", "Solicitud eliminada", ReservationHandler.DeleteReservationResponse.class))
+                                .response(jsonResponse("200", "Solicitud eliminada", DeleteReservationResponse.class))
                                 .response(apiErrorResponse("409", "Ventana de eliminación expirada"))
                 )
 
@@ -628,7 +656,7 @@ public class RouterRest {
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
                                 .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
                                 .parameter(queryParam("size", false, "Cantidad de mensajes por página", Integer.class, "50"))
-                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageResponse.class))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_MESSAGES_PATH,
@@ -637,9 +665,47 @@ public class RouterRest {
                                 .summary("Enviar mensaje en mi solicitud de reserva")
                                 .tag("Reservation Messages")
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .requestBody(jsonBody(ReservationMessageHandler.SendReservationMessageBody.class, true))
-                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .requestBody(jsonBody(SendReservationMessageBody.class, true))
+                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageResponse.class))
                                 .response(apiErrorResponse("409", "Chat cerrado"))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_PAYMENT_CHECKOUT_PATH,
+                        paymentHandler::createCheckout,
+                        ops -> ops.operationId("reservationPaymentCheckout")
+                                .summary("Crear checkout de pago Wompi")
+                                .tag("Payments")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .response(jsonResponse("201", "Checkout creado", WompiCheckoutResponse.class))
+                                .response(apiErrorResponse("409", "Pago no habilitado"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_PAYMENT_CHECKOUT_PAGE_PATH,
+                        paymentHandler::checkoutPage,
+                        ops -> ops.operationId("reservationPaymentCheckoutPage")
+                                .summary("Página HTML de redirección a Wompi")
+                                .tag("Payments")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .parameter(queryParam("token", true, "Token temporal firmado para abrir checkout", String.class, "token"))
+                                .response(responseBuilder().responseCode("200").description("Formulario HTML auto-submit a Wompi"))
+                                .response(apiErrorResponse("400", "Token inválido o expirado"))
+                )
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.RESERVATIONS_PAYMENT_STATUS_PATH,
+                        paymentHandler::paymentStatus,
+                        ops -> ops.operationId("reservationPaymentStatus")
+                                .summary("Consultar estado de pago")
+                                .tag("Payments")
+                                .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
+                                .response(jsonResponse("200", "Estado de pago", PaymentStatusResponse.class))
+                )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.WOMPI_WEBHOOK_PATH,
+                        paymentHandler::wompiWebhook,
+                        ops -> ops.operationId("wompiWebhook")
+                                .summary("Webhook público de Wompi")
+                                .tag("Payments")
+                                .response(jsonResponse("200", "Evento recibido", String.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_PATH,
@@ -650,7 +716,7 @@ public class RouterRest {
                                 .parameter(queryParam("status", false, "Estado de reserva", String.class, "requested"))
                                 .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
                                 .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "20"))
-                                .response(jsonResponse("200", "Reservas de la agencia", ReservationHandler.ReservationResponse.class))
+                                .response(jsonResponse("200", "Reservas de la agencia", ReservationResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_ID_PATH,
@@ -659,7 +725,7 @@ public class RouterRest {
                                 .summary("Detalle de solicitud de mi agencia")
                                 .tag("Agency Reservations")
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .response(jsonResponse("200", "Reserva encontrada", ReservationHandler.ReservationResponse.class))
+                                .response(jsonResponse("200", "Reserva encontrada", ReservationResponse.class))
                                 .response(apiErrorResponse("404", "No encontrada"))
                 )
 
@@ -669,8 +735,8 @@ public class RouterRest {
                                 .summary("Actualizar estado de solicitud de mi agencia")
                                 .tag("Agency Reservations")
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .requestBody(jsonBody(ReservationHandler.UpdateReservationStatusBody.class, true))
-                                .response(jsonResponse("200", "Estado actualizado", ReservationHandler.ReservationResponse.class))
+                                .requestBody(jsonBody(UpdateReservationStatusBody.class, true))
+                                .response(jsonResponse("200", "Estado actualizado", ReservationResponse.class))
                                 .response(apiErrorResponse("409", "Transición inválida"))
                 )
 
@@ -682,7 +748,7 @@ public class RouterRest {
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
                                 .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
                                 .parameter(queryParam("size", false, "Cantidad de mensajes por página", Integer.class, "50"))
-                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageResponse.class))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ME_RESERVATIONS_MESSAGES_PATH,
@@ -691,8 +757,8 @@ public class RouterRest {
                                 .summary("Enviar mensaje como agencia")
                                 .tag("Agency Reservation Messages")
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .requestBody(jsonBody(ReservationMessageHandler.SendReservationMessageBody.class, true))
-                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .requestBody(jsonBody(SendReservationMessageBody.class, true))
+                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageResponse.class))
                                 .response(apiErrorResponse("409", "Chat cerrado"))
                 )
 
@@ -705,7 +771,7 @@ public class RouterRest {
                                 .parameter(queryParam("status", false, "Estado de reserva", String.class, "requested"))
                                 .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
                                 .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "20"))
-                                .response(jsonResponse("200", "Reservas de la agencia", ReservationHandler.ReservationResponse.class))
+                                .response(jsonResponse("200", "Reservas de la agencia", ReservationResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ID_RESERVATIONS_ID_PATH,
@@ -715,7 +781,7 @@ public class RouterRest {
                                 .tag("Agency Reservations")
                                 .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .response(jsonResponse("200", "Reserva encontrada", ReservationHandler.ReservationResponse.class))
+                                .response(jsonResponse("200", "Reserva encontrada", ReservationResponse.class))
                                 .response(apiErrorResponse("404", "No encontrada"))
                 )
 
@@ -726,8 +792,8 @@ public class RouterRest {
                                 .tag("Agency Reservations")
                                 .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .requestBody(jsonBody(ReservationHandler.UpdateReservationStatusBody.class, true))
-                                .response(jsonResponse("200", "Estado actualizado", ReservationHandler.ReservationResponse.class))
+                                .requestBody(jsonBody(UpdateReservationStatusBody.class, true))
+                                .response(jsonResponse("200", "Estado actualizado", ReservationResponse.class))
                                 .response(apiErrorResponse("409", "Transición inválida"))
                 )
 
@@ -740,7 +806,7 @@ public class RouterRest {
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
                                 .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
                                 .parameter(queryParam("size", false, "Cantidad de mensajes por página", Integer.class, "50"))
-                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .response(jsonResponse("200", "Mensajes de la solicitud", ReservationMessageResponse.class))
                 )
 
                 .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.AGENCIES_ID_RESERVATIONS_MESSAGES_PATH,
@@ -750,8 +816,8 @@ public class RouterRest {
                                 .tag("Agency Reservation Messages")
                                 .parameter(pathParam("agencyId", "Identificador de la agencia", Long.class))
                                 .parameter(pathParam("reservationId", "Identificador de la reserva", String.class))
-                                .requestBody(jsonBody(ReservationMessageHandler.SendReservationMessageBody.class, true))
-                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageHandler.ReservationMessageResponse.class))
+                                .requestBody(jsonBody(SendReservationMessageBody.class, true))
+                                .response(jsonResponse("201", "Mensaje enviado", ReservationMessageResponse.class))
                                 .response(apiErrorResponse("409", "Chat cerrado"))
                 )
 
@@ -766,7 +832,7 @@ public class RouterRest {
                                 .parameter(queryParam("unreadOnly", false, "Solo no leídas", Boolean.class, "false"))
                                 .parameter(queryParam("page", false, "Número de página (0-N)", Integer.class, "0"))
                                 .parameter(queryParam("size", false, "Cantidad de resultados por página", Integer.class, "30"))
-                                .response(jsonResponse("200", "Notificaciones del usuario", AppNotificationHandler.NotificationResponse.class))
+                                .response(jsonResponse("200", "Notificaciones del usuario", NotificationResponse.class))
                 )
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.NOTIFICATIONS_STREAM_PATH,
@@ -785,7 +851,7 @@ public class RouterRest {
                                 .summary("Marcar notificación como leída")
                                 .tag("Notifications")
                                 .parameter(pathParam("notificationId", "ID de la notificación", Long.class))
-                                .response(jsonResponse("200", "Notificación actualizada", AppNotificationHandler.NotificationResponse.class))
+                                .response(jsonResponse("200", "Notificación actualizada", NotificationResponse.class))
                 )
 
                 .PATCH(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.NOTIFICATIONS_READ_ALL_PATH,
@@ -793,7 +859,7 @@ public class RouterRest {
                         ops -> ops.operationId("notificationMarkAllAsRead")
                                 .summary("Marcar todas mis notificaciones como leídas")
                                 .tag("Notifications")
-                                .response(jsonResponse("200", "Notificaciones actualizadas", AppNotificationHandler.MarkAllNotificationsReadResponse.class))
+                                .response(jsonResponse("200", "Notificaciones actualizadas", MarkAllNotificationsReadResponse.class))
                 )
 
                 // =========================
@@ -822,7 +888,7 @@ public class RouterRest {
                         ops -> ops.operationId("categoryCreate")
                                 .summary("Crear categoría (ADMIN)")
                                 .tag("Categories")
-                                .requestBody(jsonBody(CategoryHandler.CreateCategoryBody.class, true))
+                                .requestBody(jsonBody(CreateCategoryBody.class, true))
                                 .response(jsonResponse("201", "Categoría creada", ApiCategoryResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
@@ -833,7 +899,7 @@ public class RouterRest {
                                 .summary("Editar categoría (ADMIN)")
                                 .tag("Categories")
                                 .parameter(pathParam("id", "Identificador interno de la categoría", Long.class))
-                                .requestBody(jsonBody(CategoryHandler.UpdateCategoryBody.class, true))
+                                .requestBody(jsonBody(UpdateCategoryBody.class, true))
                                 .response(jsonResponse("200", "Categoría actualizada", ApiCategoryResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                                 .response(apiErrorResponse("404", "No encontrado"))
@@ -861,7 +927,7 @@ public class RouterRest {
                         ops -> ops.operationId("geocode")
                                 .summary("Geocodificar dirección")
                                 .tag("Geocode")
-                                .requestBody(jsonBody(GeocodeHandler.Req.class, true))
+                                .requestBody(jsonBody(GeocodeRequest.class, true))
                                 .response(jsonResponse("200", "Resultados de geocodificación", ApiGeocodeResponse.class))
                 )
 
@@ -973,7 +1039,7 @@ public class RouterRest {
                                 .summary("Crear review")
                                 .tag("Reviews")
                                 .parameter(pathParam("id", "Identificador del lugar", Long.class))
-                                .requestBody(jsonBody(ReviewsHandler.CreateReviewBody.class, true))
+                                .requestBody(jsonBody(CreateReviewBody.class, true))
                                 .response(jsonResponse("201", "Reseña creada", Review.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
@@ -984,7 +1050,7 @@ public class RouterRest {
                                 .summary("Resumen de rating")
                                 .tag("Reviews")
                                 .parameter(pathParam("id", "Identificador del lugar", Long.class))
-                                .response(jsonResponse("200", "Estadísticas de calificación", ReviewsHandler.RatingSummaryResponse.class))
+                                .response(jsonResponse("200", "Estadísticas de calificación", RatingSummaryResponse.class))
                 )
 
                 .GET(
@@ -995,7 +1061,7 @@ public class RouterRest {
                                 .description("Retorna el listado de lugares mejor valorados según promedio y cantidad de reseñas")
                                 .tag("Reviews")
                                 .parameter(limitQueryParam())
-                                .response(jsonResponse("200", "Listado de lugares mejor calificados", ReviewsHandler.TopRatedPlaceResponse.class)
+                                .response(jsonResponse("200", "Listado de lugares mejor calificados", TopRatedPlaceResponse.class)
                                 )
                 )
 
@@ -1006,7 +1072,7 @@ public class RouterRest {
                                 .summary("Crear feedback para un lugar")
                                 .tag("Feedback")
                                 .parameter(pathParam("id", "Identificador del lugar", Long.class))
-                                .requestBody(jsonBody(FeedbackHandler.CreateFeedbackBody.class, true))
+                                .requestBody(jsonBody(CreateFeedbackBody.class, true))
                                 .response(jsonResponse("201", "Feedback almacenado", Feedback.class))
                                 .response(apiErrorResponse("400", "Solicitud inválida"))
                 )

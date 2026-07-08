@@ -413,6 +413,78 @@ public class ReservationRepositoryAdapter implements ReservationGateway {
                 .flatMap(rows -> findByIdForAgency(reservationId, agencyId));
     }
 
+    @Override
+    public Mono<ReservationDraft> markWompiCheckoutCreated(String reservationId, String userEmail) {
+        String sql = """
+            UPDATE reservation_details
+            SET payment_provider = 'wompi',
+                payment_status = 'checkout_created',
+                payment_id = NULL,
+                updated_at = NOW()
+            WHERE reservation_id = :reservationId
+              AND EXISTS (
+                  SELECT 1
+                  FROM reservations r
+                  WHERE r.id = reservation_details.reservation_id
+                    AND r.user_email = :userEmail
+                    AND r.status = 'awaiting_payment'
+              )
+            """;
+
+        return db.sql(sql)
+                .bind("reservationId", reservationId)
+                .bind("userEmail", userEmail)
+                .fetch()
+                .rowsUpdated()
+                .filter(rows -> rows > 0)
+                .flatMap(rows -> findByIdForUser(reservationId, userEmail));
+    }
+
+    @Override
+    public Mono<ReservationDraft> applyWompiPaymentResult(
+            String reservationId,
+            String paymentStatus,
+            String paymentId,
+            OffsetDateTime paidAt,
+            OffsetDateTime confirmedAt,
+            boolean confirmReservation
+    ) {
+        String sql = """
+            WITH updated_reservation AS (
+                UPDATE reservations
+                SET status = CASE
+                        WHEN :confirmReservation AND status = 'awaiting_payment' THEN 'confirmed'
+                        ELSE status
+                    END,
+                    updated_at = NOW()
+                WHERE id = :reservationId
+                  AND status IN ('awaiting_payment', 'confirmed')
+                RETURNING id
+            )
+            UPDATE reservation_details
+            SET payment_provider = 'wompi',
+                payment_status = :paymentStatus,
+                payment_id = COALESCE(:paymentId, payment_id),
+                paid_at = COALESCE(:paidAt, paid_at),
+                confirmed_at = COALESCE(:confirmedAt, confirmed_at),
+                updated_at = NOW()
+            WHERE reservation_id IN (SELECT id FROM updated_reservation)
+            """;
+
+        DatabaseClient.GenericExecuteSpec spec = db.sql(sql)
+                .bind("reservationId", reservationId)
+                .bind("paymentStatus", paymentStatus)
+                .bind("confirmReservation", confirmReservation);
+        spec = bindNullable(spec, "paymentId", paymentId, String.class);
+        spec = bindNullable(spec, "paidAt", paidAt, OffsetDateTime.class);
+        spec = bindNullable(spec, "confirmedAt", confirmedAt, OffsetDateTime.class);
+
+        return spec.fetch()
+                .rowsUpdated()
+                .filter(rows -> rows > 0)
+                .flatMap(rows -> findByIdForAdmin(reservationId));
+    }
+
     private DatabaseClient.GenericExecuteSpec bindReservation(
             DatabaseClient.GenericExecuteSpec spec,
             ReservationDraft reservation

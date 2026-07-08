@@ -74,6 +74,7 @@ public class SecurityConfig {
                 "Accept",
                 "X-Requested-With",
                 "X-CSRF-Token",
+                "X-Event-Checksum",
                 "Cache-Control"
         ));
         configuration.setExposedHeaders(Arrays.asList(
@@ -175,6 +176,8 @@ public class SecurityConfig {
                         // ---- Público: autenticación ----
                         .pathMatchers("/api/auth/**").permitAll()
                         .pathMatchers("/admin/auth/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/reservations/*/payment/checkout-page").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/payments/wompi/webhook").permitAll()
 
                         // ---- Público: places ----
                         .pathMatchers(HttpMethod.GET, "/api/places/nearby").permitAll()
@@ -225,6 +228,8 @@ public class SecurityConfig {
 
                         // ---- Protegido: Reservations ----
                         .pathMatchers(HttpMethod.POST, "/api/reservations").authenticated()
+                        .pathMatchers(HttpMethod.POST, "/api/reservations/*/payment/checkout").authenticated()
+                        .pathMatchers(HttpMethod.GET, "/api/reservations/*/payment/status").authenticated()
                         .pathMatchers(HttpMethod.PATCH, "/api/reservations/*").authenticated()
                         .pathMatchers(HttpMethod.DELETE, "/api/reservations/*").authenticated()
                         .pathMatchers(HttpMethod.GET, "/api/reservations/**").authenticated()

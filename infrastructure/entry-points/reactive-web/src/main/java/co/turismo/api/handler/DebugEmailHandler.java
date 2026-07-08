@@ -1,9 +1,11 @@
 package co.turismo.api.handler;
 
-import co.turismo.api.dto.common.SimpleMessageResponse;
+import co.turismo.api.dto.email.DebugEmailRequest;
+import co.turismo.api.dto.email.RecoveryEmailRequest;
+import co.turismo.api.dto.email.RecoveryEmailResponse;
 import co.turismo.api.dto.response.ApiResponse;
+import co.turismo.api.mapper.DebugEmailMapper;
 import co.turismo.model.common.AppUrlConfig;
-import co.turismo.model.notification.EmailMessage;
 import co.turismo.model.notification.gateways.EmailGateway;
 import co.turismo.usecase.authenticate.AccountRecoveryUseCase;
 import lombok.RequiredArgsConstructor;
@@ -18,150 +20,137 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 @Slf4j
 public class DebugEmailHandler {
+
     private final EmailGateway emailGateway;
     private final AccountRecoveryUseCase accountRecoveryUseCase;
     private final AppUrlConfig appUrlConfig;
 
     public Mono<ServerResponse> sendTestEmail(ServerRequest request) {
         return request.bodyToMono(DebugEmailRequest.class)
-                .flatMap(body -> {
-                    String email = safe(body.email());
-                    String subject = safe(body.subject());
-                    String message = safe(body.message());
-                    boolean html = body.html() != null && body.html();
-                    if (email == null || email.isBlank()) {
-                        return ServerResponse.badRequest()
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(new SimpleMessageResponse("Email requerido"));
-                    }
-                    if (subject == null || subject.isBlank()) {
-                        return ServerResponse.badRequest()
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(new SimpleMessageResponse("Subject requerido"));
-                    }
-                    if (message == null || message.isBlank()) {
-                        return ServerResponse.badRequest()
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(new SimpleMessageResponse("Mensaje requerido"));
-                    }
-
-                    String htmlBody = html ? message : "<pre>" + escapeHtml(message) + "</pre>";
-                    return emailGateway.sendEmail(new EmailMessage(email, subject, htmlBody))
-                            .then(ServerResponse.ok()
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Correo enviado"))));
-                })
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error enviando correo" : e.getMessage();
-                    log.warn("Debug email error: {}", msg);
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                .flatMap(DebugEmailHandler::validateDebugEmailBody)
+                .map(DebugEmailMapper::toDebugEmailMessage)
+                .flatMap(emailGateway::sendEmail)
+                .then(ok("Correo enviado"))
+                .onErrorResume(error -> handleError("Debug email error", error));
     }
 
     public Mono<ServerResponse> sendRecoveryTestEmail(ServerRequest request) {
         return request.bodyToMono(RecoveryEmailRequest.class)
+                .flatMap(DebugEmailHandler::validateRecoveryEmailBody)
                 .flatMap(body -> {
                     String email = safe(body.email());
-                    if (email == null || email.isBlank()) {
-                        return ServerResponse.badRequest()
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(new SimpleMessageResponse("Email requerido"));
-                    }
                     String token = accountRecoveryUseCase.generateRecoveryToken();
                     String link = buildRecoveryLink(token);
-                    String html = "<p>Hola,</p><p>Link: <a href=\"" + link + "\">recuperar</a></p>";
-                    return emailGateway.sendEmail(new EmailMessage(
-                                    email,
-                                    "Recupera tu cuenta",
-                                    html
-                            ))
+
+                    return emailGateway.sendEmail(DebugEmailMapper.toRecoveryEmailMessage(email, link))
                             .then(accountRecoveryUseCase.saveRecoveryToken(email, token))
                             .then(ServerResponse.ok()
                                     .header("X-Recovery-Link", link)
                                     .header("X-Recovery-Token", token)
                                     .contentType(MediaType.APPLICATION_JSON)
-                                    .bodyValue(ApiResponse.ok(new RecoveryEmailResponse(link, token))));
+                                    .bodyValue(ApiResponse.ok(
+                                            DebugEmailMapper.toRecoveryEmailResponse(link, token)
+                                    )));
                 })
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error enviando correo" : e.getMessage();
-                    log.warn("Debug recovery email error: {}", msg);
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+                .onErrorResume(error -> handleError("Debug recovery email error", error));
     }
 
     public Mono<ServerResponse> sendSimpleTestEmail(ServerRequest request) {
-        String to = request.queryParam("to").orElse(null);
-        if (to == null || to.isBlank()) {
-            return ServerResponse.badRequest()
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(new SimpleMessageResponse("Falta parámetro 'to'"));
+        return requiredQueryParam(request, "to", "Falta parámetro 'to'")
+                .map(DebugEmailMapper::toSimpleTestEmailMessage)
+                .flatMap(emailGateway::sendEmail)
+                .then(Mono.defer(() -> {
+                    String to = request.queryParam("to")
+                            .map(String::trim)
+                            .orElse("");
+
+                    return ok("Correo enviado a " + to);
+                }))
+                .onErrorResume(error -> handleError("Debug simple email error", error));
+    }
+
+    private static Mono<DebugEmailRequest> validateDebugEmailBody(DebugEmailRequest body) {
+        if (!hasText(body.email())) {
+            return Mono.error(new IllegalArgumentException("Email requerido"));
         }
 
-        EmailMessage message = new EmailMessage(
-                to,
-                "Prueba de Conexión Brevo - Turismo App",
-                "<h1>¡Funciona!</h1><p>Este es un correo de prueba enviado desde el backend.</p>"
-        );
+        if (!hasText(body.subject())) {
+            return Mono.error(new IllegalArgumentException("Subject requerido"));
+        }
 
-        return emailGateway.sendEmail(message)
-                .then(ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(ApiResponse.ok(new SimpleMessageResponse("Correo enviado a " + to))))
-                .onErrorResume(e -> {
-                    String msg = e.getMessage() == null ? "Error enviando correo" : e.getMessage();
-                    log.warn("Debug simple email error: {}", msg);
-                    return ServerResponse.badRequest()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .bodyValue(new SimpleMessageResponse(msg));
-                });
+        if (!hasText(body.message())) {
+            return Mono.error(new IllegalArgumentException("Mensaje requerido"));
+        }
+
+        return Mono.just(body);
+    }
+
+    private static Mono<RecoveryEmailRequest> validateRecoveryEmailBody(RecoveryEmailRequest body) {
+        if (!hasText(body.email())) {
+            return Mono.error(new IllegalArgumentException("Email requerido"));
+        }
+
+        return Mono.just(body);
+    }
+
+    private static Mono<String> requiredQueryParam(ServerRequest request, String param, String message) {
+        return Mono.justOrEmpty(request.queryParam(param))
+                .map(String::trim)
+                .filter(DebugEmailHandler::hasText)
+                .switchIfEmpty(Mono.error(new IllegalArgumentException(message)));
+    }
+
+    private Mono<ServerResponse> handleError(String logMessage, Throwable error) {
+        String message = safeMessage(error, "Error enviando correo");
+        log.warn("{}: {}", logMessage, message);
+
+        return ServerResponse.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(DebugEmailMapper.toSimpleMessageResponse(message));
+    }
+
+    private static Mono<ServerResponse> ok(String message) {
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(ApiResponse.ok(
+                        DebugEmailMapper.toSimpleMessageResponse(message)
+                ));
+    }
+
+    private String buildRecoveryLink(String token) {
+        String frontendBase = appUrlConfig.frontendBaseUrl();
+
+        if (hasText(frontendBase)) {
+            return normalizeBaseUrl(frontendBase) + "/recover-account?token=" + token;
+        }
+
+        String backendBase = appUrlConfig.publicBaseUrl();
+
+        if (!hasText(backendBase)) {
+            return "/recover-account?token=" + token;
+        }
+
+        return normalizeBaseUrl(backendBase) + "/recover-account?token=" + token;
+    }
+
+    private static String normalizeBaseUrl(String baseUrl) {
+        String normalized = baseUrl.trim();
+
+        return normalized.endsWith("/")
+                ? normalized.substring(0, normalized.length() - 1)
+                : normalized;
     }
 
     private static String safe(String value) {
         return value == null ? null : value.trim();
     }
 
-    private static String escapeHtml(String value) {
-        return value
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
+    private static String safeMessage(Throwable error, String fallback) {
+        String message = error != null ? error.getMessage() : null;
+        return hasText(message) ? message : fallback;
     }
 
-    private String buildRecoveryLink(String token) {
-        String frontendBase = appUrlConfig.frontendBaseUrl();
-        if (frontendBase != null && !frontendBase.isBlank()) {
-            String normalized = frontendBase.endsWith("/") ? frontendBase.substring(0, frontendBase.length() - 1) : frontendBase;
-            return normalized + "/recover-account?token=" + token;
-        }
-
-        String backendBase = appUrlConfig.publicBaseUrl();
-        if (backendBase == null || backendBase.isBlank()) {
-            return "/recover-account?token=" + token;
-        }
-        String normalized = backendBase.endsWith("/") ? backendBase.substring(0, backendBase.length() - 1) : backendBase;
-        return normalized + "/recover-account?token=" + token;
-    }
-
-    public record DebugEmailRequest(
-            String email,
-            String subject,
-            String message,
-            Boolean html
-    ) {
-    }
-
-    public record RecoveryEmailRequest(
-            String email
-    ) {
-    }
-
-    public record RecoveryEmailResponse(
-            String link,
-            String token
-    ) {
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

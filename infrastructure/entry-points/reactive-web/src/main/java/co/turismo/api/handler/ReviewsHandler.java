@@ -1,9 +1,9 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.review.CreateReviewBody;
+import co.turismo.api.dto.review.RatingSummaryResponse;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.usecase.reviews.ReviewsUseCase;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -18,15 +18,6 @@ public class ReviewsHandler {
     private static final int MAX_LIMIT = 50;
 
     private final ReviewsUseCase reviews;
-
-    @Data
-    @Schema(name = "CreateReviewRequest", description = "Información requerida para publicar una reseña")
-    public static class CreateReviewBody {
-        @Schema(description = "Calificación de 1 a 5", minimum = "1", maximum = "5", example = "5")
-        private Short rating;
-        @Schema(description = "Comentario opcional del usuario", example = "Excelente atención y ambiente")
-        private String comment;
-    }
 
     /** GET público: lista reseñas por lugar con paginación */
     public Mono<ServerResponse> list(ServerRequest req) {
@@ -81,7 +72,7 @@ public class ReviewsHandler {
                 .flatMap(t -> {
                     String email = t.getT1();
                     CreateReviewBody b = t.getT2();
-                    return reviews.create(placeId, b.getRating(), b.getComment(), email);
+                    return reviews.create(placeId, b.rating(), b.comment(), email);
                 })
                 .flatMap(r -> ServerResponse.status(201)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -90,51 +81,4 @@ public class ReviewsHandler {
                         e -> ServerResponse.badRequest().bodyValue(ApiResponse.error(400, e.getMessage())));
     }
 
-    @Schema(name = "ReviewRatingSummary", description = "Resumen estadístico de calificaciones por lugar")
-    public record RatingSummaryResponse(
-            @Schema(description = "Identificador del lugar consultado", example = "101")
-            Long placeId,
-            @Schema(description = "Promedio de calificaciones", example = "4.5")
-            double avgRating,
-            @Schema(description = "Número de reseñas consideradas", example = "245")
-            long reviewsCount
-    ) {
-    }
-
-    @Schema(
-            name = "TopRatedPlaceResponse",
-            description = "Información resumida de los lugares mejor calificados"
-    )
-    public record TopRatedPlaceResponse(
-            @Schema(
-                    description = "Identificador único del lugar",
-                    example = "15"
-            )
-            Long id,
-
-            @Schema(
-                    description = "Nombre del lugar turístico",
-                    example = "La Mano del Gigante"
-            )
-            String name,
-
-            @Schema(
-                    description = "Descripción corta del lugar",
-                    example = "Mirador turístico reconocido por su vista panorámica y estructura icónica."
-            )
-            String description,
-
-            @Schema(
-                    description = "Promedio total de calificaciones recibidas",
-                    example = "4.8"
-            )
-            double avgRating,
-
-            @Schema(
-                    description = "Cantidad total de reseñas registradas",
-                    example = "312"
-            )
-            long reviewsCount
-    ) {
-    }
 }

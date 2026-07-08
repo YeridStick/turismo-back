@@ -4,6 +4,7 @@ dependencies {
 	testImplementation 'tools.jackson.core:jackson-databind'
 	implementation project(':antispam')
 	implementation project(':brevo')
+	implementation project(':wompi')
 	implementation project(':locationiq')
 	implementation project(':reactive-web')
 	implementation project(':authenticate')

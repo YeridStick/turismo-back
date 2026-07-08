@@ -77,7 +77,7 @@ scalar:
   search-hot-key: "${SCALAR_SEARCH_HOT_KEY:k}"
 
 cors:
-  allowed-origins: "${CORS_ORIGINS:https://client.scalar.com,http://localhost:8083,http://localhost:8081,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173,https://turismo-eta-swart.vercel.app}"
+  allowed-origins: "${CORS_ALLOWED_ORIGINS:https://client.scalar.com,http://localhost:8083,http://localhost:8081,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173,https://turismo-eta-swart.vercel.app}"
 
 security:
   jwt:
@@ -143,3 +143,15 @@ brevo:
   sender:
     email: "${BREVO_SENDER_EMAIL}"
     name: "${BREVO_SENDER_NAME}"
+
+wompi:
+  enabled: ${WOMPI_ENABLED:true}
+  environment: ${WOMPI_ENVIRONMENT}
+  base-url: ${WOMPI_BASE_URL}
+  public-key: ${WOMPI_PUBLIC_KEY}
+  private-key: ${WOMPI_PRIVATE_KEY}
+  integrity-secret: ${WOMPI_INTEGRITY_SECRET}
+  events-secret: ${WOMPI_EVENTS_SECRET}
+  webhook-url: ${WOMPI_WEBHOOK_URL:${app.public-url}/api/payments/wompi/webhook}
+  redirect-url: ${WOMPI_REDIRECT_URL:${app.frontend-url}/payment-result}
+  checkout-expiration-minutes: ${WOMPI_CHECKOUT_EXPIRATION_MINUTES:30}

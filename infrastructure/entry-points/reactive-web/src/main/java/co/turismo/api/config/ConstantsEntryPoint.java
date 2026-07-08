@@ -44,6 +44,10 @@ public class ConstantsEntryPoint {
     public static final String RESERVATIONS_ME_PATH = "/reservations/me";
     public static final String RESERVATIONS_ID_PATH = "/reservations/{reservationId}";
     public static final String RESERVATIONS_MESSAGES_PATH = "/reservations/{reservationId}/messages";
+    public static final String RESERVATIONS_PAYMENT_CHECKOUT_PATH = "/reservations/{reservationId}/payment/checkout";
+    public static final String RESERVATIONS_PAYMENT_CHECKOUT_PAGE_PATH = "/reservations/{reservationId}/payment/checkout-page";
+    public static final String RESERVATIONS_PAYMENT_STATUS_PATH = "/reservations/{reservationId}/payment/status";
+    public static final String WOMPI_WEBHOOK_PATH = "/payments/wompi/webhook";
     public static final String AGENCIES_ME_RESERVATIONS_PATH = "/agencies/me/reservations";
     public static final String AGENCIES_ME_RESERVATIONS_ID_PATH = "/agencies/me/reservations/{reservationId}";
     public static final String AGENCIES_ME_RESERVATIONS_STATUS_PATH = "/agencies/me/reservations/{reservationId}/status";

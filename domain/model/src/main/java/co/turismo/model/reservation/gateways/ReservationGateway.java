@@ -29,4 +29,13 @@ public interface ReservationGateway {
             OffsetDateTime confirmedAt,
             OffsetDateTime cancelledAt
     );
+    Mono<ReservationDraft> markWompiCheckoutCreated(String reservationId, String userEmail);
+    Mono<ReservationDraft> applyWompiPaymentResult(
+            String reservationId,
+            String paymentStatus,
+            String paymentId,
+            OffsetDateTime paidAt,
+            OffsetDateTime confirmedAt,
+            boolean confirmReservation
+    );
 }

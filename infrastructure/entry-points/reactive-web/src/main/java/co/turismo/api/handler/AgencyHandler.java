@@ -1,28 +1,21 @@
 package co.turismo.api.handler;
 
+import co.turismo.api.dto.agency.*;
 import co.turismo.api.dto.response.ApiResponse;
 import co.turismo.api.dto.visit.TopPlaceDTO;
+import co.turismo.api.mapper.AgencyMapper;
 import co.turismo.model.agency.Agency;
-import co.turismo.model.agency.AgencyDashboard;
-import co.turismo.model.agency.CreateAgencyRequest;
 import co.turismo.model.agency.UpdateAgencyRequest;
 import co.turismo.model.place.Place;
-import co.turismo.model.tourpackage.TourPackage;
-import co.turismo.model.tourpackage.TopPackage;
-import co.turismo.model.tourpackage.TourPackageSalesSummary;
 
 import co.turismo.usecase.agency.AgencyUseCase;
 import co.turismo.usecase.tourpackage.TourPackageUseCase;
 import co.turismo.usecase.user.UserUseCase;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -30,8 +23,6 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -51,15 +42,7 @@ public class AgencyHandler {
                 .flatMap(tuple -> {
                     String email = tuple.getT1();
                     CreateAgencyBody body = tuple.getT2();
-                    var cmd = CreateAgencyRequest.builder()
-                            .name(body.name())
-                            .description(body.description())
-                            .phone(body.phone())
-                            .email(body.email())
-                            .website(body.website())
-                            .logoUrl(body.logoUrl())
-                            .build();
-                    return agencyUseCase.create(email, cmd);
+                    return agencyUseCase.create(email, AgencyMapper.toCreateAgencyRequest(body));
                 })
                 .flatMap(agency -> ServerResponse.status(201)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -68,7 +51,7 @@ public class AgencyHandler {
 
     public Mono<ServerResponse> addUser(ServerRequest req) {
         return req.bodyToMono(AddAgencyUserBody.class)
-                .flatMap(body -> agencyUseCase.addUserToMyAgency(body.emailAgencia, body.email))
+                .flatMap(body -> agencyUseCase.addUserToMyAgency(body.emailAgencia(), body.email()))
                 .flatMap(egency -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(ApiResponse.created(egency)));
@@ -188,7 +171,7 @@ public class AgencyHandler {
 
                     return ensureAllowedEmail(auth, email)
                             .thenMany(agencyUseCase.dashboard(email, from, to, limit))
-                            .map(this::toDashboardResponse)
+                            .map(AgencyMapper::toDashboardResponse)
                             .collectList()
                             .flatMap(resp -> ServerResponse.ok()
                                     .contentType(MediaType.APPLICATION_JSON)
@@ -200,14 +183,7 @@ public class AgencyHandler {
         Long agencyId = Long.parseLong(req.pathVariable("id"));
 
         Mono<UpdateAgencyRequest> cmd = req.bodyToMono(UpdateAgencyBody.class)
-                .map(body -> UpdateAgencyRequest.builder()
-                        .name(body.name())
-                        .description(body.description())
-                        .phone(body.phone())
-                        .email(body.email())
-                        .website(body.website())
-                        .logoUrl(body.logoUrl())
-                        .build());
+                .map(AgencyMapper::toUpdateAgencyRequest);
 
         return req.principal()
                 .cast(Authentication.class)
@@ -262,70 +238,6 @@ public class AgencyHandler {
                 .toArray(String[]::new);
     }
 
-
-    private AgencyDashboardResponse toDashboardResponse(AgencyDashboard dashboard) {
-        List<AgencyTourPackageResponse> packages = dashboard.getPackages() == null ? List.of()
-                : dashboard.getPackages().stream().map(this::toPackageResponse).toList();
-        List<TopPackageResponse> topPackages = dashboard.getTopPackages() == null ? List.of()
-                : dashboard.getTopPackages().stream().map(this::toTopPackageResponse).toList();
-        List<TopPlaceDTO> topPlaces = dashboard.getTopPlaces() == null ? List.of()
-                : dashboard.getTopPlaces().stream()
-                .map(p -> new TopPlaceDTO(p.getPlaceId(), p.getName(), p.getVisits()))
-                .toList();
-
-        return new AgencyDashboardResponse(
-                dashboard.getAgency(),
-                packages,
-                topPackages,
-                topPlaces,
-                toSalesSummaryResponse(dashboard.getSalesSummary())
-        );
-    }
-
-    private AgencyTourPackageResponse toPackageResponse(TourPackage pkg) {
-        List<String> includes = pkg.getIncludes() == null ? List.of() : Arrays.asList(pkg.getIncludes());
-        List<Long> placeIds = pkg.getPlaceIds() == null ? List.of() : Arrays.asList(pkg.getPlaceIds());
-        List<Place> places = pkg.getPlaces() == null ? List.of() : pkg.getPlaces();
-
-        return new AgencyTourPackageResponse(
-                pkg.getId() == null ? null : String.valueOf(pkg.getId()),
-                pkg.getTitle(),
-                pkg.getCity(),
-                pkg.getDescription(),
-                pkg.getDays(),
-                pkg.getNights(),
-                pkg.getPeople(),
-                pkg.getRating(),
-                pkg.getReviews(),
-                pkg.getPrice(),
-                pkg.getOriginalPrice(),
-                pkg.getDiscount(),
-                pkg.getTag(),
-                includes,
-                pkg.getImage(),
-                placeIds,
-                pkg.getAgencyId(),
-                pkg.getAgencyName(),
-                places
-        );
-    }
-
-    private TopPackageResponse toTopPackageResponse(TopPackage pkg) {
-        return new TopPackageResponse(
-                pkg.getPackageId(),
-                pkg.getTitle(),
-                pkg.getSold(),
-                pkg.getRevenue()
-        );
-    }
-
-    private SalesSummaryResponse toSalesSummaryResponse(TourPackageSalesSummary summary) {
-        if (summary == null) {
-            return new SalesSummaryResponse(0L, 0L);
-        }
-        return new SalesSummaryResponse(summary.getTotalSold(), summary.getTotalRevenue());
-    }
-
     private static Mono<Void> ensureAllowedEmail(Authentication auth, String email) {
         if (hasRole(auth, "ADMIN")) {
             return Mono.empty();
@@ -374,143 +286,5 @@ public class AgencyHandler {
         } catch (Exception e) {
             throw new IllegalArgumentException("offset inválido");
         }
-    }
-
-    @Schema(name = "CreateAgencyRequest", description = "Cuerpo para crear una agencia")
-    public record CreateAgencyBody(
-            @Schema(description = "Nombre de la agencia", example = "Turismo Huila")
-            @NotBlank String name,
-            @Schema(description = "Descripción corta")
-            String description,
-            @Schema(description = "Teléfono de contacto")
-            String phone,
-            @Schema(description = "Email de la agencia")
-            String email,
-            @Schema(description = "Sitio web")
-            String website,
-            @Schema(description = "Logo URL")
-            String logoUrl
-    ) {
-    }
-
-    @Schema(name = "AddAgencyUserRequest", description = "Asociar usuario a la agencia del solicitante")
-    public record AddAgencyUserBody(
-            @Schema(description = "Email de la agencia", example = "nuevo@correo.com")
-            @NotBlank String emailAgencia,
-            @Schema(description = "Email del usuario a asociar", example = "nuevo@correo.com")
-            @NotBlank String email
-    ) {
-    }
-
-    @Schema(name = "UpdateAgencyUserEmailRequest", description = "Corregir el correo de un usuario vinculado")
-    public record UpdateAgencyUserEmailBody(
-            @Schema(description = "Nuevo email", example = "corregido@correo.com")
-            @NotBlank String email
-    ) {
-    }
-
-    @Schema(name = "AgencyUserResponse", description = "Información básica de un usuario vinculado")
-    public record AgencyUserResponse(
-            @Schema(description = "ID del usuario", example = "5")
-            Long id,
-            @Schema(description = "Email del usuario", example = "usuario@correo.com")
-            String email
-    ) {
-    }
-
-    @Schema(name = "UpdateAgencyRequest", description = "Cuerpo para actualizar una agencia")
-    public record UpdateAgencyBody(
-            @Schema(description = "Nombre de la agencia", example = "Turismo Huila")
-            String name,
-            @Schema(description = "Descripción corta")
-            String description,
-            @Schema(description = "Teléfono de contacto")
-            String phone,
-            @Schema(description = "Email de la agencia")
-            String email,
-            @Schema(description = "Sitio web")
-            String website,
-            @Schema(description = "Logo URL")
-            String logoUrl
-    ) {}
-
-    @Schema(name = "AgencyDashboard", description = "Resumen de métricas de la agencia")
-    public record AgencyDashboardResponse(
-            @Schema(description = "Información de la agencia")
-            Agency agency,
-            @Schema(description = "Paquetes de la agencia")
-            List<AgencyTourPackageResponse> packages,
-            @Schema(description = "Paquetes más vendidos en el rango")
-            List<TopPackageResponse> topPackages,
-            @Schema(description = "Lugares más visitados en el rango")
-            List<TopPlaceDTO> topPlaces,
-            @Schema(description = "Resumen de ventas en el rango")
-            SalesSummaryResponse salesSummary
-    ) {
-    }
-
-    @Schema(name = "TopPackage", description = "Paquete con mayor número de ventas")
-    public record TopPackageResponse(
-            @Schema(description = "ID del paquete", example = "101")
-            Long packageId,
-            @Schema(description = "Título del paquete")
-            String title,
-            @Schema(description = "Cantidad vendida", example = "24")
-            Integer sold,
-            @Schema(description = "Ingresos acumulados", example = "12000000")
-            Long revenue
-    ) {
-    }
-
-    @Schema(name = "TourPackageSalesSummary", description = "Totales de ventas")
-    public record SalesSummaryResponse(
-            @Schema(description = "Total de personas vendidas", example = "120")
-            Long totalSold,
-            @Schema(description = "Ingresos acumulados", example = "48000000")
-            Long totalRevenue
-    ) {
-    }
-
-    @Schema(name = "AgencyTourPackageResponse", description = "Paquete asociado a la agencia")
-    public record AgencyTourPackageResponse(
-            @Schema(description = "Identificador del paquete", example = "1")
-            String id,
-            @Schema(description = "Título visible del paquete")
-            String title,
-            @Schema(description = "Ciudad o zona principal")
-            String city,
-            @Schema(description = "Descripción corta del paquete")
-            String description,
-            @Schema(description = "Número de días")
-            Integer days,
-            @Schema(description = "Número de noches")
-            Integer nights,
-            @Schema(description = "Texto de capacidad")
-            String people,
-            @Schema(description = "Rating promedio")
-            Double rating,
-            @Schema(description = "Cantidad de reseñas")
-            Long reviews,
-            @Schema(description = "Precio actual")
-            Long price,
-            @Schema(description = "Precio original antes de descuento")
-            Long originalPrice,
-            @Schema(description = "Texto de descuento")
-            String discount,
-            @Schema(description = "Etiqueta del paquete")
-            String tag,
-            @Schema(description = "Incluye (lista de strings)")
-            List<String> includes,
-            @Schema(description = "URL de imagen principal")
-            String image,
-            @Schema(description = "IDs de lugares asociados")
-            List<Long> placeIds,
-            @Schema(description = "ID de la agencia responsable")
-            Long agencyId,
-            @Schema(description = "Nombre de la agencia responsable")
-            String agencyName,
-            @Schema(description = "Listado de lugares asociados")
-            List<Place> places
-    ) {
     }
 }
