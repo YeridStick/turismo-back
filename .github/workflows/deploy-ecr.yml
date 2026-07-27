@@ -153,7 +153,9 @@ jobs:
           scp -i "$HOME/.ssh/turismo" "$RUNNER_TEMP/turismo.env" \
             "$LIGHTSAIL_USER@$LIGHTSAIL_HOST:/tmp/turismo.env.new"
           ssh -i "$HOME/.ssh/turismo" "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
-            "sudo install -m 600 -o root -g root /tmp/turismo.env.new /opt/turismo/.env && rm -f /tmp/turismo.env.new"
+            "sudo install -d -m 700 -o root -g root /opt/turismo &&
+             sudo install -m 600 -o root -g root /tmp/turismo.env.new /opt/turismo/.env &&
+             rm -f /tmp/turismo.env.new"
 
       - name: Deploy container with rollback
         env:
