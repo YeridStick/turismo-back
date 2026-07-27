@@ -1,0 +1,15 @@
+.git
+.github
+.gradle
+.idea
+.vscode
+**/build
+build
+build-cache
+deployment/k8s
+docs
+*.log
+*.md
+tfplan
+.env
+.env.*
