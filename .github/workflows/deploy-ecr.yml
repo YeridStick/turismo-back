@@ -1,126 +1,214 @@
-name: Build and Deploy to ECR
+name: Test, Build and Deploy to Lightsail
 
 on:
   push:
-    branches: [main, master, develop]
+    branches:
+      - master
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: turismo-back-test
+  cancel-in-progress: false
+
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: turismo/backend
-  EKS_CLUSTER_NAME: turismo-cluster
-  K8S_SECRET_NAME: turismo-env
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
 
 jobs:
-  build-and-push-docker:
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    environment: Turismo / production
-    outputs:
-      image: ${{ steps.build-image.outputs.image }}
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate AWS secrets
-        run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "AWS_ACCESS_KEY_ID missing"; exit 1; fi
-          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo "AWS_SECRET_ACCESS_KEY missing"; exit 1; fi
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
 
-      - name: Configure AWS credentials
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run tests and architecture validation
+        run: ./gradlew test validateStructure --no-daemon
+
+  build:
+    name: Build and publish image
+    runs-on: ubuntu-latest
+    environment: test
+    needs: test
+    outputs:
+      image: ${{ steps.image.outputs.uri }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+        run: |
+          test -n "$AWS_REGION" || { echo "Missing variable: AWS_REGION"; exit 1; }
+          test -n "$ECR_REPOSITORY" || { echo "Missing variable: ECR_REPOSITORY"; exit 1; }
+          test -n "$AWS_ROLE_ARN" || { echo "Missing variable: AWS_ROLE_ARN"; exit 1; }
+
+      - name: Configure temporary AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: turismo-back-${{ github.run_id }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
+        id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and Push to ECR
-        id: build-image
+      - name: Build and push immutable image
+        id: image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: sha-${{ github.sha }}
         run: |
-          echo "Building image..."
-          docker build \
-            --file deployment/Dockerfile \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-
-          echo "Pushing image..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build --file deployment/Dockerfile --tag "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
   deploy:
+    name: Deploy to Lightsail
     runs-on: ubuntu-latest
-    environment: Turismo / production
-    needs: build-and-push-docker
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
-
+    environment: test
+    needs: build
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Validate required secrets
+      - name: Validate Lightsail configuration
+        env:
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
+          LIGHTSAIL_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          LIGHTSAIL_SSH_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
+          TURISMO_ENV_FILE: ${{ secrets.TURISMO_ENV_FILE }}
         run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "AWS_ACCESS_KEY_ID missing"; exit 1; fi
-          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo "AWS_SECRET_ACCESS_KEY missing"; exit 1; fi
-          if [ -z "${{ secrets.TURISMO_ENV_FILE }}" ]; then echo "TURISMO_ENV_FILE missing"; exit 1; fi
+          test -n "$LIGHTSAIL_HOST" || { echo "Missing variable: LIGHTSAIL_HOST"; exit 1; }
+          test -n "$LIGHTSAIL_USER" || { echo "Missing variable: LIGHTSAIL_USER"; exit 1; }
+          test -n "$LIGHTSAIL_SSH_PRIVATE_KEY" || { echo "Missing secret: LIGHTSAIL_SSH_PRIVATE_KEY"; exit 1; }
+          test -n "$LIGHTSAIL_SSH_KNOWN_HOSTS" || { echo "Missing secret: LIGHTSAIL_SSH_KNOWN_HOSTS"; exit 1; }
+          test -n "$TURISMO_ENV_FILE" || { echo "Missing secret: TURISMO_ENV_FILE"; exit 1; }
 
-      - name: Configure AWS credentials
+      - name: Configure temporary AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: turismo-deploy-${{ github.run_id }}
 
-      - name: Update Kubeconfig
+      - name: Prepare SSH and environment file
+        env:
+          LIGHTSAIL_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          LIGHTSAIL_SSH_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
+          TURISMO_ENV_FILE: ${{ secrets.TURISMO_ENV_FILE }}
         run: |
-          aws eks update-kubeconfig \
-            --name ${{ env.EKS_CLUSTER_NAME }} \
-            --region ${{ env.AWS_REGION }} \
-            --alias turismo-cluster
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$LIGHTSAIL_SSH_PRIVATE_KEY" > "$HOME/.ssh/turismo"
+          chmod 600 "$HOME/.ssh/turismo"
+          printf '%s\n' "$LIGHTSAIL_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$TURISMO_ENV_FILE" > "$RUNNER_TEMP/turismo.env"
+          chmod 600 "$RUNNER_TEMP/turismo.env"
 
-      - name: Verify cluster access
-        run: |
-          kubectl config current-context
-          kubectl get nodes
+          INVALID_LINES=$(grep -Ev '^[[:space:]]*(#.*)?$|^[A-Za-z_][A-Za-z0-9_]*=.*$' "$RUNNER_TEMP/turismo.env" || true)
+          if [ -n "$INVALID_LINES" ]; then
+            echo "TURISMO_ENV_FILE contains invalid lines."
+            exit 1
+          fi
 
-      - name: Create or update Kubernetes Secret
-        run: |
-          cat > .env <<'EOF'
-          ${{ secrets.TURISMO_ENV_FILE }}
-          EOF
-          
-          echo "Validating duplicated env keys..."
-          DUPLICATES=$(grep -v '^\s*#' .env | grep -v '^\s*$' | cut -d '=' -f1 | sort | uniq -d)
-          
+          DUPLICATES=$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$RUNNER_TEMP/turismo.env" |
+            cut -d= -f1 | sort | uniq -d)
           if [ -n "$DUPLICATES" ]; then
-            echo "Duplicated env keys found:"
+            echo "TURISMO_ENV_FILE contains duplicated keys:"
             echo "$DUPLICATES"
             exit 1
           fi
-          
-          kubectl delete secret ${{ env.K8S_SECRET_NAME }} --ignore-not-found
-          kubectl create secret generic ${{ env.K8S_SECRET_NAME }} --from-env-file=.env
 
-      - name: Deploy to EKS
+      - name: Authenticate Lightsail with ECR
         env:
-          IMAGE_FULL: ${{ needs.build-and-push-docker.outputs.image }}
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
         run: |
-          echo "Deploying image: $IMAGE_FULL"
-          sed "s|IMAGE_PLACEHOLDER|$IMAGE_FULL|g" deployment/k8s/deployment.yaml | kubectl apply -f -
+          ECR_REGISTRY=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com
+          aws ecr get-login-password --region "$AWS_REGION" |
+            ssh -i "$HOME/.ssh/turismo" "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+              "sudo docker login --username AWS --password-stdin '$ECR_REGISTRY'"
 
-      - name: Check deployment status
+      - name: Upload runtime configuration
+        env:
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
         run: |
-          echo "Waiting for rollout..."
-          kubectl rollout status deployment/app-service --timeout=300s
-          echo "Pods:"
-          kubectl get pods -o wide
-          echo "Services:"
-          kubectl get svc
+          scp -i "$HOME/.ssh/turismo" "$RUNNER_TEMP/turismo.env" \
+            "$LIGHTSAIL_USER@$LIGHTSAIL_HOST:/tmp/turismo.env.new"
+          ssh -i "$HOME/.ssh/turismo" "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+            "sudo install -m 600 -o root -g root /tmp/turismo.env.new /opt/turismo/.env && rm -f /tmp/turismo.env.new"
+
+      - name: Deploy container with rollback
+        env:
+          IMAGE_URI: ${{ needs.build.outputs.image }}
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
+        run: |
+          ssh -i "$HOME/.ssh/turismo" "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+            "bash -s -- '$IMAGE_URI'" <<'REMOTE'
+          set -Eeuo pipefail
+
+          IMAGE_URI="$1"
+          APP_NAME="turismo-back"
+          PREVIOUS_NAME="${APP_NAME}-previous"
+
+          rollback() {
+            echo "Deployment failed. Restoring previous container."
+            sudo docker rm -f "$APP_NAME" >/dev/null 2>&1 || true
+            if sudo docker inspect "$PREVIOUS_NAME" >/dev/null 2>&1; then
+              sudo docker rename "$PREVIOUS_NAME" "$APP_NAME"
+              sudo docker start "$APP_NAME"
+            fi
+          }
+          trap rollback ERR
+
+          sudo docker pull "$IMAGE_URI"
+          sudo docker rm -f "$PREVIOUS_NAME" >/dev/null 2>&1 || true
+
+          if sudo docker inspect "$APP_NAME" >/dev/null 2>&1; then
+            sudo docker stop "$APP_NAME"
+            sudo docker rename "$APP_NAME" "$PREVIOUS_NAME"
+          fi
+
+          sudo docker run -d \
+            --name "$APP_NAME" \
+            --restart unless-stopped \
+            --env-file /opt/turismo/.env \
+            --memory 1536m \
+            --memory-swap 1536m \
+            -p 80:7860 \
+            "$IMAGE_URI"
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1/actuator/health | grep -q '"status":"UP"'; then
+              trap - ERR
+              sudo docker rm -f "$PREVIOUS_NAME" >/dev/null 2>&1 || true
+              sudo docker image prune -f
+              echo "Deployment completed successfully."
+              exit 0
+            fi
+            echo "Waiting for application health ($attempt/30)..."
+            sleep 5
+          done
+
+          echo "Application did not become healthy."
+          exit 1
+          REMOTE
