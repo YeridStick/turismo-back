@@ -43,9 +43,11 @@ jobs:
     needs: test
 
     env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      # Preferir variables de entorno; el fallback permite migrar valores
+      # que actualmente estén creados como secrets.
+      AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || secrets.ECR_REPOSITORY }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
 
     outputs:
       image: ${{ steps.image.outputs.uri }}
@@ -106,14 +108,14 @@ jobs:
     needs: build
 
     env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
 
     steps:
       - name: Validate Lightsail configuration
         env:
-          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
-          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST || secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER || secrets.LIGHTSAIL_USER }}
           LIGHTSAIL_SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
           LIGHTSAIL_SSH_KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_SSH_KNOWN_HOSTS }}
           TURISMO_ENV_FILE: ${{ secrets.TURISMO_ENV_FILE }}
@@ -208,8 +210,8 @@ jobs:
 
       - name: Authenticate Lightsail with ECR
         env:
-          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
-          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST || secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER || secrets.LIGHTSAIL_USER }}
         run: |
           ECR_REGISTRY=$(
             aws sts get-caller-identity \
@@ -228,8 +230,8 @@ jobs:
 
       - name: Upload runtime configuration
         env:
-          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
-          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST || secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER || secrets.LIGHTSAIL_USER }}
         run: |
           scp \
             -i "$HOME/.ssh/turismo" \
@@ -247,8 +249,8 @@ jobs:
       - name: Deploy container with rollback
         env:
           IMAGE_URI: ${{ needs.build.outputs.image }}
-          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST }}
-          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER }}
+          LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST || secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER || secrets.LIGHTSAIL_USER }}
         run: |
           ssh \
             -i "$HOME/.ssh/turismo" \
