@@ -196,14 +196,18 @@ jobs:
             > "$RUNNER_TEMP/turismo.env"
           chmod 600 "$RUNNER_TEMP/turismo.env"
 
-          INVALID_LINES=$(
-            grep -Ev \
+          # Aceptar archivos .env creados en Windows (CRLF).
+          sed -i 's/\r$//' "$RUNNER_TEMP/turismo.env"
+
+          INVALID_LINE_NUMBERS=$(
+            grep -nEv \
               '^[[:space:]]*(#.*)?$|^[A-Za-z_][A-Za-z0-9_]*=.*$' \
-              "$RUNNER_TEMP/turismo.env" || true
+              "$RUNNER_TEMP/turismo.env" |
+              cut -d: -f1 || true
           )
 
-          if [ -n "$INVALID_LINES" ]; then
-            echo "TURISMO_ENV_FILE contains invalid lines."
+          if [ -n "$INVALID_LINE_NUMBERS" ]; then
+            echo "TURISMO_ENV_FILE contains invalid lines: $INVALID_LINE_NUMBERS"
             exit 1
           fi
 
