@@ -97,7 +97,21 @@ jobs:
             --tag "$IMAGE_URI" \
             .
 
-          docker push "$IMAGE_URI"
+          # ECR usa tags inmutables. Un reintento del mismo commit debe
+          # reutilizar la imagen ya publicada en vez de intentar sobrescribirla.
+          EXISTING_TAG=$(
+            aws ecr batch-get-image \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-ids imageTag="$IMAGE_TAG" \
+              --query 'images[0].imageId.imageTag' \
+              --output text 2>/dev/null || true
+          )
+
+          if [ "$EXISTING_TAG" = "$IMAGE_TAG" ]; then
+            echo "ECR tag already exists; reusing $IMAGE_URI"
+          else
+            docker push "$IMAGE_URI"
+          fi
 
           echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
