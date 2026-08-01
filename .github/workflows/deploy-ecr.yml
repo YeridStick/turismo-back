@@ -49,9 +49,6 @@ jobs:
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || secrets.ECR_REPOSITORY }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
 
-    outputs:
-      image: ${{ steps.image.outputs.uri }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -113,8 +110,6 @@ jobs:
             docker push "$IMAGE_URI"
           fi
 
-          echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
-
   deploy:
     name: Deploy to Lightsail
     runs-on: ubuntu-latest
@@ -124,6 +119,8 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || secrets.ECR_REPOSITORY }}
+      IMAGE_TAG: sha-${{ github.sha }}
       LIGHTSAIL_INSTANCE: Turismo-test-backend
 
     steps:
@@ -298,10 +295,16 @@ jobs:
 
       - name: Deploy container with rollback
         env:
-          IMAGE_URI: ${{ needs.build.outputs.image }}
           LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST || secrets.LIGHTSAIL_HOST }}
           LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER || secrets.LIGHTSAIL_USER }}
         run: |
+          ECR_REGISTRY=$(
+            aws sts get-caller-identity \
+              --query Account \
+              --output text
+          ).dkr.ecr.${AWS_REGION}.amazonaws.com
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
           test -n "$IMAGE_URI" || {
             echo "The build job did not produce an image URI."
             exit 1
