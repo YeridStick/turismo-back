@@ -302,13 +302,27 @@ jobs:
           LIGHTSAIL_HOST: ${{ vars.LIGHTSAIL_HOST || secrets.LIGHTSAIL_HOST }}
           LIGHTSAIL_USER: ${{ vars.LIGHTSAIL_USER || secrets.LIGHTSAIL_USER }}
         run: |
+          test -n "$IMAGE_URI" || {
+            echo "The build job did not produce an image URI."
+            exit 1
+          }
+
+          case "$IMAGE_URI" in
+            *[[:space:]]*)
+              echo "The image URI contains whitespace."
+              exit 1
+              ;;
+          esac
+
+          IMAGE_URI_B64=$(printf '%s' "$IMAGE_URI" | base64 -w0)
+
           ssh \
             -i "$HOME/.ssh/turismo" \
             "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
-            "bash -s -- '$IMAGE_URI'" <<'REMOTE'
+            "bash -s -- '$IMAGE_URI_B64'" <<'REMOTE'
           set -Eeuo pipefail
 
-          IMAGE_URI="$1"
+          IMAGE_URI=$(printf '%s' "$1" | base64 -d)
           APP_NAME="turismo-back"
           PREVIOUS_NAME="${APP_NAME}-previous"
 
