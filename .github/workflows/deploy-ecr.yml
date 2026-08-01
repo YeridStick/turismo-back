@@ -241,6 +241,16 @@ jobs:
             exit 1
           fi
 
+          IDLE_TIME=$(
+            grep -E '^CONN_POOL_IDLE_TIME=' "$RUNNER_TEMP/turismo.env" |
+            cut -d= -f2- || true
+          )
+
+          if [ -n "$IDLE_TIME" ] && ! [[ "$IDLE_TIME" =~ ^[0-9]+$ ]]; then
+            echo "CONN_POOL_IDLE_TIME must be an integer number of seconds."
+            exit 1
+          fi
+
       - name: Open temporary SSH access
         run: |
           RUNNER_IP=$(curl -4 -fsS https://api.ipify.org)
@@ -360,7 +370,7 @@ jobs:
             --env-file /opt/turismo/.env \
             --memory 1536m \
             --memory-swap 1536m \
-            -p 80:7860 \
+            -p 80:8080 \
             "$IMAGE_URI"
 
           for attempt in $(seq 1 30); do
