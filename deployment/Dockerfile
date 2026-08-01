@@ -36,7 +36,7 @@ RUN chown appuser:appuser app.jar
 
 USER 1000
 
-EXPOSE 7860
+EXPOSE 8080
 
 # ============================================
 # Variables de entorno para configuración JVM
@@ -44,7 +44,7 @@ EXPOSE 7860
 # ============================================
 
 # Puerto del servidor
-ENV SERVER_PORT=7860
+ENV SERVER_PORT=8080
 
 # Configuración de Memoria Heap (ajustar según RAM del contenedor)
 # Para 480MB RAM: JVM_HEAP_MAX=240m (default)
