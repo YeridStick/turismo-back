@@ -124,6 +124,7 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+      LIGHTSAIL_INSTANCE: Turismo-test-backend
 
     steps:
       - name: Validate Lightsail configuration
@@ -196,8 +197,13 @@ jobs:
             > "$RUNNER_TEMP/turismo.env"
           chmod 600 "$RUNNER_TEMP/turismo.env"
 
-          # Aceptar archivos .env creados en Windows (CRLF).
-          sed -i 's/\r$//' "$RUNNER_TEMP/turismo.env"
+          # Normalizar archivos .env pegados desde Windows/GitHub UI:
+          # elimina BOM, CRLF y espacios finales invisibles.
+          sed -i \
+            -e '1s/^\xEF\xBB\xBF//' \
+            -e 's/\r$//' \
+            -e 's/[[:blank:]]*$//' \
+            "$RUNNER_TEMP/turismo.env"
 
           INVALID_LINE_NUMBERS=$(
             grep -nEv \
@@ -225,6 +231,20 @@ jobs:
             echo "$DUPLICATES"
             exit 1
           fi
+
+      - name: Open temporary SSH access
+        run: |
+          RUNNER_IP=$(curl -4 -fsS https://api.ipify.org)
+          echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
+
+          PORT_INFO=$(jq -cn \
+            --arg cidr "$RUNNER_IP/32" \
+            '{fromPort:22,toPort:22,protocol:"tcp",cidrs:[$cidr]}')
+
+          aws lightsail open-instance-public-ports \
+            --region "$AWS_REGION" \
+            --instance-name "$LIGHTSAIL_INSTANCE" \
+            --port-info "$PORT_INFO"
 
       - name: Authenticate Lightsail with ECR
         env:
@@ -340,3 +360,20 @@ jobs:
           echo "Application did not become healthy."
           exit 1
           REMOTE
+
+      - name: Close temporary SSH access
+        if: always()
+        run: |
+          if [ -z "${RUNNER_IP:-}" ]; then
+            echo "No temporary SSH rule was created."
+            exit 0
+          fi
+
+          PORT_INFO=$(jq -cn \
+            --arg cidr "$RUNNER_IP/32" \
+            '{fromPort:22,toPort:22,protocol:"tcp",cidrs:[$cidr]}')
+
+          aws lightsail close-instance-public-ports \
+            --region "$AWS_REGION" \
+            --instance-name "$LIGHTSAIL_INSTANCE" \
+            --port-info "$PORT_INFO"
