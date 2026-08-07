@@ -40,6 +40,8 @@ import co.turismo.api.dto.reservationmessage.ReservationMessageResponse;
 import co.turismo.api.dto.reservationmessage.SendReservationMessageBody;
 import co.turismo.api.dto.review.CreateReviewBody;
 import co.turismo.api.dto.review.RatingSummaryResponse;
+import co.turismo.api.dto.sitemedia.SiteMediaMultipartRequest;
+import co.turismo.api.dto.sitemedia.SiteMediaResponse;
 import co.turismo.api.dto.review.TopRatedPlaceResponse;
 import co.turismo.api.dto.response.UserInfoResponse;
 import co.turismo.api.dto.response.PasswordUpdateResponse;
@@ -287,7 +289,13 @@ public class RouterRest {
                         siteMediaHandler::upload,
                         ops -> ops.operationId("siteMediaUpload")
                                 .summary("Cargar contenido multimedia del sitio")
-                                .tag("Places"))
+                                .description("Recibe multipart/form-data con los campos category (images, videos o models-3d) y file (binario). El archivo no debe enviarse como JSON, base64 ni dentro de metadata.")
+                                .tag("Places")
+                                .requestBody(multipartBody(SiteMediaMultipartRequest.class, true))
+                                .response(jsonResponse("201", "Contenido multimedia cargado", SiteMediaResponse.class))
+                                .response(apiErrorResponse("400", "category y file son obligatorios o el archivo no es válido"))
+                                .response(apiErrorResponse("401", "No autenticado"))
+                                .response(apiErrorResponse("403", "Sin permisos sobre el sitio")))
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MEDIA_PATH,
                         siteMediaHandler::list,
@@ -1141,6 +1149,16 @@ public class RouterRest {
         var builder = requestBodyBuilder().required(required);
         if (schemaClass != null) {
             builder.content(jsonContent(schemaClass));
+        }
+        return builder;
+    }
+
+    private static org.springdoc.core.fn.builders.requestbody.Builder multipartBody(Class<?> schemaClass, boolean required) {
+        var builder = requestBodyBuilder().required(required);
+        if (schemaClass != null) {
+            builder.content(contentBuilder()
+                    .mediaType("multipart/form-data")
+                    .schema(schemaBuilder().implementation(schemaClass)));
         }
         return builder;
     }

@@ -139,6 +139,7 @@ wompi:
 
 site:
   media:
+    enabled: ${SITE_MEDIA_ENABLED:false}
     s3:
       bucket: ${SITE_MEDIA_S3_BUCKET:}
       region: ${AWS_REGION:us-east-1}
