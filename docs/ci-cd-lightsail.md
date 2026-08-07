@@ -41,6 +41,8 @@ región con `TURISMO_DATABASE_SECRET_REGION`. Para S3 se usan
 El job de GitHub lee el secreto usando sus credenciales OIDC y entrega al
 contenedor una copia codificada en `TURISMO_DATABASE_SECRET_JSON_B64`; por eso
 el contenedor no necesita credenciales de Secrets Manager para arrancar.
+El rol configurado en `AWS_ROLE_ARN` debe tener una política que permita
+`secretsmanager:GetSecretValue` únicamente sobre el secreto configurado.
 
 No configurar `AWS_ACCESS_KEY_ID` ni `AWS_SECRET_ACCESS_KEY`. GitHub obtiene
 credenciales temporales mediante OIDC.
