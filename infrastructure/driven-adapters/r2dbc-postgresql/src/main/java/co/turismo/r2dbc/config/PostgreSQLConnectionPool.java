@@ -16,14 +16,14 @@ public class PostgreSQLConnectionPool {
 
     private final PostgresqlConnectionProperties databaseProperties;
 
-    @Value("${spring.connection-pool.initial-size}")
+    @Value("${spring.r2dbc.pool.initial-size}")
     private int initialSize;
 
-    @Value("${spring.connection-pool.max-size}")
+    @Value("${spring.r2dbc.pool.max-size}")
     private int maxSize;
 
-    @Value("${spring.connection-pool.max-idle-time}")
-    private int maxIdleTime;
+    @Value("${spring.r2dbc.pool.max-idle-time}")
+    private Duration maxIdleTime;
 
     public PostgreSQLConnectionPool(PostgresqlConnectionProperties databaseProperties) {
         this.databaseProperties = databaseProperties;
@@ -45,7 +45,7 @@ public class PostgreSQLConnectionPool {
                 .name("api-postgres-connection-pool")
                 .initialSize(initialSize)
                 .maxSize(maxSize)
-                .maxIdleTime(Duration.ofSeconds(maxIdleTime))
+                .maxIdleTime(maxIdleTime)
                 .validationQuery("SELECT 1")
                 .build();
 
