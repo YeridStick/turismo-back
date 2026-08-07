@@ -11,6 +11,8 @@ import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 @Configuration
 @Profile("!local")
@@ -25,19 +27,10 @@ public class SecretsManagerPostgresqlConnectionConfiguration {
     @Bean
     PostgresqlConnectionProperties secretPostgresqlConnectionProperties(
             @Value("${turismo.database.secret-id}") String secretId,
+            @Value("${turismo.database.secret-json-b64:}") String secretJsonB64,
             @Value("${turismo.database.region:${AWS_REGION:us-east-1}}") String region) {
-        if (secretId == null || secretId.isBlank()) {
-            throw new IllegalStateException(
-                    "TURISMO_DATABASE_SECRET_ID debe estar configurada para perfiles no locales");
-        }
-
-        try (SecretsManagerClient client = SecretsManagerClient.builder()
-                .region(Region.of(region))
-                .build()) {
-            String secret = client.getSecretValue(GetSecretValueRequest.builder()
-                    .secretId(secretId)
-                    .build())
-                    .secretString();
+        try {
+            String secret = resolveSecret(secretId, secretJsonB64, region);
 
             if (secret == null || secret.isBlank()) {
                 throw new IllegalStateException("El secreto de base de datos no contiene SecretString");
@@ -55,6 +48,30 @@ public class SecretsManagerPostgresqlConnectionConfiguration {
             throw new IllegalStateException(
                     "No se pudo cargar la conexión PostgreSQL desde AWS Secrets Manager: " + secretId,
                     exception);
+        }
+    }
+
+    private String resolveSecret(String secretId, String secretJsonB64, String region) {
+        if (secretJsonB64 != null && !secretJsonB64.isBlank()) {
+            try {
+                return new String(Base64.getDecoder().decode(secretJsonB64), StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalStateException("TURISMO_DATABASE_SECRET_JSON_B64 no es válido", exception);
+            }
+        }
+
+        if (secretId == null || secretId.isBlank()) {
+            throw new IllegalStateException(
+                    "Debe configurarse TURISMO_DATABASE_SECRET_ID o TURISMO_DATABASE_SECRET_JSON_B64");
+        }
+
+        try (SecretsManagerClient client = SecretsManagerClient.builder()
+                .region(Region.of(region))
+                .build()) {
+            return client.getSecretValue(GetSecretValueRequest.builder()
+                    .secretId(secretId)
+                    .build())
+                    .secretString();
         }
     }
 

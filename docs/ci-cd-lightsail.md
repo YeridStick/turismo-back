@@ -38,10 +38,9 @@ El nombre del secreto se configura con `TURISMO_DATABASE_SECRET_ID` y la
 región con `TURISMO_DATABASE_SECRET_REGION`. Para S3 se usan
 `SITE_MEDIA_S3_BUCKET` y `SITE_MEDIA_S3_REGION`.
 
-El proceso que ejecuta el contenedor en Lightsail debe tener credenciales IAM
-con permiso `secretsmanager:GetSecretValue` sobre ese secreto. Las credenciales
-OIDC temporales del job de GitHub solo existen en el runner y no están
-disponibles dentro del contenedor.
+El job de GitHub lee el secreto usando sus credenciales OIDC y entrega al
+contenedor una copia codificada en `TURISMO_DATABASE_SECRET_JSON_B64`; por eso
+el contenedor no necesita credenciales de Secrets Manager para arrancar.
 
 No configurar `AWS_ACCESS_KEY_ID` ni `AWS_SECRET_ACCESS_KEY`. GitHub obtiene
 credenciales temporales mediante OIDC.

@@ -241,13 +241,40 @@ jobs:
             exit 1
           fi
 
+          DATABASE_SECRET_ID=$(
+            grep -E '^TURISMO_DATABASE_SECRET_ID=' "$RUNNER_TEMP/turismo.env" |
+            cut -d= -f2- || true
+          )
+
+          if [ -z "$DATABASE_SECRET_ID" ]; then
+            echo "TURISMO_DATABASE_SECRET_ID must be configured for deployment."
+            exit 1
+          fi
+
+          DATABASE_SECRET_JSON=$(
+            aws secretsmanager get-secret-value \
+              --secret-id "$DATABASE_SECRET_ID" \
+              --region "$AWS_REGION" \
+              --query SecretString \
+              --output text
+          )
+
+          test -n "$DATABASE_SECRET_JSON" || {
+            echo "The database secret has no SecretString."
+            exit 1
+          }
+
+          DATABASE_SECRET_JSON_B64=$(printf '%s' "$DATABASE_SECRET_JSON" | base64 -w0)
+          printf 'TURISMO_DATABASE_SECRET_JSON_B64=%s\n' \
+            "$DATABASE_SECRET_JSON_B64" >> "$RUNNER_TEMP/turismo.env"
+
           IDLE_TIME=$(
             grep -E '^CONN_POOL_IDLE_TIME=' "$RUNNER_TEMP/turismo.env" |
             cut -d= -f2- || true
           )
 
-          if [ -n "$IDLE_TIME" ] && ! [[ "$IDLE_TIME" =~ ^[0-9]+$ ]]; then
-            echo "CONN_POOL_IDLE_TIME must be an integer number of seconds."
+          if [ -n "$IDLE_TIME" ] && ! [[ "$IDLE_TIME" =~ ^[0-9]+(ns|us|ms|s|m|h|d)$ ]]; then
+            echo "CONN_POOL_IDLE_TIME must be a duration such as 300m or 2h."
             exit 1
           fi
 

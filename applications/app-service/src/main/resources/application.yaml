@@ -71,6 +71,7 @@ security:
 turismo:
   database:
     secret-id: ${TURISMO_DATABASE_SECRET_ID:}
+    secret-json-b64: ${TURISMO_DATABASE_SECRET_JSON_B64:}
     region: ${AWS_REGION:us-east-1}
   rate-limiter:
     enabled: ${RATE_LIMIT_ENABLED:false}
