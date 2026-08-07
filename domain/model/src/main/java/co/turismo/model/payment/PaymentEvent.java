@@ -23,6 +23,7 @@ public class PaymentEvent {
     private String checksum;
     private String payload;
     private Boolean processed;
+    private String processingStatus;
     private OffsetDateTime processedAt;
     private String processingError;
     private OffsetDateTime receivedAt;

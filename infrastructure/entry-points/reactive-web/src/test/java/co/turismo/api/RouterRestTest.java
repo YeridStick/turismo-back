@@ -8,6 +8,7 @@ import co.turismo.api.handler.DebugEmailHandler;
 import co.turismo.api.handler.FeedbackHandler;
 import co.turismo.api.handler.GeocodeHandler;
 import co.turismo.api.handler.PlacesHandler;
+import co.turismo.api.handler.SiteMediaHandler;
 import co.turismo.api.handler.PaymentHandler;
 import co.turismo.api.handler.ReservationHandler;
 import co.turismo.api.handler.ReservationMessageHandler;
@@ -40,6 +41,7 @@ class RouterRestTest {
                 mock(UserHandler.class),
                 mock(AuthenticateHandler.class),
                 mock(PlacesHandler.class),
+                mock(SiteMediaHandler.class),
                 mock(VisitHandler.class),
                 mock(GeocodeHandler.class),
                 mock(ReviewsHandler.class),

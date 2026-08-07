@@ -463,7 +463,11 @@ public class ReservationRepositoryAdapter implements ReservationGateway {
             )
             UPDATE reservation_details
             SET payment_provider = 'wompi',
-                payment_status = :paymentStatus,
+                payment_status = CASE
+                    WHEN reservation_details.payment_status = 'paid' AND :paymentStatus <> 'paid'
+                        THEN reservation_details.payment_status
+                    ELSE :paymentStatus
+                END,
                 payment_id = COALESCE(:paymentId, payment_id),
                 paid_at = COALESCE(:paidAt, paid_at),
                 confirmed_at = COALESCE(:confirmedAt, confirmed_at),

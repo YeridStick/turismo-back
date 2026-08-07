@@ -166,7 +166,10 @@ public class PaymentTransactionRepositoryAdapter implements PaymentTransactionRe
             UPDATE payment_transactions
             SET provider_transaction_id = COALESCE(:providerTransactionId, provider_transaction_id),
                 provider_status = COALESCE(:providerStatus, provider_status),
-                status = :status,
+                status = CASE
+                    WHEN status = 'paid' AND :status <> 'paid' THEN status
+                    ELSE :status
+                END,
                 response_payload = COALESCE(CAST(:responsePayload AS JSONB), response_payload),
                 paid_at = COALESCE(:paidAt, paid_at),
                 updated_at = NOW()

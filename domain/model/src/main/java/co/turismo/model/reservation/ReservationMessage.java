@@ -18,6 +18,7 @@ public class ReservationMessage {
     private String reservationId;
     private String senderEmail;
     private String senderType;
+    private String systemEventKey;
     private String body;
     private OffsetDateTime createdAt;
 }

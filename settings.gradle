@@ -34,3 +34,5 @@ include ':brevo'
 project(':brevo').projectDir = file('./infrastructure/driven-adapters/brevo')
 include ':wompi'
 project(':wompi').projectDir = file('./infrastructure/driven-adapters/wompi')
+include ':s3'
+project(':s3').projectDir = file('./infrastructure/driven-adapters/s3')

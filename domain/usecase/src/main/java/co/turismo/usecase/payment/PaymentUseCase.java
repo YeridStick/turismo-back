@@ -96,9 +96,10 @@ public class PaymentUseCase {
                             .build();
 
                     return paymentEventRepository.saveIfAbsent(paymentEvent)
-                            .flatMap(saved -> processWompiEvent(saved, event)
-                                    .then(paymentEventRepository.markProcessed(saved.getId()))
-                                    .then())
+                            .flatMap(saved -> paymentEventRepository.claimForProcessing(saved.getId())
+                                    .filter(Boolean.TRUE::equals)
+                                    .flatMap(ignored -> processWompiEvent(saved, event)
+                                            .then(markEventProcessed(saved.getId()))))
                             .switchIfEmpty(Mono.fromRunnable(() -> LOG.info(
                                     "Webhook Wompi duplicado ignorado. reference=" + event.getReference())));
                 });
@@ -182,7 +183,8 @@ public class PaymentUseCase {
 
     private Mono<Void> processWompiEvent(PaymentEvent savedEvent, WompiEventData event) {
         if (event.getReference() == null || event.getReference().isBlank()) {
-            return paymentEventRepository.markFailed(savedEvent.getId(), "Referencia ausente").then();
+            return paymentEventRepository.markFailed(savedEvent.getId(), "Referencia ausente")
+                    .then(Mono.error(new IllegalArgumentException("Referencia Wompi ausente")));
         }
 
         return paymentTransactionRepository.findByReference(event.getReference())
@@ -195,6 +197,12 @@ public class PaymentUseCase {
     }
 
     private Mono<Void> applyProviderStatus(PaymentTransaction transaction, WompiEventData event) {
+        if (event.getAmountInCents() != null && !event.getAmountInCents().equals(transaction.getAmountInCents())) {
+            return Mono.error(new IllegalArgumentException("El monto del webhook Wompi no coincide con la transacción"));
+        }
+        if (event.getCurrency() != null && !CURRENCY_COP.equalsIgnoreCase(event.getCurrency())) {
+            return Mono.error(new IllegalArgumentException("La moneda del webhook Wompi no es COP"));
+        }
         String providerStatus = normalize(event.getProviderStatus());
         String nextStatus = mapWompiStatus(providerStatus);
         OffsetDateTime now = OffsetDateTime.now();
@@ -216,7 +224,7 @@ public class PaymentUseCase {
                                         now,
                                         now,
                                         true)
-                                .flatMap(reservation -> appendSystemMessageOnce(
+                .flatMap(reservation -> appendSystemMessageOnce(
                                         reservation.getId(),
                                         "Pago recibido por Wompi. Tu reserva fue confirmada."));
                     }
@@ -253,8 +261,17 @@ public class PaymentUseCase {
                         .reservationId(reservationId)
                         .senderEmail(SYSTEM_SENDER_EMAIL)
                         .senderType(SENDER_SYSTEM)
+                        .systemEventKey("WOMPI_PAYMENT_SUCCESS")
                         .body(body)
                         .build())
+                .then();
+    }
+
+    private Mono<Void> markEventProcessed(Long eventId) {
+        return Mono.defer(() -> paymentEventRepository.markProcessed(eventId)
+                .flatMap(marked -> marked
+                        ? Mono.empty()
+                        : Mono.error(new IllegalStateException("No se pudo marcar el evento Wompi como procesado"))))
                 .then();
     }
 

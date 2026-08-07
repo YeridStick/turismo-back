@@ -80,6 +80,7 @@ public class RouterRest {
             UserHandler userHandler,
             AuthenticateHandler authenticateHandler,
             PlacesHandler placesHandler,
+            SiteMediaHandler siteMediaHandler,
             VisitHandler visitHandler,
             GeocodeHandler geocodeHandler,
             ReviewsHandler reviewsHandler,
@@ -281,6 +282,24 @@ public class RouterRest {
                                 .response(jsonResponse("201", "Lugar creado", ApiPlaceResponse.class))
                                 .response(apiErrorResponse("400", "Datos inválidos"))
                 )
+
+                .POST(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MEDIA_PATH,
+                        siteMediaHandler::upload,
+                        ops -> ops.operationId("siteMediaUpload")
+                                .summary("Cargar contenido multimedia del sitio")
+                                .tag("Places"))
+
+                .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MEDIA_PATH,
+                        siteMediaHandler::list,
+                        ops -> ops.operationId("siteMediaList")
+                                .summary("Listar contenido multimedia del sitio")
+                                .tag("Places"))
+
+                .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MEDIA_ID_PATH,
+                        siteMediaHandler::delete,
+                        ops -> ops.operationId("siteMediaDelete")
+                                .summary("Eliminar contenido multimedia del sitio")
+                                .tag("Places"))
 
                 .GET(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_SEARCH_FILTER_PATH,
                         placesHandler::searchFilterPlace,

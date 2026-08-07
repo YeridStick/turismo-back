@@ -34,6 +34,8 @@ public class ConstantsEntryPoint {
     public static final String PLACES_MINE_PATH    = "/places/mine";
     public static final String PLACES_ACTIVE_PATH  = "/places/{id}/active";
     public static final String PLACES_ID_PATH = "/places/{id}";
+    public static final String PLACES_MEDIA_PATH = "/places/{siteId}/media";
+    public static final String PLACES_MEDIA_ID_PATH = "/places/{siteId}/media/{mediaId}";
 
     // Tour packages
     public static final String PACKAGES_BASE_PATH = "/packages";

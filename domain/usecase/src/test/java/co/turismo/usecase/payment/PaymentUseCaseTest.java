@@ -30,8 +30,10 @@ import java.time.OffsetDateTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +61,7 @@ class PaymentUseCaseTest {
                 paymentTransactionRepository,
                 paymentEventRepository,
                 wompiGateway);
+        lenient().when(paymentEventRepository.claimForProcessing(any())).thenReturn(Mono.just(true));
     }
 
     @Test
@@ -233,6 +236,56 @@ class PaymentUseCaseTest {
         StepVerifier.create(useCase.handleWompiWebhook("{}", null))
                 .verifyComplete();
 
+        verify(reservationMessageGateway, never()).save(any());
+    }
+
+    @Test
+    void failedWebhookCanBeClaimedAndRetried() {
+        WompiEventData event = event("APPROVED");
+        PaymentEvent savedEvent = PaymentEvent.builder().id(3L).provider(PaymentProvider.WOMPI).build();
+        PaymentTransaction transaction = transaction(PaymentStatus.CHECKOUT_CREATED);
+        PaymentTransaction paid = transaction.toBuilder()
+                .status(PaymentStatus.PAID)
+                .providerTransactionId("wompi-tx-1")
+                .paidAt(OffsetDateTime.now())
+                .build();
+
+        when(wompiGateway.parseAndValidateEvent("{}", null)).thenReturn(Mono.just(event));
+        when(paymentEventRepository.saveIfAbsent(any())).thenReturn(Mono.just(savedEvent));
+        when(paymentEventRepository.claimForProcessing(3L)).thenReturn(Mono.just(true));
+        when(paymentTransactionRepository.findByReference("ref-1")).thenReturn(Mono.just(transaction));
+        when(paymentTransactionRepository.updateProviderResult(any(), any(), any(), any(), any(), any()))
+                .thenReturn(Mono.error(new IllegalStateException("fallo temporal")), Mono.just(paid));
+        when(reservationGateway.applyWompiPaymentResult(eq("reserva-1"), eq(PaymentStatus.PAID), eq("wompi-tx-1"), any(), any(), eq(true)))
+                .thenReturn(Mono.just(awaitingPaymentReservation().toBuilder().status("confirmed").paymentStatus(PaymentStatus.PAID).build()));
+        when(reservationMessageGateway.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        when(paymentEventRepository.markFailed(eq(3L), any())).thenReturn(Mono.just(true));
+        when(paymentEventRepository.markProcessed(3L)).thenReturn(Mono.just(true));
+
+        StepVerifier.create(useCase.handleWompiWebhook("{}", null))
+                .expectError(IllegalStateException.class)
+                .verify();
+
+        StepVerifier.create(useCase.handleWompiWebhook("{}", null))
+                .verifyComplete();
+
+        verify(paymentEventRepository).markFailed(eq(3L), any());
+        verify(paymentEventRepository).markProcessed(3L);
+        verify(reservationMessageGateway).save(any());
+    }
+
+    @Test
+    void concurrentDuplicateClaimDoesNotApplyEffectsTwice() {
+        PaymentEvent savedEvent = PaymentEvent.builder().id(4L).provider(PaymentProvider.WOMPI).build();
+        when(wompiGateway.parseAndValidateEvent("{}", null)).thenReturn(Mono.just(event("APPROVED")));
+        when(paymentEventRepository.saveIfAbsent(any())).thenReturn(Mono.just(savedEvent));
+        when(paymentEventRepository.claimForProcessing(4L)).thenReturn(Mono.just(false));
+
+        StepVerifier.create(useCase.handleWompiWebhook("{}", null))
+                .verifyComplete();
+
+        verify(paymentTransactionRepository, never()).findByReference(any());
+        verify(reservationGateway, never()).applyWompiPaymentResult(any(), any(), any(), any(), any(), anyBoolean());
         verify(reservationMessageGateway, never()).save(any());
     }
 

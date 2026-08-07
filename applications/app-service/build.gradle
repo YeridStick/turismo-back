@@ -5,6 +5,7 @@ dependencies {
 	implementation project(':antispam')
 	implementation project(':brevo')
 	implementation project(':wompi')
+	implementation project(':s3')
 	implementation project(':locationiq')
 	implementation project(':reactive-web')
 	implementation project(':authenticate')
