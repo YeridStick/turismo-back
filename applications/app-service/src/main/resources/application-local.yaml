@@ -1,0 +1,9 @@
+spring:
+  r2dbc:
+    postgresql:
+      host: "${DB_HOST}"
+      port: "${DB_PORT}"
+      database: "${DB_NAME}"
+      schema: "${DB_SCHEMA:public}"
+      username: "${DB_USER}"
+      password: "${DB_PASSWORD}"

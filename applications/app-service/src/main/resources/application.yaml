@@ -1,9 +1,9 @@
 server:
-  port: "${SERVER_PORT:7860}"
+  port: ${SERVER_PORT:7860}
   forward-headers-strategy: framework
   compression:
     enabled: true
-    min-response-size: 1024
+    min-response-size: 1KB
   netty:
     connection-timeout: 5s
 
@@ -18,92 +18,76 @@ management:
       enabled: true
       probes:
         enabled: true
-    prometheus:
-      enabled: ${PROMETHEUS_ENABLED:false}
 
 spring:
+  profiles:
+    default: ${SPRING_PROFILES_DEFAULT:local}
   main:
     banner-mode: off
     log-startup-info: false
     lazy-initialization: true
-
   application:
-    name: "${APP_NAME:turismo}"
+    name: ${APP_NAME:turismo}
   codec:
-    max-in-memory-size: "${MAX-IN-MEMORY-SIZE:256KB}"
-
+    max-in-memory-size: ${MAX_IN_MEMORY_SIZE:256KB}
   jackson:
     default-property-inclusion: non_null
-
   r2dbc:
-    postgresql:
-      host: "${DB_HOST}"
-      port: "${DB_PORT}"
-      database: "${DB_NAME}"
-      schema: "${DB_SCHEMA}"
-      username: "${DB_USER}"
-      password: "${DB_PASSWORD}"
     pool:
-      initial-size: "${CONN_POOL_INITIAL_SIZE:4}"
-      max-size: "${CONN_POOL_MAX_SIZE:48}"
-      max-idle-time: "${CONN_POOL_IDLE_TIME:300m}"
-      max-acquire-time: "${CONN_POOL_MAX_ACQUIRE_TIME:2s}"
-      max-create-connection-time: "${CONN_POOL_MAX_CREATE_TIME:5s}"
-      validation-query: "SELECT 1"
+      initial-size: ${CONN_POOL_INITIAL_SIZE:4}
+      max-size: ${CONN_POOL_MAX_SIZE:48}
+      max-idle-time: ${CONN_POOL_IDLE_TIME:300m}
+      max-acquire-time: ${CONN_POOL_MAX_ACQUIRE_TIME:2s}
+      max-create-connection-time: ${CONN_POOL_MAX_CREATE_TIME:5s}
+      validation-query: SELECT 1
       validation-depth: local
 
-  # compat si algún bean lee estas claves viejas
-  connection-pool:
-    initial-size: "${CONN_POOL_INITIAL_SIZE:5}"
-    max-size: "${CONN_POOL_MAX_SIZE:48}"
-    max-idle-time: "${CONN_POOL_IDLE_TIME:600}"
-
-# OpenAPI / SpringDoc Configuration
 springdoc:
   api-docs:
     path: /v3/api-docs
     enabled: ${SPRINGDOC_ENABLED:true}
   show-actuator: false
 
-# Scalar API Reference Configuration
 scalar:
-  title: "${SCALAR_TITLE:Turismo API Documentation}"
-  theme: "${SCALAR_THEME:purple}"
-  dark-mode: "${SCALAR_DARK_MODE:false}"
-  layout: "${SCALAR_LAYOUT:modern}"
-  show-sidebar: "${SCALAR_SHOW_SIDEBAR:true}"
-  hide-models: "${SCALAR_HIDE_MODELS:false}"
-  hide-download-button: "${SCALAR_HIDE_DOWNLOAD_BUTTON:false}"
-  search-hot-key: "${SCALAR_SEARCH_HOT_KEY:k}"
+  title: ${SCALAR_TITLE:Turismo API Documentation}
+  theme: ${SCALAR_THEME:purple}
+  dark-mode: ${SCALAR_DARK_MODE:false}
+  layout: ${SCALAR_LAYOUT:modern}
+  show-sidebar: ${SCALAR_SHOW_SIDEBAR:true}
+  hide-models: ${SCALAR_HIDE_MODELS:false}
+  hide-download-button: ${SCALAR_HIDE_DOWNLOAD_BUTTON:false}
+  search-hot-key: ${SCALAR_SEARCH_HOT_KEY:k}
 
 cors:
-  allowed-origins: "${CORS_ALLOWED_ORIGINS:https://client.scalar.com,http://localhost:8083,http://localhost:8081,http://localhost:5173,https://lambent-centaur-494d0b.netlify.app,https://5173-firebase-turismo-frontgit-1760412767848.cluster-lr6dwlc2lzbcctqhqorax5zmro.cloudworkstations.dev,http://localhost:8089/,http://192.168.56.1:5173,http://192.168.20.15:5173,https://turismo-eta-swart.vercel.app}"
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8081,http://localhost:5173}
 
 security:
   jwt:
-    secret: "${JWT_SECRET}"
+    secret: ${JWT_SECRET}
   session:
     bind-ip: ${SEC_BIND_IP:false}
     refresh-grace-minutes: ${SEC_REFRESH_GRACE_MINUTES:15}
 
 turismo:
+  database:
+    secret-id: ${TURISMO_DATABASE_SECRET_ID:}
+    region: ${AWS_REGION:us-east-1}
   rate-limiter:
     enabled: ${RATE_LIMIT_ENABLED:false}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
     capacity: ${RATE_LIMIT_CAPACITY:600}
     refill-per-window: ${RATE_LIMIT_REFILL:600}
     per-path:
-      "/api/auth":
+      /api/auth:
         capacity: ${RATE_LIMIT_AUTH_CAPACITY:30}
         window-seconds: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:60}
         refill-per-window: ${RATE_LIMIT_AUTH_REFILL:30}
-      "/api/places":
+      /api/places:
         capacity: ${RATE_LIMIT_PLACES_CAPACITY:1500}
         window-seconds: ${RATE_LIMIT_PLACES_WINDOW_SECONDS:60}
         refill-per-window: ${RATE_LIMIT_PLACES_REFILL:1500}
     skip-paths:
       - /actuator/health
-      - /actuator/prometheus
       - /favicon.ico
       - /
       - /v3/api-docs
@@ -112,42 +96,38 @@ turismo:
       - /docs
 
 locationiq:
-  key: "${LOCATIONIQ_KEY}"
-  base-url: https://us1.locationiq.com/v1
-  timeout-ms: 5000
+  key: ${LOCATIONIQ_KEY}
+  base-url: ${LOCATIONIQ_BASE_URL:https://us1.locationiq.com/v1}
+  timeout-ms: ${LOCATIONIQ_TIMEOUT_MS:5000}
 
 geocode:
-  daily-quota: 100
-  cache-ttl-days: 30
+  daily-quota: ${GEOCODE_DAILY_QUOTA:100}
+  cache-ttl-days: ${GEOCODE_CACHE_TTL_DAYS:30}
 
 app:
-  public-url: "${APP_PUBLIC_URL}"
-  frontend-url: "${APP_FRONTEND_URL}"
+  public-url: ${APP_PUBLIC_URL:http://localhost:7860}
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:8081}
 
 reactor:
   netty:
-    ioWorkerCount: "${REACTOR_NETTY_IO_WORKER_COUNT:2}"
-    ioSelectCount: "${REACTOR_NETTY_IO_SELECT_COUNT:1}"
+    ioWorkerCount: ${REACTOR_NETTY_IO_WORKER_COUNT:2}
+    ioSelectCount: ${REACTOR_NETTY_IO_SELECT_COUNT:1}
 
 logging:
   level:
-    root: INFO
-    co.turismo.brevo: INFO
-    co.turismo.usecase.authenticate.AccountRecoveryUseCase: INFO
-    co.turismo.r2dbc.usersRepository.adapter.UserRepositoryAdapter: INFO
+    root: ${LOG_LEVEL_ROOT:INFO}
 
 brevo:
-  base-url: "${BREVO_BASE_URL:https://api.brevo.com/v3}"
-  api-key: "${BREVO_API_KEY}"
-  mcp-api-key: "${BREVO_MCP_API_KEY}"
+  base-url: ${BREVO_BASE_URL:https://api.brevo.com/v3}
+  api-key: ${BREVO_API_KEY}
   sender:
-    email: "${BREVO_SENDER_EMAIL}"
-    name: "${BREVO_SENDER_NAME}"
+    email: ${BREVO_SENDER_EMAIL}
+    name: ${BREVO_SENDER_NAME:Turismo App Huila}
 
 wompi:
   enabled: ${WOMPI_ENABLED:true}
-  environment: ${WOMPI_ENVIRONMENT}
-  base-url: ${WOMPI_BASE_URL}
+  environment: ${WOMPI_ENVIRONMENT:sandbox}
+  base-url: ${WOMPI_BASE_URL:https://sandbox.wompi.co/v1}
   public-key: ${WOMPI_PUBLIC_KEY}
   private-key: ${WOMPI_PRIVATE_KEY}
   integrity-secret: ${WOMPI_INTEGRITY_SECRET}
@@ -155,3 +135,9 @@ wompi:
   webhook-url: ${WOMPI_WEBHOOK_URL:${app.public-url}/api/payments/wompi/webhook}
   redirect-url: ${WOMPI_REDIRECT_URL:${app.frontend-url}/payment-result}
   checkout-expiration-minutes: ${WOMPI_CHECKOUT_EXPIRATION_MINUTES:30}
+
+site:
+  media:
+    s3:
+      bucket: ${SITE_MEDIA_S3_BUCKET:}
+      region: ${AWS_REGION:us-east-1}

@@ -332,15 +332,38 @@ jobs:
           ssh \
             -i "$HOME/.ssh/turismo" \
             "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
-            "bash -s -- '$IMAGE_URI_B64'" <<'REMOTE'
+            "bash -s -- '$IMAGE_URI_B64' '$AWS_REGION'" <<'REMOTE'
           set -Eeuo pipefail
 
           IMAGE_URI=$(printf '%s' "$1" | base64 -d)
+          AWS_REGION="$2"
           APP_NAME="turismo-back"
           PREVIOUS_NAME="${APP_NAME}-previous"
 
+          diagnostics() {
+            echo "--- Failed container state ---"
+            sudo docker inspect "$APP_NAME" \
+              --format 'status={{.State.Status}} exit={{.State.ExitCode}} started={{.State.StartedAt}} finished={{.State.FinishedAt}}' \
+              2>&1 || true
+
+            echo "--- Health response ---"
+            curl \
+              --silent \
+              --show-error \
+              --max-time 10 \
+              --include \
+              http://127.0.0.1/actuator/health \
+              2>&1 || true
+
+            echo "--- Failed container logs ---"
+            sudo docker logs "$APP_NAME" --tail=250 2>&1 \
+              | sed -E 's/(password|secret|token|api-key|private-key)([=: ]+)[^ ]+/\1\2[REDACTED]/Ig' \
+              || true
+          }
+
           rollback() {
             echo "Deployment failed. Restoring previous container."
+            diagnostics
 
             sudo docker rm -f "$APP_NAME" >/dev/null 2>&1 || true
 

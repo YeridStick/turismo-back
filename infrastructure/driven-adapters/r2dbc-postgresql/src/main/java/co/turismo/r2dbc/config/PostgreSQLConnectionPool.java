@@ -14,23 +14,7 @@ import java.time.Duration;
 @Configuration
 public class PostgreSQLConnectionPool {
 
-    @Value("${spring.r2dbc.postgresql.host}")
-    private String host;
-
-    @Value("${spring.r2dbc.postgresql.port}")
-    private int port;
-
-    @Value("${spring.r2dbc.postgresql.database}")
-    private String database;
-
-    @Value("${spring.r2dbc.postgresql.username}")
-    private String username;
-
-    @Value("${spring.r2dbc.postgresql.password}")
-    private String password;
-
-    @Value("${spring.r2dbc.postgresql.schema}")
-    private String schema;
+    private final PostgresqlConnectionProperties databaseProperties;
 
     @Value("${spring.connection-pool.initial-size}")
     private int initialSize;
@@ -41,14 +25,18 @@ public class PostgreSQLConnectionPool {
     @Value("${spring.connection-pool.max-idle-time}")
     private int maxIdleTime;
 
+    public PostgreSQLConnectionPool(PostgresqlConnectionProperties databaseProperties) {
+        this.databaseProperties = databaseProperties;
+    }
+
     @Bean
     public ConnectionPool connectionPool() {
         PostgresqlConnectionConfiguration dbConfiguration = PostgresqlConnectionConfiguration.builder()
-                .host(host)
-                .port(port)
-                .database(database)
-                .username(username)
-                .password(password)
+                .host(databaseProperties.host())
+                .port(databaseProperties.port())
+                .database(databaseProperties.database())
+                .username(databaseProperties.username())
+                .password(databaseProperties.password())
                 .sslMode(SSLMode.REQUIRE)
                 .build();
 

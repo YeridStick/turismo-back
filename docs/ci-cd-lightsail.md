@@ -26,13 +26,33 @@ Secrets:
   instancia. No se desactiva la comprobación de identidad SSH.
 - `TURISMO_ENV_FILE`: archivo dotenv completo usado al iniciar Spring Boot.
 
+La aplicación usa `local` como perfil predeterminado. El perfil puede cambiarse
+desde `TURISMO_ENV_FILE` usando `SPRING_PROFILES_ACTIVE` o
+`SPRING_PROFILES_DEFAULT`. Para usar Secrets Manager debe seleccionarse un
+perfil distinto de `local`; la conexión PostgreSQL se obtiene usando el secreto
+`turismo-test-backend-db`. El JSON del secreto debe contener `host`, `port`,
+`database`, `username` y `password`; `schema` es opcional y por defecto es
+`public`.
+
+El nombre del secreto se configura con `TURISMO_DATABASE_SECRET_ID` y la
+región con `TURISMO_DATABASE_SECRET_REGION`. Para S3 se usan
+`SITE_MEDIA_S3_BUCKET` y `SITE_MEDIA_S3_REGION`.
+
+El proceso que ejecuta el contenedor en Lightsail debe tener credenciales IAM
+con permiso `secretsmanager:GetSecretValue` sobre ese secreto. Las credenciales
+OIDC temporales del job de GitHub solo existen en el runner y no están
+disponibles dentro del contenedor.
+
 No configurar `AWS_ACCESS_KEY_ID` ni `AWS_SECRET_ACCESS_KEY`. GitHub obtiene
 credenciales temporales mediante OIDC.
 
 ## Variables mínimas de la aplicación
 
-`TURISMO_ENV_FILE` debe incluir, como mínimo, las variables obligatorias que
-consume `application.yaml`:
+Para el perfil `local`, `TURISMO_ENV_FILE` debe incluir las variables directas
+de PostgreSQL. En `test` y otros perfiles no locales no se requieren
+`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` ni `DB_PASSWORD`, porque el adaptador
+las carga desde Secrets Manager. El resto de integraciones continúa usando sus
+variables habituales:
 
 ```dotenv
 DB_HOST=endpoint-privado-rds
