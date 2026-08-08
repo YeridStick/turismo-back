@@ -145,8 +145,10 @@ dimensiones diferentes a las del archivo original.
 
 ```http
 GET /api/places/{siteId}/media
-Authorization: Bearer <access-token>
 ```
+
+La consulta es pública para que los sitios puedan mostrar sus imágenes. La
+carga (`POST`) y eliminación (`DELETE`) continúan requiriendo JWT.
 
 HTTP `200 OK`:
 

@@ -301,6 +301,7 @@ public class RouterRest {
                         siteMediaHandler::list,
                         ops -> ops.operationId("siteMediaList")
                                 .summary("Listar contenido multimedia del sitio")
+                                .description("Endpoint público de lectura. Devuelve URLs prefirmadas temporales; la carga y eliminación permanecen protegidas.")
                                 .tag("Places"))
 
                 .DELETE(ConstantsEntryPoint.API_BASE_PATH + ConstantsEntryPoint.PLACES_MEDIA_ID_PATH,

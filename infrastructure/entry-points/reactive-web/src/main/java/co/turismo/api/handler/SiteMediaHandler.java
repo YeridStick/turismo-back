@@ -62,9 +62,8 @@ public class SiteMediaHandler {
     }
 
     public Mono<ServerResponse> list(ServerRequest request) {
-        return auth(request)
-                .zipWith(siteId(request))
-                .flatMapMany(tuple -> useCase.findBySite(tuple.getT1().getName(), roles(tuple.getT1()), tuple.getT2())
+        return siteId(request)
+                .flatMapMany(siteId -> useCase.findBySite(siteId)
                         .flatMap(media -> useCase.presignedUrl(media)
                                 .map(access -> SiteMediaResponse.from(media, access))))
                 .collectList()

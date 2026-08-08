@@ -211,6 +211,7 @@ public class SecurityConfig {
 
                         // ---- Protegido: Places / Admin ----
                         .pathMatchers(HttpMethod.POST,  "/api/places").hasAnyRole("OWNER", "ADMIN")
+                        .pathMatchers(HttpMethod.GET,   "/api/places/*/media").permitAll()
                         .pathMatchers(HttpMethod.GET,   "/api/places/mine").authenticated()
                         .pathMatchers(HttpMethod.PATCH, "/api/places/*/active").hasAnyRole("OWNER", "ADMIN")
                         .pathMatchers(HttpMethod.POST,  "/api/places/*/owners").hasAnyRole("OWNER", "ADMIN")
