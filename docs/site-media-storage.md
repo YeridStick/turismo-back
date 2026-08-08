@@ -203,10 +203,35 @@ El bucket S3 es privado. `objectKey` **no es una URL HTTP** y no debe asignarse
 directamente a `<img src>`, `<video src>` o un visor GLB. El backend genera una
 URL prefirmada temporal y la devuelve como `url` junto con `urlExpiresAt`.
 
-La URL tiene una vigencia de 30 minutos. Cuando expire, el frontend debe volver
-a consultar `GET /api/places/{siteId}/media` para recibir URLs nuevas. La vista
+La URL tiene una vigencia de 24 horas. Cuando expire, el frontend debe volver a
+consultar `GET /api/places/{siteId}/media` para recibir URLs nuevas. La vista
 previa local (`URL.createObjectURL`) sigue siendo válida para mostrar el archivo
 antes de terminar la carga, pero no debe persistirse.
+
+Los objetos se almacenan con `Cache-Control: public, max-age=31536000, immutable`.
+Como las claves incluyen un UUID y nunca se reutilizan, el cliente móvil puede
+mantener la imagen en caché sin riesgo de recibir una versión vieja para una
+nueva carga.
+
+### Recomendación para la aplicación móvil
+
+- Consultar `GET /api/places/{siteId}/media` una vez al cargar el detalle del
+  sitio, no cada vez que cambia la diapositiva del carrusel.
+- Guardar la respuesta por `siteId` en el estado/cache de la aplicación y usar
+  `media.id` u `objectKey` como identidad del elemento.
+- Usar una librería de imágenes con caché de memoria y disco (por ejemplo,
+  `expo-image` con `cachePolicy="memory-disk"` o el equivalente de la
+  tecnología móvil utilizada).
+- En el carrusel, reutilizar `media.url`; no solicitar una URL nueva por cada
+  render, swipe o re-render.
+- Renovar la lista solamente al expirar `urlExpiresAt`, al hacer pull-to-refresh
+  o después de cargar/eliminar multimedia.
+- Para la vista previa antes de subir, usar la URI local; después de una carga
+  exitosa reemplazarla por `data.url`.
+
+La firma de la URL se realiza localmente en el backend y no hace una llamada a
+S3. S3 recibe una solicitud únicamente cuando el dispositivo realmente necesita
+descargar un objeto que no tiene en caché.
 
 ## Errores que debe manejar la interfaz
 

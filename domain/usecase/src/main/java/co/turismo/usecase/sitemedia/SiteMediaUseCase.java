@@ -36,7 +36,9 @@ import java.util.logging.Logger;
 
 @RequiredArgsConstructor
 public class SiteMediaUseCase {
-    private static final Duration PRESIGNED_URL_DURATION = Duration.ofMinutes(30);
+    // Las claves incluyen UUID y no se reutilizan; una URL de 24 h reduce
+    // renovaciones innecesarias mientras el cliente móvil mantiene su caché.
+    private static final Duration PRESIGNED_URL_DURATION = Duration.ofHours(24);
     private static final Logger LOG = Logger.getLogger(SiteMediaUseCase.class.getName());
     private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png");
     private static final Set<String> VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");

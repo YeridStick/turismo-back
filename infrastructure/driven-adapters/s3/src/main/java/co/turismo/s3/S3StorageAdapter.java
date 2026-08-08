@@ -22,6 +22,7 @@ import java.time.ZoneOffset;
 @Component
 @RequiredArgsConstructor
 public class S3StorageAdapter implements SiteMediaStorageGateway {
+    private static final String IMMUTABLE_MEDIA_CACHE = "public, max-age=31536000, immutable";
     private final S3AsyncClient client;
     private final S3Presigner presigner;
     private final S3Properties properties;
@@ -35,6 +36,7 @@ public class S3StorageAdapter implements SiteMediaStorageGateway {
                 .bucket(properties.bucket())
                 .key(objectKey)
                 .contentType(contentType)
+                .cacheControl(IMMUTABLE_MEDIA_CACHE)
                 .contentLength(contentLength)
                 .build();
         return Mono.fromFuture(() -> client.putObject(request, AsyncRequestBody.fromPublisher(content)))
