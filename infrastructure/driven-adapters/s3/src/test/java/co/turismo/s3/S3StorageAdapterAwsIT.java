@@ -10,6 +10,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @EnabledIfEnvironmentVariable(named = "RUN_AWS_S3_INTEGRATION", matches = "true")
 class S3StorageAdapterAwsIT {
     private static S3AsyncClient client;
+    private static S3Presigner presigner;
     private static S3StorageAdapter adapter;
     private static String bucket;
     private static String key;
@@ -32,7 +34,8 @@ class S3StorageAdapterAwsIT {
         bucket = required("SITE_MEDIA_S3_BUCKET");
         String region = required("SITE_MEDIA_S3_REGION");
         client = S3AsyncClient.builder().region(Region.of(region)).build();
-        adapter = new S3StorageAdapter(client, new S3Properties(bucket, region));
+        presigner = S3Presigner.builder().region(Region.of(region)).build();
+        adapter = new S3StorageAdapter(client, presigner, new S3Properties(bucket, region));
         key = "sites/integration-tests/" + UUID.randomUUID() + "/s3-adapter-connectivity.txt";
     }
 
@@ -40,6 +43,9 @@ class S3StorageAdapterAwsIT {
     static void tearDown() {
         if (client != null) {
             client.close();
+        }
+        if (presigner != null) {
+            presigner.close();
         }
     }
 

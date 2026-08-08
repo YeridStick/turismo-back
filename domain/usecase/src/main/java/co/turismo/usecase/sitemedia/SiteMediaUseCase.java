@@ -6,6 +6,7 @@ import co.turismo.model.place.gateways.PlaceRepository;
 import co.turismo.model.sitemedia.SiteMedia;
 import co.turismo.model.sitemedia.SiteMediaSettings;
 import co.turismo.model.sitemedia.SiteMediaUpload;
+import co.turismo.model.sitemedia.SiteMediaAccess;
 import co.turismo.model.sitemedia.gateways.SiteMediaRepository;
 import co.turismo.model.sitemedia.gateways.SiteMediaStorageGateway;
 import co.turismo.model.userIdentityPort.UserIdentityPort;
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.security.MessageDigest;
 import java.time.OffsetDateTime;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -34,6 +36,7 @@ import java.util.logging.Logger;
 
 @RequiredArgsConstructor
 public class SiteMediaUseCase {
+    private static final Duration PRESIGNED_URL_DURATION = Duration.ofMinutes(30);
     private static final Logger LOG = Logger.getLogger(SiteMediaUseCase.class.getName());
     private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png");
     private static final Set<String> VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
@@ -74,6 +77,10 @@ public class SiteMediaUseCase {
                         .switchIfEmpty(Mono.error(new NotFoundException("Contenido no encontrado"))))
                 .flatMap(media -> storageGateway.delete(media.getObjectKey())
                         .then(mediaRepository.deleteByIdForSite(mediaId, siteId)));
+    }
+
+    public Mono<SiteMediaAccess> presignedUrl(SiteMedia media) {
+        return storageGateway.presignedGet(media.getObjectKey(), PRESIGNED_URL_DURATION);
     }
 
     private Mono<Void> authorize(String email, Set<String> roles, Long siteId) {

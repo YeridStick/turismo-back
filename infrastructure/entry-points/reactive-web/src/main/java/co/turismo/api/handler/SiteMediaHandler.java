@@ -52,9 +52,10 @@ public class SiteMediaHandler {
                                             .filename(file.filename())
                                             .contentType(file.headers().getContentType() == null ? null : file.headers().getContentType().toString())
                                             .declaredSize(file.headers().getContentLength() < 0 ? null : file.headers().getContentLength())
-                                            .content(content)
+                            .content(content)
                                             .build())
-                            .map(SiteMediaResponse::from);
+                            .flatMap(media -> useCase.presignedUrl(media)
+                                    .map(access -> SiteMediaResponse.from(media, access)));
                 })
                 .flatMap(body -> ServerResponse.status(HttpStatus.CREATED)
                         .bodyValue(ApiResponse.created(body)));
@@ -63,8 +64,9 @@ public class SiteMediaHandler {
     public Mono<ServerResponse> list(ServerRequest request) {
         return auth(request)
                 .zipWith(siteId(request))
-                .flatMapMany(tuple -> useCase.findBySite(tuple.getT1().getName(), roles(tuple.getT1()), tuple.getT2()))
-                .map(SiteMediaResponse::from)
+                .flatMapMany(tuple -> useCase.findBySite(tuple.getT1().getName(), roles(tuple.getT1()), tuple.getT2())
+                        .flatMap(media -> useCase.presignedUrl(media)
+                                .map(access -> SiteMediaResponse.from(media, access))))
                 .collectList()
                 .flatMap(body -> ServerResponse.ok().bodyValue(ApiResponse.ok(body)));
     }

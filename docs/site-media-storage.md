@@ -114,7 +114,9 @@ HTTP `201 Created`:
     "sizeBytes": 184320,
     "width": 1200,
     "height": 800,
-    "checksum": "<sha256>"
+    "checksum": "<sha256>",
+    "url": "https://s3-presigned-url...",
+    "urlExpiresAt": "2026-08-07T23:00:00Z"
   }
 }
 ```
@@ -132,6 +134,8 @@ El objeto `data` tiene estos campos:
 | `sizeBytes` | Tamaño final almacenado |
 | `width`, `height` | Dimensiones; aplican principalmente a imágenes |
 | `checksum` | Huella SHA-256; no es necesario mostrarla |
+| `url` | URL prefirmada temporal para mostrar/descargar el archivo |
+| `urlExpiresAt` | Fecha de expiración de `url` |
 
 Las imágenes se validan, normalizan y almacenan como JPEG. Por eso una imagen
 PNG aceptada puede responder con `contentType: "image/jpeg"` y un tamaño o
@@ -193,24 +197,16 @@ del backend, no duplicar valores como reglas de seguridad.
 El backend también valida contenido real: cambiar solamente la extensión o el
 MIME declarado no hace válido un archivo corrupto o de otro tipo.
 
-## URLs y visualización: ajuste pendiente
+## URLs y visualización
 
 El bucket S3 es privado. `objectKey` **no es una URL HTTP** y no debe asignarse
-directamente a `<img src>`, `<video src>` o un visor GLB. Actualmente el
-contrato persiste y devuelve únicamente esa clave interna.
+directamente a `<img src>`, `<video src>` o un visor GLB. El backend genera una
+URL prefirmada temporal y la devuelve como `url` junto con `urlExpiresAt`.
 
-Para que el frontend pueda mostrar los archivos ya cargados, hay que acordar e
-implementar una de estas opciones en el backend:
-
-- devolver una URL pública/CloudFront, si la política de seguridad lo permite;
-- crear un endpoint autenticado de descarga/visualización; o
-- devolver una URL prefirmada con expiración.
-
-Hasta que exista una de esas opciones, el frontend puede mostrar la vista
-previa local inmediatamente después de seleccionar el archivo usando una URL
-temporal (`URL.createObjectURL`), pero debe revocarla al desmontar o reemplazar
-la selección y no persistirla. Tras recargar la pantalla, no hay una URL
-reproducible disponible en la respuesta actual.
+La URL tiene una vigencia de 30 minutos. Cuando expire, el frontend debe volver
+a consultar `GET /api/places/{siteId}/media` para recibir URLs nuevas. La vista
+previa local (`URL.createObjectURL`) sigue siendo válida para mostrar el archivo
+antes de terminar la carga, pero no debe persistirse.
 
 ## Errores que debe manejar la interfaz
 
